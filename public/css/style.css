@@ -485,3 +485,7 @@ input[type="range"].invest-slider::-webkit-slider-thumb {
 .card-review-gradient {
     background: linear-gradient(135deg, #92400e 0%, #78350f 50%, #451a03 100%);
 }
+
+.card-modifier-gradient {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #022c22 100%);
+}

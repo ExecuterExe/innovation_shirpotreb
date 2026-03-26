@@ -314,6 +314,17 @@ function buildRulesContent() {
     html += '</div>';
     html += '</div>';
 
+    // Pseudo mode
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎯 Псевдоинновации</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Лайт-режим для новичков! Вместо трёх карт (прилагательное + предмет + особенность) ';
+    html += 'игроки получают только <span class="text-accent-blue font-bold">две карты</span>: ';
+    html += 'прилагательное и предмет. Например: «Жидкий утюг» — и всё! ';
+    html += 'Проще придумать питч, но сложнее выделиться среди конкурентов.';
+    html += '</p>';
+    html += '</div>';
+
     // Custom cards
     html += '<div>';
     html += '<h3 class="text-lg font-black text-accent-blue mb-3">🧟 Генератор абсурда</h3>';
@@ -326,6 +337,49 @@ function buildRulesContent() {
     html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-gold/40">';
     html += '<span class="text-sm">⚠️</span>';
     html += '<span class="text-xs text-corp-dim">В этом режиме автоматические склонения не работают</span>';
+    html += '</div>';
+    html += '</div>';
+
+    // Reviews
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">💬 Карточка отзыва</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Опциональная механика! Каждый игрок получает дополнительную карточку — ';
+    html += '<span class="text-accent-gold font-bold">первый отзыв клиента</span> о продукте. ';
+    html += 'Это может быть что-то вроде «После использования от меня ушла жена. Спасибо!» ';
+    html += 'Используйте отзыв в своей презентации — объясните, почему это на самом деле хорошо!';
+    html += '</p>';
+    html += '</div>';
+
+    // Modifiers
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">📜 Модификаторы предмета</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Добавьте эпичности! Модификатор — это дополнительные слова после предмета. ';
+    html += 'Можно выбрать один из двух вариантов:';
+    html += '</p>';
+    html += '<div class="mt-3 space-y-2">';
+
+    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
+    html += '<span class="text-lg flex-shrink-0">📜</span>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">Дополнение</div>';
+    html += '<div class="text-xs text-corp-dim">+1 слово: «Утюг <span class="text-accent-green font-bold">СПРАВЕДЛИВОСТИ</span>»</div>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
+    html += '<span class="text-lg flex-shrink-0">🌀</span>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">Метафора</div>';
+    html += '<div class="text-xs text-corp-dim">+2 слова: «Утюг <span class="text-accent-green font-bold">ТОКСИЧНОЙ ЭНЕРГЕТИКИ</span>»</div>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '</div>';
+    html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-gold/40">';
+    html += '<span class="text-sm">⚠️</span>';
+    html += '<span class="text-xs text-corp-dim">Не совместим с «Генератором абсурда». Можно выбрать только одну колоду модификаторов</span>';
     html += '</div>';
     html += '</div>';
 

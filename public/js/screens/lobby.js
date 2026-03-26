@@ -86,8 +86,57 @@ export function updateSettingsPanel(container) {
     html += buildSetting('Инвестирование (сек)', 'invest', 'set-invest', 30, 120, s.investTime || 60, 10);
 
     html += '<div class="h-px bg-corp-border my-4"></div>';
+    html += buildToggle('Псевдоинновации', 'Лайт-режим: только прилагательное + предмет (без особенности)', 'set-pseudo', s.pseudoMode, false);
+
+    html += '<div class="h-px bg-corp-border my-4"></div>';
     html += buildToggle('Карточка отзыва', 'Добавляет первый отзыв клиента к продукту', 'set-reviews', s.useReviews, false);
     html += buildToggle('Чёрный лебедь', '20% шанс замены карты при выступлении', 'set-blackswan', s.blackSwan, false);
+    html += '<div class="h-px bg-corp-border my-4"></div>';
+    html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Модификатор предмета</div>';
+
+    var modNone = !s.modifier || s.modifier === 'none';
+    var modAdd = s.modifier === 'addition';
+    var modMeta = s.modifier === 'metaphor';
+
+    html += '<div class="space-y-2">';
+
+    html += '<label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ';
+    html += modNone ? 'bg-corp-black/30 border border-accent-blue/20' : 'bg-corp-black/30 border border-corp-border hover:border-corp-border';
+    html += '">';
+    html += '<input type="radio" name="modifier" value="none" class="modifier-radio"';
+    if (modNone) html += ' checked';
+    html += '>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">🚫 Без модификатора</div>';
+    html += '<div class="text-[0.6rem] text-corp-dim">Классическая игра</div>';
+    html += '</div>';
+    html += '</label>';
+
+    html += '<label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ';
+    html += modAdd ? 'bg-accent-green-dim border border-accent-green/20' : 'bg-corp-black/30 border border-corp-border hover:border-corp-border';
+    html += '">';
+    html += '<input type="radio" name="modifier" value="addition" class="modifier-radio"';
+    if (modAdd) html += ' checked';
+    html += '>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">📜 Дополнение</div>';
+    html += '<div class="text-[0.6rem] text-corp-dim">+1 слово после предмета (напр. «Утюг СПРАВЕДЛИВОСТИ»)</div>';
+    html += '</div>';
+    html += '</label>';
+
+    html += '<label class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ';
+    html += modMeta ? 'bg-accent-green-dim border border-accent-green/20' : 'bg-corp-black/30 border border-corp-border hover:border-corp-border';
+    html += '">';
+    html += '<input type="radio" name="modifier" value="metaphor" class="modifier-radio"';
+    if (modMeta) html += ' checked';
+    html += '>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">🌀 Метафора</div>';
+    html += '<div class="text-[0.6rem] text-corp-dim">+2 слова после предмета (напр. «Утюг ТОКСИЧНОЙ ЭНЕРГЕТИКИ»)</div>';
+    html += '</div>';
+    html += '</label>';
+
+    html += '</div>';
     html += buildToggle('Колода событий', 'Случайные ограничения', 'set-events', s.useEvents, false);
     html += buildToggle('Текстовые питчи', 'Для стримера / без микрофона', 'set-streamer', s.streamerMode, false);
 
@@ -317,13 +366,31 @@ function attachSettingsListeners(container) {
         (function (radio) {
             radio.addEventListener('change', function () {
                 if (radio.value === 'players' && radio.checked) {
-                    // Выключаем "Чёрный лебедь"
+                    // Выключаем Чёрный лебедь
                     var bsToggle = container.querySelector('#set-blackswan');
                     if (bsToggle) bsToggle.checked = false;
+                    // Выключаем модификатор
+                    var noneRadio = container.querySelector('input[name="modifier"][value="none"]');
+                    if (noneRadio) noneRadio.checked = true;
                 }
                 pushSettings(container);
             });
         })(sourceRadios[r]);
+    }
+
+    // Modifier radios
+    var modRadios = container.querySelectorAll('.modifier-radio');
+    for (var m = 0; m < modRadios.length; m++) {
+        (function (radio) {
+            radio.addEventListener('change', function () {
+                if (radio.value !== 'none' && radio.checked) {
+                    // Модификаторы несовместимы с генератором абсурда
+                    var dbRadio = container.querySelector('input[name="cardSource"][value="database"]');
+                    if (dbRadio) dbRadio.checked = true;
+                }
+                pushSettings(container);
+            });
+        })(modRadios[m]);
     }
 }
 
@@ -341,6 +408,8 @@ function handleStep(field, dir, container) {
 
 function pushSettings(container) {
     var cardSourceEl = container.querySelector('input[name="cardSource"]:checked');
+    var modifierEl = container.querySelector('input[name="modifier"]:checked');
+
     var settings = {
         rounds: parseInt(container.querySelector('#set-rounds')?.value) || 3,
         startCapital: parseInt(container.querySelector('#set-capital')?.value) || 10,
@@ -352,6 +421,8 @@ function pushSettings(container) {
         investTime: parseInt(container.querySelector('#set-invest')?.value) || 60,
         cardSource: cardSourceEl ? cardSourceEl.value : 'database',
         blackSwan: container.querySelector('#set-blackswan')?.checked || false,
+        modifier: modifierEl ? modifierEl.value : 'none',
+        pseudoMode: container.querySelector('#set-pseudo')?.checked || false,
     };
     console.log('[lobby] Pushing settings:', settings);
     sendMsg({ type: 'updateSettings', settings: settings });

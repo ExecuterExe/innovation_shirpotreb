@@ -8,6 +8,7 @@ import { sendMsg } from '../socket.js';
 var CARD_TYPES = [
     { key: 'adjective', label: 'Прилагательное', gradient: 'card-adjective-gradient', shadow: 'shadow-red-950/40' },
     { key: 'item', label: 'Предмет', gradient: 'card-item-gradient', shadow: 'shadow-cyan-950/40' },
+    { key: 'modifier', label: 'Модификатор', gradient: 'card-modifier-gradient', shadow: 'shadow-emerald-950/40' },
     { key: 'feature', label: 'Особенность', gradient: 'card-feature-gradient', shadow: 'shadow-purple-950/40' },
     // Будущие карты:
     // { key: 'modifier',  label: 'Модификатор',    gradient: 'card-modifier-gradient',  shadow: 'shadow-amber-950/40' },
