@@ -11,6 +11,7 @@ import { renderResults } from './screens/results.js';
 import { renderGameOver } from './screens/gameover.js';
 import { renderCardInput } from './screens/card-input.js';
 import { renderTied, renderTiebreaker, renderTiebreakerVoting } from './screens/tiebreaker.js';
+import { initSpeech } from './components/speech.js';
 
 // ==================== GLOBAL STATE ====================
 
@@ -171,6 +172,7 @@ export function escapeHtml(str) {
 
 function init() {
     initParticles();
+    initSpeech();
     connectWS();
     navigate('welcome');
 
@@ -186,6 +188,17 @@ function init() {
     });
 
     console.log('🚀 Инновационный Ширпотреб v3.0');
+    // Клиентский AFK — пинг при активности
+    var activityEvents = ['click', 'keydown', 'touchstart', 'mousemove'];
+    var lastActivity = Date.now();
+
+    function onActivity() {
+        lastActivity = Date.now();
+    }
+
+    for (var i = 0; i < activityEvents.length; i++) {
+        document.addEventListener(activityEvents[i], onActivity, { passive: true });
+    }
 }
 
 init();

@@ -25,11 +25,14 @@ export function renderWelcome(container) {
     html += '</div>';
 
     // ═══════ RULES BUTTON ═══════
-    html += '<button id="btn-rules" class="flex items-center gap-2 mb-6 px-5 py-2.5 rounded-xl text-sm font-bold text-corp-muted hover:text-accent-blue transition-colors cursor-pointer group">';
-    html += '  <span class="text-lg">📖</span>';
-    html += '  <span>Как играть?</span>';
-    html += '  <span id="rules-arrow" class="text-xs transition-transform group-hover:text-accent-blue">▼</span>';
+    html += '<div class="w-full max-w-md mb-6">';
+    html += '<button id="btn-rules" class="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer group ';
+    html += 'bg-accent-gold-dim border-2 border-accent-gold/30 text-accent-gold hover:bg-accent-gold/20 hover:border-accent-gold/50 transition-all">';
+    html += '  <span class="text-xl">📖</span>';
+    html += '  <span>ОБЯЗАТЕЛЬНО ПРОЧИТАЙТЕ ПРАВИЛА!</span>';
+    html += '  <span id="rules-arrow" class="text-sm transition-transform">▼</span>';
     html += '</button>';
+    html += '</div>';
 
     // ═══════ RULES PANEL ═══════
     html += '<div id="rules-panel" class="hidden w-full max-w-2xl mb-8">';
@@ -406,6 +409,16 @@ function buildRulesContent() {
     html += 'Для тех, кто играет через чат стрима или без микрофона. ';
     html += 'В этом режиме игроки пишут текст питча, который показывается всем на экране. ';
     html += 'Фаза подготовки завершается когда все нажмут «Готов» или по таймеру.';
+    html += '</p>';
+    html += '</div>';
+
+    // Speech
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🔊 Озвучка текста</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Голосовое сопровождение презентаций! Хост нажимает кнопку — и все игроки слышат ';
+    html += 'озвучку названия продукта, карточек и даже текста питча в стримерском режиме. ';
+    html += 'Использует встроенный синтезатор речи браузера — работает без интернета!';
     html += '</p>';
     html += '</div>';
 

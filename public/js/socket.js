@@ -2,6 +2,7 @@ import { state, setState, navigate, startTimer } from './app.js';
 import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
 import { updatePlayersList, updateStartButton, updateSettingsPanel } from './screens/lobby.js';
+import { speakSequence, stopSpeaking } from './components/speech.js';
 
 var ws = null;
 var reconnectAttempts = 0;
@@ -97,6 +98,14 @@ function handleMessage(msg) {
             playSound('success');
             break;
 
+        case 'afkKick':
+            showNotification(msg.message || 'Отключено из-за неактивности', 'error');
+            playSound('warning');
+            setTimeout(function () {
+                window.location.reload();
+            }, 3000);
+            break;
+
         case 'roomJoined':
             setState({ playerId: msg.playerId, roomCode: msg.roomCode });
             navigate('lobby');
@@ -111,6 +120,13 @@ function handleMessage(msg) {
         case 'gameStarted':
             showNotification('Игра начинается!', 'success');
             playSound('start');
+            break;
+
+        case 'playSpeech':
+            stopSpeaking();
+            if (msg.texts && msg.texts.length > 0) {
+                speakSequence(msg.texts);
+            }
             break;
 
         case 'roundStart':

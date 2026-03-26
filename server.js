@@ -1209,6 +1209,8 @@ function createRoom(hostId, settings) {
             blackSwan: !!settings.blackSwan,
             modifier: settings.modifier || 'none', // 'none' | 'addition' | 'metaphor'
             pseudoMode: !!settings.pseudoMode,
+            useSpeech: !!settings.useSpeech,
+            maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
         },
         players: new Map(),
         state: 'lobby',
@@ -1995,9 +1997,36 @@ wss.on('connection', (ws) => {
 
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
+    // AFK таймер — 10 минут без активности
+    var AFK_TIMEOUT = 10 * 60 * 1000; // 10 минут
+    var afkTimer = null;
 
+    function resetAfkTimer() {
+        if (afkTimer) clearTimeout(afkTimer);
+        afkTimer = setTimeout(function () {
+            var info = playerRooms.get(ws);
+            if (info) {
+                var room = rooms.get(info.roomCode);
+                if (room && (room.state === 'lobby')) {
+                    // В лобби — кикаем
+                    console.log(`[AFK] Kicking idle player from lobby in ${info.roomCode}`);
+                    ws.close();
+                    return;
+                }
+            }
+            // Если не в комнате (welcome) — просто закрываем
+            if (!info) {
+                console.log('[AFK] Closing idle connection');
+                ws.send(JSON.stringify({ type: 'afkKick', message: 'Вы были отключены из-за неактивности (10 минут)' }));
+                setTimeout(function () { ws.close(); }, 1000);
+            }
+        }, AFK_TIMEOUT);
+    }
+
+    resetAfkTimer();
     ws.on('message', (data) => {
         let msg;
+        resetAfkTimer(); // Сбрасываем AFK при любой активности
         try { msg = JSON.parse(data.toString()); } catch (e) { return; }
 
         switch (msg.type) {
@@ -2035,8 +2064,9 @@ wss.on('connection', (ws) => {
                     ws.send(JSON.stringify({ type: 'error', message: 'Игра в этой комнате уже началась.' }));
                     return;
                 }
-                if (room.players.size >= 8) {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Комната заполнена (максимум 8 игроков).' }));
+                if (room.players.size >= (room.settings.maxPlayers || 8)) {
+                    var maxP = room.settings.maxPlayers || 8;
+                    ws.send(JSON.stringify({ type: 'error', message: 'Комната заполнена (максимум ' + maxP + ' игроков).' }));
                     return;
                 }
                 let nickTaken = false;
@@ -2070,8 +2100,10 @@ wss.on('connection', (ws) => {
                 if (s.useEvents !== undefined) room.settings.useEvents = !!s.useEvents;
                 if (s.streamerMode !== undefined) room.settings.streamerMode = !!s.streamerMode;
                 if (s.prepTime !== undefined) room.settings.prepTime = Math.min(600, Math.max(10, parseInt(s.prepTime) || 120));
+                if (s.maxPlayers !== undefined) room.settings.maxPlayers = Math.min(18, Math.max(3, parseInt(s.maxPlayers) || 8));
                 if (s.presentTime !== undefined) room.settings.presentTime = Math.min(600, Math.max(10, parseInt(s.presentTime) || 120));
                 if (s.useReviews !== undefined) room.settings.useReviews = !!s.useReviews;
+                if (s.useSpeech !== undefined) room.settings.useSpeech = !!s.useSpeech;
                 if (s.investTime !== undefined) room.settings.investTime = Math.min(600, Math.max(10, parseInt(s.investTime) || 60));
                 if (s.pseudoMode !== undefined) room.settings.pseudoMode = !!s.pseudoMode;
                 if (s.modifier !== undefined) {
@@ -2389,6 +2421,23 @@ wss.on('connection', (ws) => {
                 break;
             }
 
+            // ==================== ОЗВУЧКА ====================
+            case 'triggerSpeech': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room) return;
+                if (info.playerId !== room.hostId) return;
+                if (!room.settings.useSpeech) return;
+
+                // Пересылаем всем игрокам команду озвучить
+                broadcastToRoom(room, {
+                    type: 'playSpeech',
+                    texts: msg.texts || [],
+                });
+                break;
+            }
+
             // ==================== СТРИМЕРСКИЙ РЕЖИМ: ТЕКСТ ПРЕЗЕНТАЦИИ ====================
             case 'updatePitchText': {
                 const info = playerRooms.get(ws);
@@ -2441,6 +2490,7 @@ wss.on('connection', (ws) => {
 
     // ==================== ОТКЛЮЧЕНИЕ ====================
     ws.on('close', () => {
+        if (afkTimer) { clearTimeout(afkTimer); afkTimer = null; }
         const info = playerRooms.get(ws);
         if (info) {
             const room = rooms.get(info.roomCode);

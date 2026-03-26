@@ -79,6 +79,7 @@ export function updateSettingsPanel(container) {
     var s = state.settings || {};
 
     var html = '';
+    html += buildSetting('Макс. игроков', 'maxPlayers', 'set-max-players', 3, 18, s.maxPlayers || 8, 1);
     html += buildSetting('Количество раундов', 'rounds', 'set-rounds', 1, 7, s.rounds || 3, 1);
     html += buildSetting('Стартовый капитал', 'capital', 'set-capital', 3, 30, s.startCapital || 10, 1);
     html += buildSetting('Подготовка (сек)', 'prep', 'set-prep', 30, 300, s.prepTime || 60, 15);
@@ -139,6 +140,8 @@ export function updateSettingsPanel(container) {
     html += '</div>';
     html += buildToggle('Колода событий', 'Случайные ограничения', 'set-events', s.useEvents, false);
     html += buildToggle('Текстовые питчи', 'Для стримера / без микрофона', 'set-streamer', s.streamerMode, false);
+
+    html += buildToggle('Озвучка текста', 'Голосовое сопровождение презентаций (хост управляет)', 'set-speech', s.useSpeech, false);
 
     html += '<div class="h-px bg-corp-border my-4"></div>';
 
@@ -395,7 +398,7 @@ function attachSettingsListeners(container) {
 }
 
 function handleStep(field, dir, container) {
-    var map = { rounds: 'set-rounds', capital: 'set-capital', prep: 'set-prep', present: 'set-present', invest: 'set-invest' };
+    var map = { rounds: 'set-rounds', capital: 'set-capital', prep: 'set-prep', present: 'set-present', invest: 'set-invest', maxPlayers: 'set-max-players' };
     var input = container.querySelector('#' + map[field]);
     if (!input) return;
 
@@ -411,10 +414,12 @@ function pushSettings(container) {
     var modifierEl = container.querySelector('input[name="modifier"]:checked');
 
     var settings = {
+        maxPlayers: parseInt(container.querySelector('#set-max-players')?.value) || 8,
         rounds: parseInt(container.querySelector('#set-rounds')?.value) || 3,
         startCapital: parseInt(container.querySelector('#set-capital')?.value) || 10,
         useReviews: container.querySelector('#set-reviews')?.checked || false,
         useEvents: container.querySelector('#set-events')?.checked || false,
+        useSpeech: container.querySelector('#set-speech')?.checked || false,
         streamerMode: container.querySelector('#set-streamer')?.checked || false,
         prepTime: parseInt(container.querySelector('#set-prep')?.value) || 60,
         presentTime: parseInt(container.querySelector('#set-present')?.value) || 120,
