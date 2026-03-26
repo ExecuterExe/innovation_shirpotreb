@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИННОВАЦИОННЫЙ ШИРПОТРЕБ</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'corp': {
+                            'black': '#0a0a0a',
+                            'dark': '#141414',
+                            'graphite': '#1e1e1e',
+                            'card': '#252525',
+                            'border': '#2e2e2e',
+                            'muted': '#555555',
+                            'dim': '#888888',
+                            'text': '#c8c8c8',
+                            'light': '#e8e8e8',
+                            'white': '#f5f5f0',
+                        },
+                        'accent': {
+                            'blue': '#00b4ff',
+                            'blue-dim': 'rgba(0, 180, 255, 0.12)',
+                            'blue-glow': 'rgba(0, 180, 255, 0.4)',
+                            'cyan': '#22d3ee',
+                            'red': '#ff3b3b',
+                            'red-dim': 'rgba(255, 59, 59, 0.15)',
+                            'gold': '#ffd700',
+                            'gold-dim': 'rgba(255, 215, 0, 0.12)',
+                            'green': '#22c55e',
+                            'green-dim': 'rgba(34, 197, 94, 0.12)',
+                        }
+                    },
+                    fontFamily: {
+                        'display': ['Montserrat', 'Inter', 'sans-serif'],
+                        'body': ['Inter', 'system-ui', 'sans-serif'],
+                        'mono': ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease forwards',
+                        'slide-up': 'slideUp 0.6s ease forwards',
+                        'glow-pulse': 'glowPulse 2s ease-in-out infinite',
+                        'card-deal': 'cardDeal 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(40px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        glowPulse: {
+                            '0%, 100%': { boxShadow: '0 0 5px rgba(0,180,255,0.2)' },
+                            '50%': { boxShadow: '0 0 25px rgba(0,180,255,0.5), 0 0 50px rgba(0,180,255,0.2)' },
+                        },
+                        cardDeal: {
+                            '0%': { opacity: '0', transform: 'translateY(-80px) rotateX(40deg) scale(0.8)' },
+                            '100%': { opacity: '1', transform: 'translateY(0) rotateX(0deg) scale(1)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="bg-corp-black text-corp-text font-body min-h-screen overflow-x-hidden antialiased">
+
+    <canvas id="particles-canvas" class="fixed inset-0 z-0 pointer-events-none"></canvas>
+
+    <div id="app" class="relative z-10"></div>
+
+    <div id="notification-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none"></div>
+
+    <div id="confetti-container" class="fixed inset-0 z-40 pointer-events-none"></div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+
+</html>
