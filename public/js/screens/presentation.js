@@ -26,6 +26,7 @@ export function renderPresentation(container) {
     var event = state.currentEvent;
     var prevs = state.previousPresentations || [];
     var streamer = state.settings && state.settings.streamerMode;
+    var anonymized = !!(state.settings && state.settings.streamerMode && state.settings.anonymizeParticipants);
 
     // Отправляем текст при переходе из подготовки
     if (isMe && state.pitchText) {
@@ -118,7 +119,7 @@ export function renderPresentation(container) {
     html += '  </h2>';
 
     // "It's you!" badge
-    if (isMe) {
+    if (isMe && !anonymized) {
         html += '<div class="inline-flex items-center gap-2.5 bg-accent-blue text-white px-6 py-2.5 rounded-full text-sm font-black uppercase tracking-wider mb-8 animate-glow-pulse">';
         html += '  <span class="w-2.5 h-2.5 rounded-full bg-white/80 animate-ping"></span>';
         html += '  🎤 ЭТО ВЫ! ВЫСТУПАЙТЕ!';

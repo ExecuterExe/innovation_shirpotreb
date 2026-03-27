@@ -142,7 +142,7 @@ function handleMessage(msg) {
             break;
 
         case 'investmentAccepted':
-            setState({ investmentConfirmed: true });
+            setState({ investmentConfirmed: true, lastInvestmentTotal: msg.total || 0 });
             // Перерисовываем только если мы на экране инвестирования
             if (state.phase === 'investing') {
                 navigate('investing');
@@ -209,7 +209,19 @@ function handleMessage(msg) {
             break;
 
         case 'playerDisconnected':
-            showNotification(msg.nickname + ' отключился', 'error');
+            if (msg.message) {
+                showNotification(msg.message + ': ' + msg.nickname, 'error');
+            } else {
+                showNotification(msg.nickname + ' отключился', 'error');
+            }
+            break;
+
+        case 'kicked':
+            showNotification(msg.message || 'Вы исключены из комнаты', 'error');
+            playSound('warning');
+            setTimeout(function () {
+                window.location.reload();
+            }, 1200);
             break;
 
         case 'error':
@@ -359,18 +371,26 @@ function handlePresentation(msg) {
 
 function handleInvesting(msg) {
     var capital = state.myCapital;
+    var myCapLimit = capital;
     for (var i = 0; i < msg.players.length; i++) {
         if (msg.players[i].id === state.playerId) {
             capital = msg.players[i].capital;
             break;
         }
     }
+    if (msg.investmentCaps && msg.investmentCaps[state.playerId] !== undefined) {
+        myCapLimit = parseInt(msg.investmentCaps[state.playerId]) || capital;
+    } else {
+        myCapLimit = capital;
+    }
 
     setState({
         myCapital: capital,
+        myInvestmentCap: Math.min(capital, myCapLimit),
         presentations: msg.presentations,
         players: msg.players,
         investmentConfirmed: false,
+        lastInvestmentTotal: 0,
         currentRound: msg.round || state.currentRound,
         totalRounds: msg.totalRounds || state.totalRounds
     });
@@ -394,6 +414,7 @@ function handleRoundResults(msg) {
         roundWinners: msg.roundWinners,
         investmentDetails: msg.investmentDetails,
         luckyInvestors: msg.luckyInvestors,
+        roundBestInvestor: msg.roundBestInvestor || null,
         isLastRound: msg.isLastRound,
         currentRound: msg.round
     });

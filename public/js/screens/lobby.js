@@ -2,6 +2,11 @@ import { state, escapeHtml } from '../app.js';
 import { sendMsg } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 
+var MAX_PLAYERS_MIN = 3;
+var MAX_PLAYERS_MAX = 18;
+var SETTINGS_TAB = 'params';
+var IS_CODE_HIDDEN = false;
+
 // ═══════════════════════════════════════════
 // Экспортируемые функции для частичного обновления
 // (вызываются из socket.js при lobbyUpdate)
@@ -19,6 +24,7 @@ export function updatePlayersList(container) {
     for (var i = 0; i < players.length; i++) {
         var p = players[i];
         var isMe = p.id === state.playerId;
+        var canKick = state.isHost && !isMe && !p.isHost;
         var hue1 = i * 45 + 120;
         var hue2 = i * 45 + 160;
         var hue3 = i * 45 + 140;
@@ -30,6 +36,18 @@ export function updatePlayersList(container) {
         html += (i + 1);
         html += '</div>';
         html += '<span class="font-bold text-corp-light flex-1">' + escapeHtml(p.nickname) + '</span>';
+        var cups = parseInt(p.investorCups) || 0;
+        var bags = parseInt(p.entrepreneurMoneybags) || 0;
+        if (cups > 0 || bags > 0) {
+            html += '<div class="text-[0.65rem] text-corp-muted font-black tracking-wide">';
+            if (cups > 0) {
+                html += '<span title="Лучший инвестор игр">💼'.repeat(Math.min(cups, 5)) + (cups > 5 ? '×' + cups : '') + '</span>';
+            }
+            if (bags > 0) {
+                html += ' <span title="Лучший предприниматель игр">💰'.repeat(Math.min(bags, 5)) + (bags > 5 ? '×' + bags : '') + '</span>';
+            }
+            html += '</div>';
+        }
         html += '<div class="flex gap-2">';
         if (p.isHost) {
             html += '<span class="text-[0.65rem] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-accent-gold-dim text-accent-gold border border-accent-gold/20">ХОСТ</span>';
@@ -37,10 +55,26 @@ export function updatePlayersList(container) {
         if (isMe) {
             html += '<span class="text-[0.65rem] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-accent-blue-dim text-accent-blue border border-accent-blue/20">ВЫ</span>';
         }
+        if (canKick) {
+            html += '<button class="kick-player-btn w-7 h-7 rounded-lg border border-accent-red/25 text-accent-red hover:bg-accent-red/10 transition-colors text-xs font-black cursor-pointer" title="Исключить игрока" data-player-id="' + p.id + '" data-player-name="' + escapeHtml(p.nickname) + '">✕</button>';
+        }
         html += '</div>';
         html += '</div>';
     }
     list.innerHTML = html;
+
+    var kickBtns = container.querySelectorAll('.kick-player-btn');
+    for (var kb = 0; kb < kickBtns.length; kb++) {
+        (function (btn) {
+            btn.addEventListener('click', function () {
+                var targetId = btn.getAttribute('data-player-id');
+                var targetName = btn.getAttribute('data-player-name') || 'игрока';
+                if (!targetId) return;
+                if (!window.confirm('Исключить игрока «' + targetName + '» из комнаты?')) return;
+                sendMsg({ type: 'kickPlayer', targetPlayerId: targetId });
+            });
+        })(kickBtns[kb]);
+    }
 }
 
 export function updateStartButton(container) {
@@ -79,20 +113,40 @@ export function updateSettingsPanel(container) {
     var s = state.settings || {};
 
     var html = '';
-    html += buildSetting('Макс. игроков', 'maxPlayers', 'set-max-players', 3, 18, s.maxPlayers || 8, 1);
+    var isParams = SETTINGS_TAB === 'params';
+    var isModes = SETTINGS_TAB === 'modes';
+
+    html += '<div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-corp-black/40 border border-corp-border">';
+    html += '<button id="settings-tab-params" class="px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ';
+    html += isParams ? 'bg-accent-blue-dim text-accent-blue border border-accent-blue/20' : 'text-corp-muted hover:text-corp-light';
+    html += '">Параметры</button>';
+    html += '<button id="settings-tab-modes" class="px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ';
+    html += isModes ? 'bg-accent-gold-dim text-accent-gold border border-accent-gold/20' : 'text-corp-muted hover:text-corp-light';
+    html += '">Режимы</button>';
+    html += '</div>';
+    html += '<div class="text-[0.65rem] text-corp-dim mt-2">';
+    html += isParams ? 'Тайминги и числовые параметры партии' : 'Механики, модификаторы и источники карт';
+    html += '</div>';
+
+    html += '<div id="settings-pane-params" class="space-y-4 mt-4';
+    if (!isParams) html += ' hidden';
+    html += '">';
+    html += buildSetting('Макс. игроков', 'maxPlayers', 'set-max-players', MAX_PLAYERS_MIN, MAX_PLAYERS_MAX, s.maxPlayers || 8, 1);
     html += buildSetting('Количество раундов', 'rounds', 'set-rounds', 1, 7, s.rounds || 3, 1);
     html += buildSetting('Стартовый капитал', 'capital', 'set-capital', 3, 30, s.startCapital || 10, 1);
     html += buildSetting('Подготовка (сек)', 'prep', 'set-prep', 30, 300, s.prepTime || 60, 15);
     html += buildSetting('Питч (сек)', 'present', 'set-present', 60, 300, s.presentTime || 120, 15);
     html += buildSetting('Инвестирование (сек)', 'invest', 'set-invest', 30, 120, s.investTime || 60, 10);
+    html += '</div>';
 
-    html += '<div class="h-px bg-corp-border my-4"></div>';
+    html += '<div id="settings-pane-modes" class="space-y-4 mt-4';
+    if (!isModes) html += ' hidden';
+    html += '">';
     html += buildToggle('Псевдоинновации', 'Лайт-режим: только прилагательное + предмет (без особенности)', 'set-pseudo', s.pseudoMode, false);
-
-    html += '<div class="h-px bg-corp-border my-4"></div>';
+    html += '<div class="h-px bg-corp-border my-2"></div>';
     html += buildToggle('Карточка отзыва', 'Добавляет первый отзыв клиента к продукту', 'set-reviews', s.useReviews, false);
     html += buildToggle('Чёрный лебедь', '20% шанс замены карты при выступлении', 'set-blackswan', s.blackSwan, false);
-    html += '<div class="h-px bg-corp-border my-4"></div>';
+    html += '<div class="h-px bg-corp-border my-2"></div>';
     html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Модификатор предмета</div>';
 
     var modNone = !s.modifier || s.modifier === 'none';
@@ -140,10 +194,11 @@ export function updateSettingsPanel(container) {
     html += '</div>';
     html += buildToggle('Колода событий', 'Случайные ограничения', 'set-events', s.useEvents, false);
     html += buildToggle('Текстовые питчи', 'Для стримера / без микрофона', 'set-streamer', s.streamerMode, false);
+    html += buildToggle('Зашифровать участников', 'Только в текстовых питчах: имена заменяются псевдонимами', 'set-anon', s.anonymizeParticipants, !s.streamerMode);
 
     html += buildToggle('Озвучка текста', 'Голосовое сопровождение презентаций (хост управляет)', 'set-speech', s.useSpeech, false);
 
-    html += '<div class="h-px bg-corp-border my-4"></div>';
+    html += '<div class="h-px bg-corp-border my-2"></div>';
 
     html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Источник карт</div>';
 
@@ -179,9 +234,10 @@ export function updateSettingsPanel(container) {
 
     html += '</div>';
 
-    html += '<div class="h-px bg-corp-border my-4"></div>';
+    html += '<div class="h-px bg-corp-border my-2"></div>';
 
     html += buildToggle('Режим «Бункер»', 'Постепенное открытие карт', 'set-bunker', false, true);
+    html += '</div>';
 
     panel.innerHTML = html;
 
@@ -200,7 +256,7 @@ export function renderLobby(container) {
     var isHost = state.isHost;
 
     var html = '';
-    html += '<div class="max-w-5xl mx-auto px-4 py-8 min-h-screen">';
+    html += '<div class="max-w-6xl mx-auto px-4 py-8 min-h-screen">';
 
     // Back
     html += '<button id="btn-back" class="flex items-center gap-2 text-corp-muted hover:text-accent-red text-sm font-bold mb-6 transition-colors group cursor-pointer">';
@@ -218,11 +274,18 @@ export function renderLobby(container) {
     html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">Код комнаты</div>';
     html += '<div class="flex items-center gap-4">';
     html += '<span class="font-mono text-4xl md:text-5xl font-black text-accent-blue tracking-[0.2em]" style="text-shadow: 0 0 20px rgba(0,180,255,0.3);">';
-    html += escapeHtml(state.roomCode || '');
+    if (IS_CODE_HIDDEN && state.isHost) {
+        html += '•••••';
+    } else {
+        html += escapeHtml(state.roomCode || '');
+    }
     html += '</span>';
+    if (state.isHost) {
+        html += '<button id="btn-toggle-code" class="p-2 rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скрыть/показать код">' + (IS_CODE_HIDDEN ? '🙈' : '👁') + '</button>';
+    }
     html += '<button id="btn-copy" class="p-2 rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скопировать">📋</button>';
     html += '</div>';
-    html += '<p class="text-xs text-corp-muted mt-3">Отправьте этот код инвесторам</p>';
+    html += '<p class="text-xs text-corp-muted mt-3">' + (IS_CODE_HIDDEN && state.isHost ? 'Код скрыт. Нажмите 👁 чтобы снова показать.' : 'Отправьте этот код инвесторам') + '</p>';
     html += '</div>';
 
     // Players
@@ -238,9 +301,9 @@ export function renderLobby(container) {
 
     // RIGHT — settings (host only)
     if (isHost) {
-        html += '<div class="lg:w-[380px] space-y-4">';
+        html += '<div class="lg:w-[520px] space-y-4">';
         html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-1">Приборная панель</div>';
-        html += '<div class="corp-card p-6 space-y-5" id="settings-panel"></div>';
+        html += '<div class="corp-card p-7 space-y-5" id="settings-panel"></div>';
         html += '</div>';
     }
 
@@ -263,10 +326,22 @@ export function renderLobby(container) {
         });
     }
 
+    var btnToggleCode = container.querySelector('#btn-toggle-code');
+    if (btnToggleCode) {
+        btnToggleCode.addEventListener('click', function () {
+            IS_CODE_HIDDEN = !IS_CODE_HIDDEN;
+            renderLobby(container);
+        });
+    }
+
     var btnCopy = container.querySelector('#btn-copy');
     if (btnCopy) {
         btnCopy.addEventListener('click', function () {
             if (!state.roomCode) return;
+            if (IS_CODE_HIDDEN && state.isHost) {
+                showNotification('Сначала покажите код комнаты', 'info');
+                return;
+            }
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(state.roomCode)
                     .then(function () { showNotification('Код скопирован: ' + state.roomCode, 'success'); })
@@ -300,22 +375,46 @@ function buildToggle(label, hint, inputId, checked, locked) {
     var html = '';
     if (locked) {
         html += '<div class="feature-locked flex items-center justify-between py-1">';
-    } else {
-        html += '<div class="flex items-center justify-between py-1">';
+        html += '<div>';
+        html += '<div class="text-sm font-bold text-corp-light">' + label + '</div>';
+        html += '<div class="text-xs text-corp-light/80 mt-1 leading-relaxed max-w-[300px]">' + hint + '</div>';
+        html += '</div>';
+        html += '<input type="checkbox" id="' + inputId + '" class="toggle-corp"';
+        if (checked) html += ' checked';
+        html += ' disabled>';
+        html += '</div>';
+        return html;
     }
+
+    // Делаем всю строку кликабельной, чтобы переключатель точно выбирался.
+    html += '<label for="' + inputId + '" class="flex items-center justify-between py-1 cursor-pointer">';
     html += '<div>';
     html += '<div class="text-sm font-bold text-corp-light">' + label + '</div>';
-    html += '<div class="text-xs text-corp-muted mt-0.5">' + hint + '</div>';
+    html += '<div class="text-xs text-corp-light/80 mt-1 leading-relaxed max-w-[300px]">' + hint + '</div>';
     html += '</div>';
     html += '<input type="checkbox" id="' + inputId + '" class="toggle-corp"';
     if (checked) html += ' checked';
-    if (locked) html += ' disabled';
     html += '>';
-    html += '</div>';
+    html += '</label>';
     return html;
 }
 
 function attachSettingsListeners(container) {
+    var tabParams = container.querySelector('#settings-tab-params');
+    if (tabParams) {
+        tabParams.addEventListener('click', function () {
+            SETTINGS_TAB = 'params';
+            updateSettingsPanel(container);
+        });
+    }
+    var tabModes = container.querySelector('#settings-tab-modes');
+    if (tabModes) {
+        tabModes.addEventListener('click', function () {
+            SETTINGS_TAB = 'modes';
+            updateSettingsPanel(container);
+        });
+    }
+
     // Steppers
     var stepBtns = container.querySelectorAll('.stepper-btn');
     for (var j = 0; j < stepBtns.length; j++) {
@@ -360,6 +459,17 @@ function attachSettingsListeners(container) {
                 if (dbRadio) {
                     dbRadio.checked = true;
                 }
+            }
+            pushSettings(container);
+        });
+    }
+
+    var streamerToggle = container.querySelector('#set-streamer');
+    var anonToggle = container.querySelector('#set-anon');
+    if (streamerToggle && anonToggle) {
+        streamerToggle.addEventListener('change', function () {
+            if (!streamerToggle.checked) {
+                anonToggle.checked = false;
             }
             pushSettings(container);
         });
@@ -413,14 +523,21 @@ function pushSettings(container) {
     var cardSourceEl = container.querySelector('input[name="cardSource"]:checked');
     var modifierEl = container.querySelector('input[name="modifier"]:checked');
 
+    var rawMaxPlayers = parseInt(container.querySelector('#set-max-players')?.value);
+    var fallbackMaxPlayers = parseInt(state.settings && state.settings.maxPlayers) || 8;
+    var safeMaxPlayers = rawMaxPlayers;
+    if (isNaN(safeMaxPlayers)) safeMaxPlayers = fallbackMaxPlayers;
+    safeMaxPlayers = Math.max(MAX_PLAYERS_MIN, Math.min(MAX_PLAYERS_MAX, safeMaxPlayers));
+
     var settings = {
-        maxPlayers: parseInt(container.querySelector('#set-max-players')?.value) || 8,
+        maxPlayers: safeMaxPlayers,
         rounds: parseInt(container.querySelector('#set-rounds')?.value) || 3,
         startCapital: parseInt(container.querySelector('#set-capital')?.value) || 10,
         useReviews: container.querySelector('#set-reviews')?.checked || false,
         useEvents: container.querySelector('#set-events')?.checked || false,
         useSpeech: container.querySelector('#set-speech')?.checked || false,
         streamerMode: container.querySelector('#set-streamer')?.checked || false,
+        anonymizeParticipants: container.querySelector('#set-anon')?.checked || false,
         prepTime: parseInt(container.querySelector('#set-prep')?.value) || 60,
         presentTime: parseInt(container.querySelector('#set-present')?.value) || 120,
         investTime: parseInt(container.querySelector('#set-invest')?.value) || 60,

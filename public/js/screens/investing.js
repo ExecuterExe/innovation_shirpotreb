@@ -5,10 +5,14 @@ import { playSound } from '../components/sound.js';
 import { CARD_TYPES } from './presentation.js';
 
 export function renderInvesting(container) {
-    var presentations = state.presentations || [];
-    var capital = state.myCapital;
+    var presentations = (state.presentations || []).filter(function (p) { return p.id !== state.playerId; });
+    var isHost = !!state.isHost;
+    var capital = parseInt(state.myCapital) || 0;
+    var investmentCap = parseInt(state.myInvestmentCap);
+    if (isNaN(investmentCap)) investmentCap = capital;
+    var budget = Math.max(0, Math.min(capital, investmentCap));
     var confirmed = state.investmentConfirmed;
-    var isHost = state.isHost;
+    var alreadyInvested = parseInt(state.lastInvestmentTotal) || 0;
 
     var html = '';
     html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen">';
@@ -34,6 +38,10 @@ export function renderInvesting(container) {
     html += '  <div class="text-right">';
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Ваш капитал</div>';
     html += '    <div class="text-2xl font-black text-accent-blue">' + capital + '</div>';
+    html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest mt-1">Лимит раунда: ' + budget + '</div>';
+    if (budget < capital) {
+        html += '    <div class="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-lg border border-accent-red/30 bg-accent-red/10 text-accent-red text-[0.6rem] font-black uppercase tracking-wider animate-pulse">🧿 Проклятие активно</div>';
+    }
     html += '  </div>';
 
     html += '</div>';
@@ -41,32 +49,39 @@ export function renderInvesting(container) {
     // ═══════ HEADER ═══════
     html += '<div class="text-center mb-8">';
     html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Терминал инвестиций</h2>';
-    html += '  <p class="text-corp-muted text-sm">Распределите жетоны между проектами. В себя вкладывать нельзя.</p>';
+    html += '  <p class="text-corp-muted text-sm">Распределите жетоны между проектами. Ваш проект скрыт из списка.</p>';
     html += '  <p class="text-accent-blue font-bold text-sm mt-1">Кто вложится в лучшего предпринимателя — получит ×2!</p>';
     html += '</div>';
+
+    if (budget < capital) {
+        html += '<div class="corp-card border-accent-red/25 bg-accent-red/10 px-6 py-5 mb-6 curse-banner-enter">';
+        html += '  <div class="flex items-start gap-3">';
+        html += '    <div class="text-2xl leading-none">🧿</div>';
+        html += '    <div>';
+        html += '      <div class="text-sm font-black text-accent-red uppercase tracking-wider">Проклятие инвестора</div>';
+        html += '      <div class="text-xs text-corp-light mt-1 leading-relaxed">';
+        html += '        Вы лидер по капиталу, поэтому в этом раунде действует ограничение: можно инвестировать не больше <span class="font-black text-accent-gold">' + budget + '</span> из <span class="font-black">' + capital + '</span>.';
+        html += '      </div>';
+        html += '    </div>';
+        html += '  </div>';
+        html += '</div>';
+    }
 
     // ═══════ INVESTMENT LIST ═══════
     html += '<div class="space-y-4 mb-8" id="invest-list">';
 
     for (var i = 0; i < presentations.length; i++) {
         var p = presentations[i];
-        var isSelf = p.id === state.playerId;
 
-        html += '<div class="corp-card overflow-hidden';
-        if (isSelf) html += ' opacity-30 relative';
-        html += '">';
-
-        // Self overlay
-        if (isSelf) {
-            html += '<div class="absolute inset-0 flex items-center justify-center z-10">';
-            html += '  <span class="text-xs font-bold text-accent-red bg-corp-black/90 px-4 py-2 rounded-xl">🚫 Нельзя инвестировать в себя</span>';
-            html += '</div>';
-        }
+        html += '<div class="corp-card overflow-hidden hover:border-accent-blue/20 transition-colors">';
 
         // Top section — name + cards
         html += '<div class="px-6 py-5">';
-        html += '  <div class="text-lg font-black text-accent-gold mb-3">' + escapeHtml(p.nickname);
-        if (isSelf) html += ' <span class="text-corp-muted text-sm font-normal">(Вы)</span>';
+        html += '  <div class="flex items-center justify-between gap-3 mb-3">';
+        html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
+        if (isHost) {
+            html += '    <button class="kick-player-btn w-8 h-8 rounded-lg border border-accent-red/25 text-accent-red hover:bg-accent-red/10 transition-colors text-sm font-black cursor-pointer" title="Исключить игрока" data-player-id="' + p.id + '" data-player-name="' + escapeHtml(p.nickname) + '">✕</button>';
+        }
         html += '  </div>';
 
         // Card tags
@@ -87,12 +102,24 @@ export function renderInvesting(container) {
             }
         }
         html += '  </div>';
+
+        if (p.pitchText && p.pitchText.trim()) {
+            html += '  <div class="mt-4 p-4 rounded-xl border border-accent-blue/15 bg-accent-blue-dim">';
+            html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest mb-2">Текстовый питч</div>';
+            html += '    <div class="text-sm text-corp-light leading-relaxed whitespace-pre-wrap break-words">' + escapeHtml(p.pitchText) + '</div>';
+            html += '  </div>';
+        }
         html += '</div>';
 
         // Bottom section — investment controls
-        if (!isSelf) {
-            html += '<div class="bg-corp-black/40 px-6 py-5 border-t border-corp-border">';
-            html += '  <div class="flex items-center gap-4 flex-wrap">';
+        html += '<div class="bg-corp-black/40 px-6 py-5 border-t border-corp-border">';
+        if (confirmed) {
+            html += '  <div class="text-xs font-semibold text-corp-muted">Инвестиции зафиксированы, изменение недоступно.</div>';
+            html += '</div>';
+            html += '</div>'; // end invest item
+            continue;
+        }
+        html += '  <div class="flex items-center gap-4 flex-wrap">';
 
             // Minus button
             html += '    <button class="invest-minus w-10 h-10 rounded-full border border-corp-border text-corp-dim font-black text-lg flex items-center justify-center hover:border-accent-red hover:text-accent-red transition-colors cursor-pointer" data-target="' + p.id + '">−</button>';
@@ -108,7 +135,7 @@ export function renderInvesting(container) {
 
             // Slider
             html += '    <div class="flex-1 min-w-[120px]">';
-            html += '      <input type="range" class="invest-slider w-full" min="0" max="' + capital + '" value="0" data-target="' + p.id + '">';
+        html += '      <input type="range" class="invest-slider w-full" min="0" max="' + budget + '" value="0" data-target="' + p.id + '">';
             html += '    </div>';
 
             // Quick buttons
@@ -119,9 +146,8 @@ export function renderInvesting(container) {
             html += '      <button class="invest-quick-all text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-accent-blue-dim text-accent-blue border border-accent-blue/20 hover:bg-accent-blue hover:text-white transition-colors cursor-pointer" data-target="' + p.id + '">ALL</button>';
             html += '    </div>';
 
-            html += '  </div>';
-            html += '</div>';
-        }
+        html += '  </div>';
+        html += '</div>';
 
         html += '</div>'; // end invest item
     }
@@ -132,9 +158,17 @@ export function renderInvesting(container) {
     html += '<div class="corp-card px-6 py-5 flex items-center justify-between flex-wrap gap-4 mb-6">';
     html += '  <div class="flex items-center gap-4">';
     html += '    <span class="text-sm font-bold text-corp-dim">Осталось жетонов:</span>';
-    html += '    <span id="inv-remaining" class="font-mono text-4xl font-black text-accent-blue">' + capital + '</span>';
+    var initialRemaining = confirmed ? Math.max(0, budget - alreadyInvested) : budget;
+    html += '    <span id="inv-remaining" class="font-mono text-4xl font-black text-accent-blue">' + initialRemaining + '</span>';
     html += '  </div>';
-    html += '  <div id="invest-progress" class="text-xs font-semibold text-corp-muted"></div>';
+    if (confirmed) {
+        html += '  <div class="text-right">';
+        html += '    <div class="text-xs font-semibold text-corp-muted">Зафиксировано</div>';
+        html += '    <div class="text-lg font-black text-accent-green">' + alreadyInvested + ' жет.</div>';
+        html += '  </div>';
+    } else {
+        html += '  <div id="invest-progress" class="text-xs font-semibold text-corp-muted"></div>';
+    }
     html += '</div>';
 
     // ═══════ CONFIRM / CONFIRMED ═══════
@@ -152,15 +186,43 @@ export function renderInvesting(container) {
 
     container.innerHTML = html;
 
+    var kickBtns = container.querySelectorAll('.kick-player-btn');
+    for (var kk = 0; kk < kickBtns.length; kk++) {
+        (function (btn) {
+            btn.addEventListener('click', function () {
+                var targetId = btn.getAttribute('data-player-id');
+                var targetName = btn.getAttribute('data-player-name') || 'игрока';
+                if (!targetId) return;
+                if (!window.confirm('Исключить игрока «' + targetName + '» из партии?')) return;
+                sendMsg({ type: 'kickPlayer', targetPlayerId: targetId });
+            });
+        })(kickBtns[kk]);
+    }
+
+    if (budget < capital && !confirmed) {
+        var curseKey = 'invest-curse-' + (state.roomCode || 'room') + '-' + (state.playerId || 'player') + '-' + (state.currentRound || 0);
+        try {
+            if (sessionStorage.getItem(curseKey) !== '1') {
+                sessionStorage.setItem(curseKey, '1');
+                showNotification('🧿 Проклятие инвестора активно: лимит ' + budget + ' из ' + capital, 'warning');
+                playSound('warning');
+            }
+        } catch (e) {
+            // Если sessionStorage недоступен — просто показываем уведомление.
+            showNotification('🧿 Проклятие инвестора активно: лимит ' + budget + ' из ' + capital, 'warning');
+            playSound('warning');
+        }
+    }
+
+    if (confirmed) return;
+
     // ═══════════════════════════════════════════
     // INVESTMENT LOGIC
     // ═══════════════════════════════════════════
 
     var investments = {};
     for (var j = 0; j < presentations.length; j++) {
-        if (presentations[j].id !== state.playerId) {
-            investments[presentations[j].id] = 0;
-        }
+        investments[presentations[j].id] = 0;
     }
 
     function getTotal() {
@@ -171,7 +233,7 @@ export function renderInvesting(container) {
     }
 
     function updateRemainingUI() {
-        var remaining = capital - getTotal();
+        var remaining = budget - getTotal();
         var el = container.querySelector('#inv-remaining');
         if (el) {
             el.textContent = remaining;
@@ -195,7 +257,7 @@ export function renderInvesting(container) {
         for (var k = 0; k < keys.length; k++) {
             if (keys[k] !== targetId) otherTotal += investments[keys[k]];
         }
-        var maxForThis = capital - otherTotal;
+        var maxForThis = budget - otherTotal;
         if (value > maxForThis) value = maxForThis;
         if (value < 0) value = 0;
 
@@ -262,7 +324,7 @@ export function renderInvesting(container) {
                         for (var s = 0; s < sliders.length; s++) sliders[s].value = 0;
                     }
                 }
-                setInvestment(id, capital);
+                setInvestment(id, budget);
             });
         })(allBtns[al]);
     }
@@ -283,8 +345,8 @@ export function renderInvesting(container) {
         btnConfirm.addEventListener('click', function () {
             var total = getTotal();
 
-            if (total > capital) {
-                showNotification('Недостаточно капитала! У вас ' + capital + ', вкладываете ' + total, 'error');
+            if (total > budget) {
+                showNotification('Превышен лимит раунда! Лимит: ' + budget + ', выбрано: ' + total, 'error');
                 playSound('warning');
                 return;
             }

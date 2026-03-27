@@ -27,6 +27,7 @@ export var state = {
         startCapital: 10,
         useEvents: false,
         streamerMode: false,
+        anonymizeParticipants: false,
         prepTime: 60,
         presentTime: 120,
         investTime: 60,
@@ -41,11 +42,14 @@ export var state = {
     totalPresenters: 0,
     previousPresentations: [],
     myCapital: 10,
+    myInvestmentCap: 10,
     presentations: [],
     investmentConfirmed: false,
+    lastInvestmentTotal: 0,
     roundWinners: [],
     investmentDetails: [],
     luckyInvestors: [],
+    roundBestInvestor: null,
     isLastRound: false,
     tiedPlayers: [],
     timerDuration: 0,
@@ -68,6 +72,8 @@ export function setState(updates) {
 }
 
 export function navigate(phase) {
+    // При смене экранов останавливаем предыдущий таймер, чтобы не было "поздних" тиков/звуков.
+    stopTimer();
     var prevPhase = state.phase;
     state.phase = phase;
 

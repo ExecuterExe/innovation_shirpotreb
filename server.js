@@ -1163,6 +1163,14 @@ const rooms = new Map();
 const playerRooms = new Map(); // ws -> { roomCode, playerId }
 const disconnectTimers = new Map(); // playerId -> setTimeout id
 const RECONNECT_TIMEOUT = 15000; // 15 секунд на возврат
+const ANON_NAMES = [
+    'Богатый Волк', 'Миллионер из трущоб', 'Тихий Единорог', 'Крипто-Барон', 'Смелый Кальмар',
+    'Железный Инвестор', 'Ночной Брокер', 'Солнечный Капиталист', 'Лазерный Банкир', 'Громкий Фонд',
+    'Умный Енот', 'Шумный Пингвин', 'Золотой Феникс', 'Лунный Предприниматель', 'Дерзкий Технарь',
+    'Акулья Улыбка', 'Гибкий Магнат', 'Хитрый Бизон', 'Шустрый Кот', 'Космический Директор',
+    'Реактивный Аналитик', 'Суровый Меценат', 'Мятежный Стартапер', 'Алмазный Трейдер', 'Холодный Стратег',
+    'Платиновый Лис', 'Быстрый Рейдер', 'Северный Портфель', 'Медный Рокетмен', 'Теплый Хеджер'
+];
 
 function generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -1210,6 +1218,7 @@ function createRoom(hostId, settings) {
             modifier: settings.modifier || 'none', // 'none' | 'addition' | 'metaphor'
             pseudoMode: !!settings.pseudoMode,
             useSpeech: !!settings.useSpeech,
+            anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
         },
         players: new Map(),
@@ -1245,6 +1254,8 @@ function createRoom(hostId, settings) {
         tieInvestmentDetails: null,
         tieOriginalInvestments: null,
         autoFinalTimer: null,
+        investmentCaps: {},
+        anonAliases: {},
     };
     rooms.set(code, room);
     return room;
@@ -1261,6 +1272,8 @@ function addPlayer(room, playerId, nickname, ws) {
         connected: true,
         isHost: room.hostId === playerId,
         pitchText: '',
+        investorCups: 0,
+        entrepreneurMoneybags: 0,
     });
 }
 
@@ -1280,6 +1293,31 @@ function sendToPlayer(room, playerId, message) {
     }
 }
 
+function isAnonymizeEnabled(room) {
+    return !!(room && room.settings && room.settings.streamerMode && room.settings.anonymizeParticipants);
+}
+
+function rebuildAnonAliases(room) {
+    room.anonAliases = {};
+    if (!isAnonymizeEnabled(room)) return;
+    const activeIds = [];
+    room.players.forEach(p => {
+        if (!p.eliminated && p.connected) activeIds.push(p.id);
+    });
+    const pool = shuffle(ANON_NAMES);
+    for (let i = 0; i < activeIds.length; i++) {
+        room.anonAliases[activeIds[i]] = pool[i] || ('Игрок ' + (i + 1));
+    }
+}
+
+function getDisplayNickname(room, playerId) {
+    if (isAnonymizeEnabled(room)) {
+        return room.anonAliases && room.anonAliases[playerId] ? room.anonAliases[playerId] : 'Игрок';
+    }
+    const p = room.players.get(playerId);
+    return p ? p.nickname : '???';
+}
+
 function getPlayersPublicInfo(room) {
     const players = [];
     room.players.forEach(p => {
@@ -1291,6 +1329,8 @@ function getPlayersPublicInfo(room) {
             isHost: p.isHost,
             connected: p.connected,
             eliminated: !!p.eliminated,  // ← ДОБАВЬ ЭТО
+            investorCups: p.investorCups || 0,
+            entrepreneurMoneybags: p.entrepreneurMoneybags || 0,
 
         });
     });
@@ -1522,6 +1562,7 @@ function startNewRound(room) {
     room.players.forEach(p => { if (!p.eliminated) playerIds.push(p.id); });
     room.presentationOrder = shuffle(playerIds);
     room.currentPresenterIndex = 0;
+    rebuildAnonAliases(room);
 
     // ═══════ ВЫБОР ИСТОЧНИКА КАРТ ═══════
     if (room.settings.cardSource === 'players') {
@@ -1583,7 +1624,7 @@ function showCurrentPresenter(room) {
         if (prevPlayer && !prevPlayer.eliminated) {
             previousPresentations.push({
                 id: prevId,
-                nickname: prevPlayer.nickname,
+                nickname: getDisplayNickname(room, prevId),
                 cards: prevPlayer.cards,
             });
         }
@@ -1594,7 +1635,7 @@ function showCurrentPresenter(room) {
         phase: 'presentation',
         currentPresenter: {
             id: presenterId,
-            nickname: presenter.nickname,
+            nickname: getDisplayNickname(room, presenterId),
             cards: presenter.cards,
             pitchText: presenter.pitchText || '',
         },
@@ -1625,9 +1666,38 @@ function nextPresenter(room) {
     showCurrentPresenter(room);
 }
 
+function getInvestmentCaps(room) {
+    const caps = {};
+    const active = [];
+
+    room.players.forEach(p => {
+        if (!p.eliminated && p.connected) {
+            active.push(p);
+            caps[p.id] = p.capital;
+        }
+    });
+
+    if (active.length < 3) return caps;
+
+    active.sort((a, b) => b.capital - a.capital);
+    const leader = active[0];
+    const second = active[1];
+    const third = active[2] || active[1];
+
+    if (!leader || !second || !third) return caps;
+    if (leader.capital <= second.capital) return caps;
+
+    // Антисноуболл: лидер по капиталу инвестирует не больше среднего 2 следующих по капиталу.
+    const limitedCap = Math.max(1, Math.floor((second.capital + third.capital) / 2));
+    caps[leader.id] = Math.min(leader.capital, limitedCap);
+
+    return caps;
+}
+
 function startInvesting(room) {
     room.state = 'investing';
     room.investments.clear();
+    room.investmentCaps = getInvestmentCaps(room);
 
     // ═══════ НОВОЕ — eliminated игроки сразу "проголосовали" пустышкой ═══════
     room.players.forEach(p => {
@@ -1638,7 +1708,12 @@ function startInvesting(room) {
 
     const allPresentations = room.presentationOrder.map(id => {
         const p = room.players.get(id);
-        return (p && !p.eliminated) ? { id, nickname: p.nickname, cards: p.cards } : null;
+        return (p && !p.eliminated) ? {
+            id,
+            nickname: getDisplayNickname(room, id),
+            cards: p.cards,
+            pitchText: p.pitchText || '',
+        } : null;
     }).filter(Boolean);
 
     broadcastToRoom(room, {
@@ -1648,6 +1723,7 @@ function startInvesting(room) {
         presentations: allPresentations,
         event: room.currentEvent,
         investTime: room.settings.investTime,
+        investmentCaps: room.investmentCaps,
         round: room.currentRound,
         totalRounds: room.totalRounds,
     });
@@ -1689,7 +1765,10 @@ function processInvestments(room) {
             valid.push(inv);
         }
 
-        if (totalSpent <= investor.capital) {
+        const capLimit = room.investmentCaps && room.investmentCaps[investorId] !== undefined
+            ? room.investmentCaps[investorId]
+            : investor.capital;
+        if (totalSpent <= Math.min(investor.capital, capLimit)) {
             validatedInvestments.set(investorId, valid);
         }
     });
@@ -1919,6 +1998,41 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
         });
     }
 
+    const investorRoundStats = new Map();
+    room.investments.forEach((investData, investorId) => {
+        let totalSpent = 0;
+        let investedInWinners = 0;
+        investData.forEach(inv => {
+            totalSpent += inv.amount;
+            if (roundWinners.includes(inv.targetId)) investedInWinners += inv.amount;
+        });
+        const reward = investedInWinners * 2;
+        investorRoundStats.set(investorId, {
+            investorId,
+            totalSpent,
+            investedInWinners,
+            reward,
+        });
+    });
+
+    let roundBestInvestor = null;
+    investorRoundStats.forEach(stat => {
+        if (!roundBestInvestor
+            || stat.reward > roundBestInvestor.reward
+            || (stat.reward === roundBestInvestor.reward && stat.investedInWinners > roundBestInvestor.investedInWinners)
+            || (stat.reward === roundBestInvestor.reward && stat.investedInWinners === roundBestInvestor.investedInWinners && stat.totalSpent > roundBestInvestor.totalSpent)) {
+            const investor = room.players.get(stat.investorId);
+            if (!investor) return;
+            roundBestInvestor = {
+                id: stat.investorId,
+                nickname: investor.nickname,
+                reward: stat.reward,
+                investedInWinners: stat.investedInWinners,
+                totalSpent: stat.totalSpent,
+            };
+        }
+    });
+
     // 4) Банкроты получают 1
     room.players.forEach(p => {
         if (p.capital <= 0) p.capital = 1;
@@ -1947,8 +2061,11 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
         roundWinners: roundWinners.map(id => ({
             id,
             nickname: room.players.get(id) ? room.players.get(id).nickname : '???',
+            cards: room.players.get(id) ? room.players.get(id).cards : null,
+            pitchText: room.players.get(id) ? room.players.get(id).pitchText || '' : '',
         })),
         luckyInvestors,
+        roundBestInvestor,
         players: getPlayersPublicInfo(room),
         isLastRound,
     });
@@ -1976,6 +2093,15 @@ function showFinalResults(room) {
         if (p.capital > maxCapital) { maxCapital = p.capital; bestInvestor = p; }
         if (p.attractedInvestments > maxAttracted) { maxAttracted = p.attractedInvestments; bestEntrepreneur = p; }
     });
+
+    if (bestInvestor) {
+        const p = room.players.get(bestInvestor.id);
+        if (p) p.investorCups = (p.investorCups || 0) + 1;
+    }
+    if (bestEntrepreneur) {
+        const p = room.players.get(bestEntrepreneur.id);
+        if (p) p.entrepreneurMoneybags = (p.entrepreneurMoneybags || 0) + 1;
+    }
 
     broadcastToRoom(room, {
         type: 'gameOver',
@@ -2099,6 +2225,7 @@ wss.on('connection', (ws) => {
                 if (s.startCapital !== undefined) room.settings.startCapital = Math.min(30, Math.max(3, parseInt(s.startCapital) || 10));
                 if (s.useEvents !== undefined) room.settings.useEvents = !!s.useEvents;
                 if (s.streamerMode !== undefined) room.settings.streamerMode = !!s.streamerMode;
+                if (s.anonymizeParticipants !== undefined) room.settings.anonymizeParticipants = !!s.anonymizeParticipants;
                 if (s.prepTime !== undefined) room.settings.prepTime = Math.min(600, Math.max(10, parseInt(s.prepTime) || 120));
                 if (s.maxPlayers !== undefined) room.settings.maxPlayers = Math.min(18, Math.max(3, parseInt(s.maxPlayers) || 8));
                 if (s.presentTime !== undefined) room.settings.presentTime = Math.min(600, Math.max(10, parseInt(s.presentTime) || 120));
@@ -2130,6 +2257,9 @@ wss.on('connection', (ws) => {
                         room.settings.blackSwan = false;
                         room.settings.modifier = 'none';
                     }
+                }
+                if (!room.settings.streamerMode) {
+                    room.settings.anonymizeParticipants = false;
                 }
                 room.totalRounds = room.settings.rounds;
 
@@ -2251,6 +2381,88 @@ wss.on('connection', (ws) => {
             }
 
             // ==================== ИНВЕСТИЦИИ ====================
+            case 'kickPlayer': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.hostId !== info.playerId) return;
+
+                const targetId = msg.targetPlayerId;
+                if (!targetId || targetId === room.hostId) return;
+                const target = room.players.get(targetId);
+                if (!target) return;
+
+                room.players.delete(targetId);
+                room.presentationOrder = (room.presentationOrder || []).filter(id => id !== targetId);
+                room.tiedPlayers = (room.tiedPlayers || []).filter(id => id !== targetId);
+                if (room.investments) {
+                    room.investments.delete(targetId);
+                    room.investments.forEach((arr, investorId) => {
+                        room.investments.set(investorId, (arr || []).filter(inv => inv.targetId !== targetId));
+                    });
+                }
+
+                const dTimer = disconnectTimers.get(targetId);
+                if (dTimer) {
+                    clearTimeout(dTimer);
+                    disconnectTimers.delete(targetId);
+                }
+
+                if (target.ws && target.ws.readyState === WebSocket.OPEN) {
+                    playerRooms.delete(target.ws);
+                    target.ws.send(JSON.stringify({ type: 'kicked', message: 'Хост исключил вас из комнаты.' }));
+                    setTimeout(() => {
+                        try { target.ws.close(); } catch (e) { /* ignore */ }
+                    }, 100);
+                }
+
+                broadcastToRoom(room, {
+                    type: 'playerDisconnected',
+                    playerId: targetId,
+                    nickname: target.nickname,
+                    message: 'Игрок исключен хостом',
+                    players: getPlayersPublicInfo(room),
+                });
+
+                if (room.state === 'lobby') {
+                    broadcastToRoom(room, getLobbyState(room));
+                } else if (room.state === 'investing') {
+                    room.investmentCaps = getInvestmentCaps(room);
+                    const allPresentations = room.presentationOrder.map(id => {
+                        const p = room.players.get(id);
+                        return (p && !p.eliminated) ? {
+                            id,
+                            nickname: getDisplayNickname(room, id),
+                            cards: p.cards,
+                            pitchText: p.pitchText || '',
+                        } : null;
+                    }).filter(Boolean);
+
+                    broadcastToRoom(room, {
+                        type: 'investingPhase',
+                        phase: 'investing',
+                        players: getPlayersPublicInfo(room),
+                        presentations: allPresentations,
+                        event: room.currentEvent,
+                        investTime: room.settings.investTime,
+                        investmentCaps: room.investmentCaps,
+                        round: room.currentRound,
+                        totalRounds: room.totalRounds,
+                    });
+                    broadcastToRoom(room, {
+                        type: 'investmentProgress',
+                        voted: room.investments.size,
+                        total: room.players.size,
+                    });
+
+                    if (room.investments.size >= room.players.size) {
+                        clearTimer(room);
+                        processInvestments(room);
+                    }
+                }
+                break;
+            }
+
             case 'submitInvestment': {
                 const info = playerRooms.get(ws);
                 if (!info) return;
@@ -2274,6 +2486,16 @@ wss.on('connection', (ws) => {
 
                 if (total > player.capital) {
                     ws.send(JSON.stringify({ type: 'error', message: 'Недостаточно капитала! У вас ' + player.capital + ', пытаетесь вложить ' + total }));
+                    return;
+                }
+                const capLimit = room.investmentCaps && room.investmentCaps[info.playerId] !== undefined
+                    ? room.investmentCaps[info.playerId]
+                    : player.capital;
+                if (total > capLimit) {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: 'Лимит инвестиций на этот раунд: ' + capLimit + '. Уменьшите сумму.',
+                    }));
                     return;
                 }
 
@@ -2380,6 +2602,7 @@ wss.on('connection', (ws) => {
                     p.eliminated = false;  // ← ДОБАВЬ ЭТО
 
                 });
+                room.anonAliases = {};
                 broadcastToRoom(room, getLobbyState(room));
                 break;
             }
@@ -2789,8 +3012,7 @@ function sendRoundStartToAll(room) {
             phase: 'preparation',
             players: getPlayersPublicInfo(room),
             presentationOrder: room.presentationOrder.map(id => {
-                const pl = room.players.get(id);
-                return { id, nickname: pl ? pl.nickname : '???' };
+                return { id, nickname: getDisplayNickname(room, id) };
             }),
             prepTime: room.settings.prepTime,
             streamerMode: room.settings.streamerMode,

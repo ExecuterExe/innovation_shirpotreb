@@ -482,6 +482,42 @@ input[type="range"].invest-slider::-webkit-slider-thumb {
     border: 1px solid rgba(255, 215, 0, 0.2);
 }
 
+.curse-banner-enter {
+    animation: curseBannerEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes curseBannerEnter {
+    0% {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+        filter: blur(1px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+.mvp-reveal {
+    animation: mvpReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes mvpReveal {
+    0% {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+        filter: blur(2px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
 .card-review-gradient {
     background: linear-gradient(135deg, #92400e 0%, #78350f 50%, #451a03 100%);
 }
