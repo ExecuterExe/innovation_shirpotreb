@@ -86,7 +86,9 @@ export function updateStartButton(container) {
 
     var html = '';
     if (isHost && canStart) {
-        html = '<button id="btn-start" class="btn-neon-solid w-full py-5 rounded-2xl text-lg font-black uppercase tracking-wider cursor-pointer">НАЧАТЬ ПИТЧИНГ</button>';
+        var btnText = (state.settings && state.settings.bunkerMode) ? 'НАЧАТЬ ВЫЖИВАНИЕ' : 'НАЧАТЬ ПИТЧИНГ';
+        var btnEmoji = (state.settings && state.settings.bunkerMode) ? '🏠' : '🚀';
+        html = '<button id="btn-start" class="btn-neon-solid w-full py-5 rounded-2xl text-lg font-black uppercase tracking-wider cursor-pointer">' + btnEmoji + ' ' + btnText + '</button>';
     } else if (isHost) {
         html = '<div class="text-center text-corp-muted text-sm font-semibold py-4">Ожидание игроков... (' + (state.players || []).length + '/3)</div>';
     } else if (canStart) {
@@ -145,6 +147,9 @@ export function updateSettingsPanel(container) {
     html += buildToggle('Псевдоинновации', 'Лайт-режим: только прилагательное + предмет (без особенности)', 'set-pseudo', s.pseudoMode, false);
     html += '<div class="h-px bg-corp-border my-2"></div>';
     html += buildToggle('Карточка отзыва', 'Добавляет первый отзыв клиента к продукту', 'set-reviews', s.useReviews, false);
+    html += buildToggle('Целевая аудитория', 'Карточка «для кого» продукт (напр. «Для геймеров»)', 'set-target-audience', s.useTargetAudience, false);
+    html += buildToggle('Скрытый дефект', 'Карточка с тайным недостатком продукта', 'set-hidden-defects', s.useHiddenDefects, false);
+    html += buildToggle('Упаковка', 'Карточка с абсурдной упаковкой (напр. «Мусорный мешок»)', 'set-packaging', s.usePackaging, false);
     html += buildToggle('Чёрный лебедь', '20% шанс замены карты при выступлении', 'set-blackswan', s.blackSwan, false);
     html += '<div class="h-px bg-corp-border my-2"></div>';
     html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Модификатор предмета</div>';
@@ -236,8 +241,7 @@ export function updateSettingsPanel(container) {
 
     html += '<div class="h-px bg-corp-border my-2"></div>';
 
-    html += buildToggle('Режим «Бункер»', 'Постепенное открытие карт', 'set-bunker', false, true);
-    html += '</div>';
+    html += buildToggle('Режим «Бункер»', 'Выживание стартапов: 8 карт, раскрытие по очереди, голосование за кик', 'set-bunker', s.bunkerMode, false); html += '</div>';
 
     panel.innerHTML = html;
 
@@ -505,6 +509,23 @@ function attachSettingsListeners(container) {
             });
         })(modRadios[m]);
     }
+
+    // Бункер — при включении отключаем несовместимые опции
+    var bunkerToggle = container.querySelector('#set-bunker');
+    if (bunkerToggle) {
+        bunkerToggle.addEventListener('change', function () {
+            if (bunkerToggle.checked) {
+                // Бункер включает ВСЕ карты принудительно, отключаем генератор абсурда
+                var dbRadio = container.querySelector('input[name="cardSource"][value="database"]');
+                if (dbRadio) dbRadio.checked = true;
+
+                // Отключаем псевдоинновации (нужны все 8 карт)
+                var pseudoToggle = container.querySelector('#set-pseudo');
+                if (pseudoToggle) pseudoToggle.checked = false;
+            }
+            pushSettings(container);
+        });
+    }
 }
 
 function handleStep(field, dir, container) {
@@ -534,6 +555,9 @@ function pushSettings(container) {
         rounds: parseInt(container.querySelector('#set-rounds')?.value) || 3,
         startCapital: parseInt(container.querySelector('#set-capital')?.value) || 10,
         useReviews: container.querySelector('#set-reviews')?.checked || false,
+        useTargetAudience: container.querySelector('#set-target-audience')?.checked || false,
+        useHiddenDefects: container.querySelector('#set-hidden-defects')?.checked || false,
+        usePackaging: container.querySelector('#set-packaging')?.checked || false,
         useEvents: container.querySelector('#set-events')?.checked || false,
         useSpeech: container.querySelector('#set-speech')?.checked || false,
         streamerMode: container.querySelector('#set-streamer')?.checked || false,
@@ -545,6 +569,7 @@ function pushSettings(container) {
         blackSwan: container.querySelector('#set-blackswan')?.checked || false,
         modifier: modifierEl ? modifierEl.value : 'none',
         pseudoMode: container.querySelector('#set-pseudo')?.checked || false,
+        bunkerMode: container.querySelector('#set-bunker')?.checked || false,
     };
     console.log('[lobby] Pushing settings:', settings);
     sendMsg({ type: 'updateSettings', settings: settings });

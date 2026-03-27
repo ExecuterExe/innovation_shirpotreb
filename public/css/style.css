@@ -525,3 +525,102 @@ input[type="range"].invest-slider::-webkit-slider-thumb {
 .card-modifier-gradient {
     background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #022c22 100%);
 }
+
+/* Target Audience card */
+.card-audience-gradient {
+    background: linear-gradient(135deg, #be185d 0%, #9d174d 50%, #831843 100%);
+}
+
+/* Hidden Defect card */
+.card-defect-gradient {
+    background: linear-gradient(135deg, #c2410c 0%, #9a3412 50%, #7c2d12 100%);
+}
+
+/* Packaging card */
+.card-packaging-gradient {
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #115e59 100%);
+}
+
+/* ═══════ BUNKER MODE ═══════ */
+
+/* Card flip animation */
+.bunker-card-flip {
+    animation: bunkerFlip 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes bunkerFlip {
+    0% {
+        transform: rotateY(180deg) scale(0.8);
+        opacity: 0;
+    }
+
+    50% {
+        transform: rotateY(90deg) scale(0.9);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: rotateY(0deg) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Card back pattern */
+.bunker-card-back {
+    background:
+        repeating-linear-gradient(45deg,
+            transparent,
+            transparent 5px,
+            rgba(255, 255, 255, 0.03) 5px,
+            rgba(255, 255, 255, 0.03) 10px),
+        linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Eliminated player overlay */
+.bunker-eliminated {
+    position: relative;
+}
+
+.bunker-eliminated::after {
+    content: '💀';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+/* Vote card hover */
+.bunker-vote-card {
+    transition: all 0.2s;
+}
+
+.bunker-vote-card:hover {
+    border-color: rgba(255, 59, 59, 0.3);
+    transform: translateY(-1px);
+}
+
+.bunker-vote-card.selected {
+    border-color: rgba(0, 180, 255, 0.5);
+    box-shadow: 0 0 15px rgba(0, 180, 255, 0.15);
+}
+
+/* Pulse for current player */
+.bunker-current-pulse {
+    animation: bunkerPulse 2s ease infinite;
+}
+
+@keyframes bunkerPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 20px 5px rgba(255, 215, 0, 0.15);
+    }
+}

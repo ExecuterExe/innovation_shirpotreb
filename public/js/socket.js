@@ -3,6 +3,7 @@ import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
 import { updatePlayersList, updateStartButton, updateSettingsPanel } from './screens/lobby.js';
 import { speakSequence, stopSpeaking } from './components/speech.js';
+import { setPendingReveal } from './screens/bunker-game.js';
 
 var ws = null;
 var reconnectAttempts = 0;
@@ -205,7 +206,10 @@ function handleMessage(msg) {
             break;
 
         case 'timerStart':
-            startTimer(msg.duration);
+            // Задержка чтобы DOM успел отрисоваться после navigate
+            setTimeout(function () {
+                startTimer(msg.duration);
+            }, 50);
             break;
 
         case 'playerDisconnected':
@@ -288,6 +292,60 @@ function handleMessage(msg) {
                         + '</div>';
                 }
             }
+
+        // ═══════ БУНКЕР ═══════
+
+        case 'bunkerStart':
+            handleBunkerStart(msg);
+            break;
+
+        case 'bunkerTurn':
+            handleBunkerTurn(msg);
+            break;
+
+        case 'bunkerCardRevealed':
+            handleBunkerCardRevealed(msg);
+            break;
+
+        case 'bunkerVotePhase':
+            handleBunkerVotePhase(msg);
+            break;
+
+        case 'bunkerVoteProgress':
+            var bvp = document.querySelector('#bunker-vote-progress');
+            if (bvp) bvp.textContent = 'Проголосовали: ' + msg.voted + ' / ' + msg.total;
+            break;
+
+        case 'bunkerVoteAccepted':
+            showNotification('Голос принят!', 'success');
+            break;
+
+        case 'bunkerVoteResult':
+            handleBunkerVoteResult(msg);
+            break;
+
+        case 'bunkerTieVotePhase':
+            handleBunkerTieVotePhase(msg);
+            break;
+
+        case 'bunkerTieVoteProgress':
+            var btvp = document.querySelector('#bunker-vote-progress');
+            if (btvp) btvp.textContent = 'Проголосовали: ' + msg.voted + ' / ' + msg.total;
+            break;
+
+        case 'bunkerTieVoteAccepted':
+            showNotification('Голос принят!', 'success');
+            break;
+
+        case 'bunkerPauseState':
+            setState({ bunker: Object.assign({}, state.bunker, { paused: msg.paused }) });
+            if (state.phase === 'bunkerVote') navigate('bunkerVote');
+            else if (state.phase === 'bunkerTieVote') navigate('bunkerTieVote');
+            showNotification(msg.paused ? 'Пауза' : 'Таймер запущен', 'info');
+            break;
+
+        case 'bunkerGameOver':
+            handleBunkerGameOver(msg);
             break;
     }
 }
@@ -463,5 +521,183 @@ function handleGameOver(msg) {
     });
 
     navigate('gameOver');
+    playSound('fanfare');
+}
+
+// ═══════════════════════════════════════════
+// BUNKER HANDLERS
+// ═══════════════════════════════════════════
+
+function handleBunkerStart(msg) {
+    // Сохраняем свои карты
+    setState({
+        myCards: msg.yourCards,
+        players: msg.players,
+        bunker: {
+            globalProblem: msg.globalProblem,
+            revealOrder: msg.revealOrder,
+            currentPlayerId: msg.revealOrder.length > 0 ? (msg.revealOrder[0].id || msg.revealOrder[0]) : null,
+            currentTurnIndex: 0,
+            totalTurns: msg.revealOrder.length,
+            currentRound: 1,
+            revealedCards: msg.revealedCards,
+            revealedCardValues: {},
+            eliminatedPlayers: msg.eliminatedPlayers || [],
+            survivorsCount: msg.survivorsCount,
+            totalPlayers: msg.totalPlayers,
+            activePlayers: [],
+            tiedPlayers: [],
+            remainingKicks: 0,
+            voteResult: null,
+            survivors: [],
+            eliminated: [],
+            paused: false,
+        },
+    });
+
+    navigate('bunkerReveal');
+    playSound('start');
+    showNotification('Бункер начинается! У каждого 8 карт.', 'success');
+}
+
+function handleBunkerTurn(msg) {
+    var bunker = Object.assign({}, state.bunker);
+    bunker.currentPlayerId = msg.currentPlayerId;
+    bunker.currentTurnIndex = msg.currentTurnIndex;
+    bunker.totalTurns = msg.totalTurns;
+    bunker.currentRound = msg.currentRound;
+    bunker.revealedCards = msg.revealedCards;
+    bunker.eliminatedPlayers = msg.eliminatedPlayers || bunker.eliminatedPlayers;
+    bunker.hasRevealedThisTurn = false; // Сброс при новом ходе
+    setState({
+        bunker: bunker,
+        players: msg.players || state.players,
+    });
+
+    // НЕ навигируем если мы уже на этом экране и просто обновляем
+    // (navigate пересоздаёт DOM и убивает таймер)
+    navigate('bunkerReveal');
+
+    // Таймер перезапустится автоматически через timerStart от сервера
+    // НО нам нужно убедиться что DOM уже на месте
+
+    if (msg.currentPlayerId === state.playerId) {
+        playSound('start');
+        showNotification('Ваш ход! Выберите карту для раскрытия.', 'info');
+    } else {
+        playSound('join');
+    }
+}
+
+function handleBunkerCardRevealed(msg) {
+    var bunker = Object.assign({}, state.bunker);
+    bunker.revealedCards = msg.revealedCards;
+
+    if (!bunker.revealedCardValues) bunker.revealedCardValues = {};
+    if (!bunker.revealedCardValues[msg.playerId]) bunker.revealedCardValues[msg.playerId] = {};
+    bunker.revealedCardValues[msg.playerId][msg.cardKey] = msg.cardValue;
+
+    if (msg.playerId === state.playerId) {
+        bunker.hasRevealedThisTurn = true;
+    }
+    setState({ bunker: bunker });
+
+    setPendingReveal({
+        playerId: msg.playerId,
+        nickname: msg.nickname,
+        cardKey: msg.cardKey,
+        cardValue: msg.cardValue,
+        isAuto: msg.isAuto,
+    });
+
+    if (state.phase === 'bunkerReveal') {
+        // ═══════ FIX: сохраняем таймер до navigate ═══════
+        var remainingTime = state.timerRemaining;
+        var totalDuration = state.timerDuration;
+
+        navigate('bunkerReveal');
+
+        // ═══════ FIX: восстанавливаем таймер после navigate ═══════
+        if (remainingTime > 0) {
+            startTimer(remainingTime);
+        }
+    }
+
+    if (msg.isAuto) {
+        showNotification(msg.nickname + ': авто-раскрытие', 'info');
+    } else {
+        playSound('success');
+    }
+}
+
+function handleBunkerVotePhase(msg) {
+    var bunker = Object.assign({}, state.bunker);
+    bunker.activePlayers = msg.activePlayers;
+    bunker.eliminatedPlayers = msg.eliminatedPlayers;
+    bunker.survivorsCount = msg.survivorsCount;
+    bunker.remainingKicks = msg.remainingKicks;
+    bunker.revealedCards = msg.revealedCards;
+    bunker.currentRound = msg.round || bunker.currentRound;
+
+    setState({
+        bunker: bunker,
+        players: msg.players || state.players,
+    });
+
+    navigate('bunkerVote');
+    playSound('invest');
+}
+
+function handleBunkerVoteResult(msg) {
+    var bunker = Object.assign({}, state.bunker);
+    bunker.voteResult = msg;
+    bunker.revealedCards = msg.revealedCards || bunker.revealedCards;
+    bunker.eliminatedPlayers = msg.eliminatedPlayers || bunker.eliminatedPlayers;
+
+    // Если карты кикнутого раскрыты — сохраняем значения
+    if (msg.eliminatedCards && msg.eliminatedId) {
+        if (!bunker.revealedCardValues) bunker.revealedCardValues = {};
+        bunker.revealedCardValues[msg.eliminatedId] = msg.eliminatedCards;
+    }
+
+    setState({
+        bunker: bunker,
+        players: msg.players || state.players,
+    });
+
+    navigate('bunkerVoteResult');
+
+    if (msg.result === 'eliminated') {
+        playSound('warning');
+    } else {
+        playSound('join');
+    }
+}
+
+function handleBunkerTieVotePhase(msg) {
+    var bunker = Object.assign({}, state.bunker);
+    bunker.tiedPlayers = msg.tiedPlayers;
+
+    setState({
+        bunker: bunker,
+        players: msg.players || state.players,
+    });
+
+    navigate('bunkerTieVote');
+    playSound('warning');
+}
+
+function handleBunkerGameOver(msg) {
+    var bunker = Object.assign({}, state.bunker);
+    bunker.survivors = msg.survivors;
+    bunker.eliminated = msg.eliminated;
+    bunker.globalProblem = msg.globalProblem;
+
+    setState({
+        bunker: bunker,
+        players: msg.players || state.players,
+    });
+
+    navigate('bunkerGameOver');
     playSound('fanfare');
 }

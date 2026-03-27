@@ -12,6 +12,8 @@ import { renderGameOver } from './screens/gameover.js';
 import { renderCardInput } from './screens/card-input.js';
 import { renderTied, renderTiebreaker, renderTiebreakerVoting } from './screens/tiebreaker.js';
 import { initSpeech } from './components/speech.js';
+import { renderBunkerReveal, renderBunkerVoteResult } from './screens/bunker-game.js';
+import { renderBunkerVote, renderBunkerTieVote, renderBunkerGameOver } from './screens/bunker-vote.js';
 
 // ==================== GLOBAL STATE ====================
 
@@ -60,6 +62,27 @@ export var state = {
     bestInvestor: null,
     bestEntrepreneur: null,
     blackSwan: null,
+    // Бункер
+    bunker: {
+        globalProblem: null,
+        revealOrder: [],
+        currentPlayerId: null,
+        currentTurnIndex: 0,
+        totalTurns: 0,
+        currentRound: 1,
+        revealedCards: {},
+        revealedCardValues: {},
+        eliminatedPlayers: [],
+        survivorsCount: 0,
+        totalPlayers: 0,
+        activePlayers: [],
+        tiedPlayers: [],
+        remainingKicks: 0,
+        voteResult: null,
+        survivors: [],
+        eliminated: [],
+        paused: false,
+    },
 };
 
 // ==================== STATE UPDATE ====================
@@ -97,6 +120,11 @@ export function navigate(phase) {
         case 'tiebreaker': renderTiebreaker(wrapper); break;
         case 'tiebreaker_voting': renderTiebreakerVoting(wrapper); break;
         case 'gameOver': renderGameOver(wrapper); break;
+        case 'bunkerReveal': renderBunkerReveal(wrapper); break;
+        case 'bunkerVote': renderBunkerVote(wrapper); break;
+        case 'bunkerTieVote': renderBunkerTieVote(wrapper); break;
+        case 'bunkerVoteResult': renderBunkerVoteResult(wrapper); break;
+        case 'bunkerGameOver': renderBunkerGameOver(wrapper); break;
         default: renderWelcome(wrapper);
     }
 

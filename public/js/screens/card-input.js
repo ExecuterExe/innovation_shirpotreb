@@ -41,6 +41,33 @@ var PHASE_CONFIG = {
         color: 'accent-gold',
         maxLength: 150,
     },
+    targetAudience: {
+        emoji: '🎯',
+        title: 'ПРИДУМАЙТЕ ЦЕЛЕВУЮ АУДИТОРИЮ',
+        subtitle: 'Для кого будет чей-то продукт?',
+        placeholder: 'Например: Для геймеров, Для бабушек, Для инопланетян...',
+        hint: 'Начните с "Для..." — опишите группу людей',
+        color: 'accent-pink',
+        maxLength: 80,
+    },
+    hiddenDefect: {
+        emoji: '⚠️',
+        title: 'ПРИДУМАЙТЕ СКРЫТЫЙ ДЕФЕКТ',
+        subtitle: 'Какой тайный недостаток будет у продукта?',
+        placeholder: 'Например: Разряжается за 1 час, Может взорваться...',
+        hint: 'Опишите скрытую проблему продукта',
+        color: 'accent-orange',
+        maxLength: 100,
+    },
+    packaging: {
+        emoji: '📦',
+        title: 'ПРИДУМАЙТЕ УПАКОВКУ',
+        subtitle: 'В чём будет упакован чей-то продукт?',
+        placeholder: 'Например: Мусорный мешок, Бронированный кейс...',
+        hint: 'Опишите абсурдную упаковку',
+        color: 'accent-teal',
+        maxLength: 80,
+    },
 };
 
 export function renderCardInput(container) {

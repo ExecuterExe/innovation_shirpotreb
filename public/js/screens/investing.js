@@ -91,11 +91,14 @@ export function renderInvesting(container) {
             var cval = p.cards[ctype.key];
             if (cval) {
                 var tagColors = [
-                    'bg-red-900/30 text-red-400 border-red-800/30',
-                    'bg-cyan-900/30 text-cyan-400 border-cyan-800/30',
-                    'bg-purple-900/30 text-purple-400 border-purple-800/30',
-                    'bg-amber-900/30 text-amber-400 border-amber-800/30',
-                    'bg-green-900/30 text-green-400 border-green-800/30',
+                    'bg-red-900/30 text-red-400 border-red-800/30',       // adjective
+                    'bg-cyan-900/30 text-cyan-400 border-cyan-800/30',     // item
+                    'bg-emerald-900/30 text-emerald-400 border-emerald-800/30', // modifier
+                    'bg-purple-900/30 text-purple-400 border-purple-800/30', // feature
+                    'bg-pink-900/30 text-pink-400 border-pink-800/30',     // targetAudience
+                    'bg-orange-900/30 text-orange-400 border-orange-800/30', // hiddenDefect
+                    'bg-teal-900/30 text-teal-400 border-teal-800/30',     // packaging
+                    'bg-amber-900/30 text-amber-400 border-amber-800/30',  // review
                 ];
                 var tagColor = tagColors[ct] || tagColors[0];
                 html += '<span class="text-xs font-bold px-3 py-1 rounded-lg border ' + tagColor + '">' + escapeHtml(cval) + '</span>';
@@ -121,30 +124,30 @@ export function renderInvesting(container) {
         }
         html += '  <div class="flex items-center gap-4 flex-wrap">';
 
-            // Minus button
-            html += '    <button class="invest-minus w-10 h-10 rounded-full border border-corp-border text-corp-dim font-black text-lg flex items-center justify-center hover:border-accent-red hover:text-accent-red transition-colors cursor-pointer" data-target="' + p.id + '">−</button>';
+        // Minus button
+        html += '    <button class="invest-minus w-10 h-10 rounded-full border border-corp-border text-corp-dim font-black text-lg flex items-center justify-center hover:border-accent-red hover:text-accent-red transition-colors cursor-pointer" data-target="' + p.id + '">−</button>';
 
-            // Amount display
-            html += '    <div class="flex-shrink-0 text-center">';
-            html += '      <div class="invest-display font-mono text-3xl font-black text-accent-blue w-16 text-center" data-target="' + p.id + '">0</div>';
-            html += '      <div class="text-[0.6rem] text-corp-muted font-bold uppercase tracking-wider mt-0.5">жетонов</div>';
-            html += '    </div>';
+        // Amount display
+        html += '    <div class="flex-shrink-0 text-center">';
+        html += '      <div class="invest-display font-mono text-3xl font-black text-accent-blue w-16 text-center" data-target="' + p.id + '">0</div>';
+        html += '      <div class="text-[0.6rem] text-corp-muted font-bold uppercase tracking-wider mt-0.5">жетонов</div>';
+        html += '    </div>';
 
-            // Plus button
-            html += '    <button class="invest-plus w-10 h-10 rounded-full border border-corp-border text-corp-dim font-black text-lg flex items-center justify-center hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '">+</button>';
+        // Plus button
+        html += '    <button class="invest-plus w-10 h-10 rounded-full border border-corp-border text-corp-dim font-black text-lg flex items-center justify-center hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '">+</button>';
 
-            // Slider
-            html += '    <div class="flex-1 min-w-[120px]">';
+        // Slider
+        html += '    <div class="flex-1 min-w-[120px]">';
         html += '      <input type="range" class="invest-slider w-full" min="0" max="' + budget + '" value="0" data-target="' + p.id + '">';
-            html += '    </div>';
+        html += '    </div>';
 
-            // Quick buttons
-            html += '    <div class="flex gap-1.5">';
-            html += '      <button class="invest-quick text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-corp-graphite text-corp-dim border border-corp-border hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '" data-amount="1">+1</button>';
-            html += '      <button class="invest-quick text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-corp-graphite text-corp-dim border border-corp-border hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '" data-amount="3">+3</button>';
-            html += '      <button class="invest-quick text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-corp-graphite text-corp-dim border border-corp-border hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '" data-amount="5">+5</button>';
-            html += '      <button class="invest-quick-all text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-accent-blue-dim text-accent-blue border border-accent-blue/20 hover:bg-accent-blue hover:text-white transition-colors cursor-pointer" data-target="' + p.id + '">ALL</button>';
-            html += '    </div>';
+        // Quick buttons
+        html += '    <div class="flex gap-1.5">';
+        html += '      <button class="invest-quick text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-corp-graphite text-corp-dim border border-corp-border hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '" data-amount="1">+1</button>';
+        html += '      <button class="invest-quick text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-corp-graphite text-corp-dim border border-corp-border hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '" data-amount="3">+3</button>';
+        html += '      <button class="invest-quick text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-corp-graphite text-corp-dim border border-corp-border hover:border-accent-blue hover:text-accent-blue transition-colors cursor-pointer" data-target="' + p.id + '" data-amount="5">+5</button>';
+        html += '      <button class="invest-quick-all text-[0.65rem] font-bold px-2.5 py-1 rounded-lg bg-accent-blue-dim text-accent-blue border border-accent-blue/20 hover:bg-accent-blue hover:text-white transition-colors cursor-pointer" data-target="' + p.id + '">ALL</button>';
+        html += '    </div>';
 
         html += '  </div>';
         html += '</div>';

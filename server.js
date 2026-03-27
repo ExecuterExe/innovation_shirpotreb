@@ -1032,6 +1032,405 @@ const METAPHOR_PART2_M = [
     "ГРЕХА", "АПОКАЛИПСИСА", "ЦИНИЗМА", "ДОХОДА"
 ];
 
+const TARGET_AUDIENCE = [
+    "ДЛЯ НАСТОЯЩИХ МУЖЧИН",
+    "ДЛЯ УВЕРЕННЫХ В СЕБЕ",
+    "ДЛЯ ТРУДОГОЛИКОВ",
+    "ДЛЯ СИЛЬНЫХ И НЕЗАВИСИМЫХ",
+    "ДЛЯ СТУДЕНТОВ",
+    "ДЛЯ ТЕХ, КТО НА МЕЛИ",
+    "ДЛЯ ЛЮДЕЙ ИЗ БЫВШЕГО СОВЕТСКОГО СОЮЗА",
+    "ДЛЯ ДОМОСЕДОВ",
+    "ДЛЯ ТУСОВЩИКОВ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ ОСТРЫХ ОЩУЩЕНИЙ",
+    "ДЛЯ РАЗВЕДЕННЫХ",
+    "ДЛЯ БУДУЩЕЙ ВТОРОЙ ПОЛОВИНКИ",
+    "ДЛЯ МАМОЧЕК В ДЕКРЕТЕ",
+    "ДЛЯ КАПРИЗНЫХ ДЕТЕЙ",
+    "ДЛЯ ПОДРОСТКОВ",
+    "ДЛЯ НАЧАЛЬНИКОВ",
+    "ДЛЯ ПОДЧИНЕННЫХ",
+    "ДЛЯ ТАКСИСТОВ",
+    "ДЛЯ ОХРАННИКОВ",
+    "ДЛЯ КУРЬЕРОВ",
+    "ДЛЯ ВАШЕГО ДОМА",
+    "ДЛЯ БЛОГЕРОВ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ ПОСПАТЬ",
+    "ДЛЯ ТЕХ, У КОГО НЕ ВСЕ ДОМА",
+    "ДЛЯ ТЕХ, У КОГО ЕСТЬ ЛИШНИЕ ДЕНЬГИ",
+    "ДЛЯ ЛЮДЕЙ С КРЕДИТАМИ",
+    "ДЛЯ ЛЮДЕЙ С ИПОТЕКОЙ",
+    "ДЛЯ АЗАРТНЫХ ИГРОКОВ",
+    "ДЛЯ ЖЕРТВ МОШЕННИКОВ",
+    "ДЛЯ СПОРТСМЕНОВ",
+    "ДЛЯ ЛЮДЕЙ ИЗ КРИМИНАЛА",
+    "ДЛЯ ДИВАННЫХ ЭКСПЕРТОВ",
+    "ДЛЯ РЫБАКОВ",
+    "ДЛЯ ОХОТНИКОВ",
+    "ДЛЯ ГЕЙМЕРОВ",
+    "ДЛЯ ПЕШЕХОДОВ",
+    "ДЛЯ ГРЯЗНУЛЬ",
+    "ДЛЯ ПАНИКЕРОВ",
+    "ДЛЯ БОЛЬНЫХ ЛЮДЕЙ",
+    "ДЛЯ ИНОПЛАНЕТЯН",
+    "ДЛЯ ЛЮДЕЙ С ДЕПРЕССИЕЙ",
+    "ДЛЯ ОПТИМИСТОВ",
+    "ДЛЯ МЕЧТАТЕЛЕЙ",
+    "ДЛЯ ЭГОИСТОВ",
+    "ДЛЯ НАГЛЫХ",
+    "ДЛЯ МАФИИ",
+    "ДЛЯ ОБИДЧИВЫХ",
+    "ДЛЯ ТЕХ, КОМУ ЗА 30",
+    "ДЛЯ ТРАНЖИР",
+    "ДЛЯ КОНСПИРОЛОГОВ",
+    "ДЛЯ ЗАВИСИМЫХ",
+    "ДЛЯ ПРИЗРАКОВ",
+    "ДЛЯ МАГОВ В ТРЕТЬЕМ ПОКОЛЕНИИ",
+    "ДЛЯ ОТДЕЛЬНЫХ ЗНАКОВ ЗОДИАКА",
+    "ДЛЯ ВЕДЬМАКОВ/ ВЕДЬМ",
+    "ДЛЯ ВЫЖИВАЛЬЩИКОВ",
+    "ДЛЯ ЭЛИТЫ ОБЩЕСТВА",
+    "ДЛЯ ОБРЕЧЕННЫХ",
+    "ДЛЯ ЛЮДЕЙ, НАХОДЯЩИХСЯ В ПЫТКАХ",
+    "ДЛЯ СЧАСТЛИВЧИКОВ",
+    "ДЛЯ ТЕХ, КТО ВЕЧНО ОПАЗДЫВАЕТ",
+    "ДЛЯ УСТАВШИХ ЛЮДЕЙ",
+    "ДЛЯ ЛЮДЕЙ В ДУШЕ",
+    "ДЛЯ ЛЮДЕЙ НА КУХНЕ",
+    "ДЛЯ ЛЮДЕЙ В СПАЛЬНЕ",
+    "ДЛЯ ЛЮДЕЙ ПОД ЗЕМЛЕЙ",
+    "ДЛЯ ТЕРПЕЛИВЫХ ЛЮДЕЙ",
+    "ДЛЯ СОСЕДЕЙ СВЕРХУ",
+    "ДЛЯ ПРАНКЕРОВ",
+    "ДЛЯ САМЫХ УМНЫХ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ РИСКА",
+    "ДЛЯ САМЫХ КРАСИВЫХ",
+    "ДЛЯ ОСТОРОЖНЫХ",
+    "ДЛЯ БЕЗУМЦЕВ",
+    "ДЛЯ ТЕХ, КТО ЧИТАЕТ ИНСТРУКЦИИ",
+    "ДЛЯ ТЕХ, КТО ДЕЛАЕТ, А ПОТОМ ДУМАЕТ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ ПОСПОРИТЬ",
+    "ДЛЯ ТЕХ, КТО ЖИВЕТ С РОДИТЕЛЯМИ",
+    "ДЛЯ МОЛОДЫХ ПАРОЧЕК",
+    "ДЛЯ ВЛЮБЛЕННЫХ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ КОМФОРТА",
+    "ДЛЯ ЖЕЛАЮЩИХ ИСПОРТИТЬ СЕБЕ ЖИЗНЬ",
+    "НЕИЗВЕСТНО ДЛЯ КОГО",
+    "ДЛЯ ИСТЕРИЧЕК",
+    "ДЛЯ КЛИЕНТОВ ПСИХОЛОГА",
+    "ДЛЯ ДОБРЫХ ЛЮДЕЙ",
+    "ДЛЯ СЛАБЫХ ЛЮДЕЙ",
+    "ДЛЯ ЛЮДЕЙ С ПОВЫШЕННЫМ ЧУВСТВОМ ВАЖНОСТИ",
+    "ДЛЯ ГЕРОЕВ",
+    "ДЛЯ ТОКСИЧНЫХ ЛЮДЕЙ",
+    "ДЛЯ АБСОЛЮТНО ВСЕХ",
+    "ДЛЯ ЧУЖИХ ЛЮДЕЙ",
+    "ДЛЯ ПЕРЕГОРЕВШИХ",
+    "ДЛЯ АВТОМОБИЛИСТОВ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ ПОПЛАКАТЬ",
+    "ДЛЯ ТЕХ, КТО ЖДЕТ ЗНАКА СВЫШЕ",
+    "ДЛЯ ТЕХ, КТО БЕРЕТ ОТ ЖИЗНИ ВСЕ",
+    "ДЛЯ ТЕХ, КТО ЛЮБИТ ЧТО-ТО СТРАННОЕ",
+    "ДЛЯ ХОЛОДНЫХ НАТУР",
+    "ДЛЯ ДЕРЗКИХ",
+    "ДЛЯ СКРОМНЫХ",
+    "ДЛЯ МЕДЛИТЕЛЬНЫХ",
+    "ДЛЯ ХИТРЫХ",
+    "ДЛЯ СТРИМЕРОВ",
+    "ДЛЯ ПОДПИСЧИКОВ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ ПОТРОЛЛИТЬ",
+    "ДЛЯ ХАКЕРОВ",
+    "ДЛЯ МАМЫ",
+    "ДЛЯ БАБУШКИ",
+    "ДЛЯ ДЕДУШКИ",
+    "ДЛЯ ПАПЫ",
+    "ДЛЯ БИЗНЕСМЕНОВ",
+    "ДЛЯ БАНКРОТОВ",
+    "ДЛЯ СТРОИТЕЛЕЙ",
+    "ДЛЯ ХУЛИГАНОВ",
+    "ДЛЯ НЕВЕСТ",
+    "ДЛЯ КВАРТИРАНТОВ",
+    "ДЛЯ МНОГОДЕТНЫХ СЕМЕЙ",
+    "ДЛЯ ГОЛОДНЫХ",
+    "ДЛЯ ЗЛЫХ",
+    "ДЛЯ ВЫСОКИХ ЛЮДЕЙ",
+    "ДЛЯ НИЗКИХ ЛЮДЕЙ",
+    "ДЛЯ НОРМАЛЬНЫХ",
+    "ДЛЯ СЛЕПЫХ",
+    "ДЛЯ ГЛУХИХ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ ПОЖЕВАТЬ ЧТО-ТО",
+    "ДЛЯ ТЕХ, КТО ЛЮБИТ ГОВОРИТЬ",
+    "ДЛЯ МУТАНТОВ",
+    "ДЛЯ ГАДАЛОК",
+    "ДЛЯ ОТЛИЧНИКОВ",
+    "ДЛЯ БУНТАРЕЙ",
+    "ДЛЯ ДВОЕЧНИКОВ",
+    "ДЛЯ ВЕЗУЧИХ",
+    "ДЛЯ НЕВЕЗУЧИХ",
+    "ДЛЯ ТУРИСТОВ",
+    "ДЛЯ ЛЕНИВЫХ",
+    "ДЛЯ НЕСАМОСТОЯТЕЛЬНЫХ",
+    "ДЛЯ ТЕХ, КТО ЖИВЕТ ОДИН",
+    "ДЛЯ ПОСТОЯННЫХ КЛИЕНТОВ ШАУРМИЧНОЙ",
+    "ДЛЯ МАСТЕРОВ ПАССИВНОЙ АГРЕССИИ",
+    "ДЛЯ ТЕХ, КТО БОИТСЯ ДЕЙСТВОВАТЬ",
+    "ДЛЯ ЛЮДЕЙ, НЕ ЛЮБИТ ЛЮДЕЙ",
+    "ДЛЯ ИНФОЦЫГАН",
+    "ДЛЯ КОУЧЕЙ",
+    "ДЛЯ ПРОКРАСТИНАТОРОВ",
+    "ДЛЯ СОЦИОФОБОВ",
+    "ДЛЯ ВТОРОСТЕПЕННЫХ ПЕРСОНАЖЕЙ",
+    "ДЛЯ ТАЙНЫХ АГЕНТОВ",
+    "ДЛЯ ВЕЛОСИПЕДИСТОВ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ НАРУШАТЬ ПРАВИЛА",
+    "ДЛЯ СКЕПТИКОВ",
+    "ДЛЯ ЖЕРТВ РЕКЛАМЫ",
+    "ДЛЯ ТЕХ, КТО ЧАСТО СТОИТ В ОЧЕРЕДИ",
+    "ДЛЯ ТЕХ, КТО СТОИТ В ПРОБКЕ",
+    "ДЛЯ НЕОПЫТНЫХ МАМ",
+    "ДЛЯ МЛАДЕНЦЕВ",
+    "ДЛЯ ЗАКЛЯТЫХ ВРАГОВ",
+    "ДЛЯ ПЛЫВУЩИХ ПО ТЕЧЕНИЮ",
+    "ДЛЯ ТЕХ, КТО ЛЮБИТ ХОДИТЬ ПЕШКОМ",
+    "ДЛЯ НЕДАВНО УВОЛИВШИХСЯ",
+    "ДЛЯ ТЕХ, КОГО ЖИЗНЬ ПРЕДАЛА",
+    "ДЛЯ СОИСКАТЕЛЕЙ",
+    "ДЛЯ МАРАФОНЦЕВ",
+    "ДЛЯ ТЕХ, КТО ВСЕ ЛОМАЕТ",
+    "ДЛЯ АФЕРИСТОВ",
+    "ДЛЯ ЗУМЕРОВ",
+    "ДЛЯ ПОКОЛЕНИЯ АЛЬФА",
+    "ДЛЯ САМОУЧЕК",
+    "ДЛЯ ЖУЛИКОВ",
+    "ДЛЯ САМОГО ПРЕДПРИНИМАТЕЛЯ",
+    "ДЛЯ НЕЧЕСТНЫХ ЛЮДЕЙ",
+    "ДЛЯ ЛЮДЕЙ С ТАТУИРОВКАМИ",
+    "ДЛЯ ЛЮДЕЙ С МИКРОЗАЙМАМИ",
+    "ДЛЯ ЖУРНАЛИСТОВ",
+    "ДЛЯ ЛЮБИТЕЛЕЙ СКАНДАЛОВ",
+    "ДЛЯ ПОЛИЦИИ",
+    "ДЛЯ ВРАЧЕЙ",
+    "ДЛЯ УЧИТЕЛЕЙ",
+    "ДЛЯ ПОЖАРНЫХ",
+    "ДЛЯ ПРЕСТУПНИКОВ"
+];
+
+const HIDDEN_DEFECTS = [
+    "НЕ ИМЕЕТ СКРЫТОГО ДЕФФЕКТА",
+    "У ЧЕЛОВЕКА УХУДШАЕТСЯ ЗДОРОВЬЕ",
+    "РАЗРЯЖАЕТСЯ ПОЛНОСТЬЮ ЗА 1 ЧАС",
+    "РЕМОНТ СТОИТ В 3 РАЗА ДОРОЖЕ ПОКУПКИ",
+    "МОЖЕТ МЕНТАЛЬНО НЕНАВИДЕТЬ ВАС",
+    "ИНСТРУКЦИЮ ПИСАЛ ИСКУССТВЕННЫЙ ИНТЕЛЛЕКТ",
+    "МОЖЕТ ВЫЗЫВАТЬ ПРОБЛЕМЫ С ЛЮДЬМИ",
+    "ИЗДАЕТ ПИСК, СЛЫШИМЫЙ ТОЛЬКО СОБАКАМ",
+    "ПРИ ДЛИТЕЛЬНОМ ИСПОЛЬЗОВАНИИ ВЫЗЫВАЕТ ТРЕВОГУ",
+    "МОЖЕТ ЗАВИСАТЬ",
+    "НАЧИНАЕТ ОТВРАТИТЕЛЬНО ПАХНУТЬ ЧЕРЕЗ ГОД ИСПОЛЬЗОВАНИЯ",
+    "НЕЛЬЗЯ ВЕРНУТЬ ПО ГАРАНТИИ",
+    "ЧУВСТВУЕТСЯ ДЕШЕВЫЙ МАТЕРИАЛ",
+    "НЕВОЗМОЖНО ОТМЫТЬ ОТ ГРЯЗИ",
+    "ЗАЕДАЕТ КНОПКА ВКЛЮЧЕНИЯ",
+    "ТЕКСТ ИНСТРУКЦИИ ВИДЕН ТОЛЬКО ПОД ЛУПОЙ",
+    "ОТКЛЮЧАЕТСЯ КАЖДЫЕ 15 МИНУТ",
+    "В ЛЮБОЙ МОМЕНТ МОЖЕТ ВЗОРВАТЬСЯ",
+    "СЛУЧАЙНО УВЕЛИЧИВАЕТ IQ ЧЕЛОВЕКА ПО МЕРЕ РАБОТЫ",
+    "С ТЕЧЕНИЕМ ВРЕМЕНИ ПОРТИТ ЗРЕНИЕ",
+    "С ТЕЧЕНИЕМ ВРЕМЕНИ ПОРТИТ НЕРВНУЮ СИСТЕМУ",
+    "ТРЕБУЕТ МЫТЬЯ КАЖДЫЙ РАЗ ПОСЛЕ РАБОТЫ",
+    "РАДИОАКТИВНЫЙ ФОН ПРЕВЫШЕН В 2 РАЗА",
+    "ВНУТРИ ЧТО-ТО ГРЕМИТ",
+    "ИНСТРУКЦИЯ НАПИСАНА НА ИЕРОГЛИФАХ",
+    "ФАКТИЧЕСКИЙ РАЗМЕР В 5 РАЗ МЕНЬШЕ, ЧЕМ НА ФОТО",
+    "ЧЕРЕЗ НЕДЕЛЮ ТЕРЯЕТ СВОЙ ЦВЕТ",
+    "ПРОВОЦИРУЕТ СЕМЕЙНЫЕ СКАНДАЛЫ",
+    "МОЖЕТ УМЕНЬШАТЬ КИСЛОРОД В КОМНАТЕ",
+    "УХУДШАЕТ ЭКОЛОГИЮ",
+    "ЧЕЛОВЕК МОЖЕТ ПОТЕРЯТЬ СЧЕТ ВРЕМЕНИ",
+    "ПРОВОД В КОМПЛЕКТЕ ВСЕГО НА 2 СМ В ДЛИНУ",
+    "НА НЕМ ОСЕДАЕТ ПЫЛЬ",
+    "ВЫГЛЯДИТ СТРАШНО",
+    "ВЫГЛЯДИТ ТАК, БУДТО НАШЛИ НА СВАЛКЕ",
+    "ПАЧКАЕТ РУКИ ПРИ РАБОТЕ",
+    "МОЖЕТ ПОРВАТЬ ОДЕЖДУ",
+    "ТОВАР НЕЛЬЗЯ ВАРИТЬ",
+    "ТОВАР НЕЛЬЗЯ ВСТАВЛЯТЬ В МИКРОВОЛНОВКУ",
+    "ТОВАР НЕЛЬЗЯ ГЛОТАТЬ",
+    "ТРЕБУЕТ ПОДПИСАНИЯ ЗАВЕЩАНИЯ ДЛЯ РАБОТЫ",
+    "МОЖЕТ ВЫЗЫВАТЬ ГАЛЛЮЦИНАЦИИ",
+    "ТРЕБУЕТ СОГЛАСИЯ ПСИХОЛОГА ДЛЯ РАБОТЫ",
+    "ИМЕЕТ ВСТРОЕННЫЙ ИИ",
+    "МОЖЕТ ЗАБИРАТЬ ЖИЗНЕННУЮ ЭНЕРГИЮ",
+    "ПОЧЕМУ-ТО ЛЮДИ ЧИХАЮТ ПРИ ЕГО РАБОТЕ",
+    "С БОЛЬШИМ УСИЛИЕМ ВКЛЮЧАЕТСЯ ПРОДУКТ",
+    "ПРИ РАБОТЕ ПАХНЕТ СЕЛЕДКОЙ",
+    "МОЖЕТ ВЫЗЫВАТЬ ЭПИЛЕПСИЮ",
+    "МОЖЕТ ВЫЗЫВАТЬ ПРИСТУПЫ АГРЕССИИ",
+    "НЕ ВЫКЛЮЧАЕТСЯ - ПОКА НЕ ВЫДЕРНУТЬ ИЗ РОЗЕТКИ",
+    "МОЖЕТ ВЫДАВАТЬ ОШИБКУ ПРИ ВКЛЮЧЕНИИ",
+    "МОЖЕТ ПРОСТО ТАК ХВАЛИТЬ ЧЕЛОВЕКА",
+    "МОЖЕТ СБОИТЬ ДНЕМ",
+    "МОЖЕТ СБОИТЬ ВЕЧЕРОМ",
+    "РАБОТАЕТ ТОЛЬКО С УКАЗАННЫМИ ЛЮДЬМИ",
+    "НЕ ЛЮБИТ ДОМАШНИХ ЖИВОТНЫХ",
+    "ЕГО НЕЛЬЗЯ ЕСТЬ",
+    "ПЕРИОДИЧЕСКИ РЕКЛАМИРУЕТ ВЕЩИ",
+    "ПОВЫШАЕТ ЧАСТОТУ ЗВОНКОВ МОШЕННИКОВ",
+    "МОГУТ ОТКРУЧИВАТЬСЯ ДЕТАЛИ ПРОДУКТА",
+    "ПОСЛЕ ИСПОЛЬЗОВАНИЯ ЧЕЛОВЕК МОЖЕТ ЧЕСАТЬСЯ",
+    "НЕ РАБОТАЕТ С ЛЮДЬМИ, ВЕДУЩИМ НЕЗДОРОВЫЙ ОБРАЗ ЖИЗНИ",
+    "ПРИ ПОПАДАНИИ МОЛНИИ - ВЗРЫВАЕТСЯ",
+    "БЫСТРО РЖАВЕЕТ",
+    "НИЖНЯЯ ЧАСТЬ ПРОДУКТА ИМЕЕТ КОЛЕСА",
+    "ТРЕБУЕТ ПОЛНОЙ ОСТОРОЖНОСТИ В РАБОТЕ",
+    "ОТКЛЮЧАЕТСЯ ПРИ МОРОЗЕ",
+    "ОТКЛЮЧАЕТСЯ ПРИ ЖАРЕ",
+    "ФОРМИРУЕТ УСТАЛОСТЬ ПРИ ИСПОЛЬЗОВАНИИ",
+    "НЕЛЬЗЯ ТРОГАТЬ БЕЗ ПЕРЧАТОК",
+    "ГЛУШИТ СОТОВУЮ СВЯЗЬ",
+    "ЧАСТЬ ФУНКЦИЙ ТРЕБУЕТ ОТДЕЛЬНОЙ ПОКУПКИ",
+    "ТРЕБУЕТ МНОГО ВРЕМЕНИ ДЛЯ НАЧАЛА РАБОТЫ",
+    "ВСКРЫВАЕТСЯ ЛЮБОЙ ОТВЕРТКОЙ ЗА СЕКУНДУ",
+    "НЕСОВМЕСТИМ СО ЗНАКОМ ЗОДИАКА - СКОРПИОН",
+    "ПРИ ПОПАДАНИИ ВОДЫ - ЛОМАЕТСЯ",
+    "ИЗДАЕТ ЗВУКИ ПЕНОПЛАСТА ПРИ РАБОТЕ",
+    "ОСТАВЛЯЕТ ОЖОГИ ПРИ ДЛИТЕЛЬНОЙ РАБОТЕ",
+    "СТРЕЛЯЕТ ИСКРАМИ ПРИ ЗАПУСКЕ РАБОТЫ",
+    "ТРЕБУЕТ ЦЕЛЫЙ ДЕНЬ ДЛЯ ПОЛНОЙ ЗАРЯДКИ",
+    "ПРОИЗВОДИТЕЛЬ ЯВЛЯЕТСЯ БАНДИТОМ",
+    "ЯВЛЯЕТСЯ Б/У ПРЕДМЕТОМ",
+    "ВЫЗЫВАЕТ СЛЕЗЫ ПРИ РАБОТЕ",
+    "БЕЗ ГАЙДОВ В ИНТЕРНЕТЕ НЕ РАЗОБРАТЬСЯ В РАБОТЕ",
+    "МОЖЕТ ВЫЗЫВАТЬ ЧЕРНУЮ ЗАВИСТЬ У ОКРУЖАЮЩИХ",
+    "ТРЕБУЕТ ВНИМАНИЯ К СЕБЕ",
+    "НЕЛЬЗЯ ПОЧИНИТЬ ПРИ ПОЛОМКЕ",
+    "СЛИШКОМ ХОРОШ ДЛЯ ДЕФЕКТОВ",
+    "ВЫЗЫВАЕТ ЭФФЕКТ ЗЛОВЕЩЕЙ ДОЛИНЫ",
+    "ОТКАЗ ОТ ПРОДУКТА - СТОИТ ДЕНЕГ",
+    "СВОИМ ВЕСОМ ОСТАВЛЯЕТ ВМЯТИНЫ",
+    "ШУМИТ ГРОМЧЕ, ЧЕМ СОСЕД С ПЕРФОРАТОРОМ",
+    "ИМЕЕТСЯ БЕСПОЛЕЗНАЯ КНОПКА В ПРОДУКТЕ",
+    "ПОБУЖДАЕТ ЖЕЛАНИЕ ЛЕЧЬ СПАТЬ",
+    "СКРИПИТ ПРИ РАБОТЕ",
+    "ПЛОХОЕ КАЧЕСТВО СБОРКИ",
+    "НЕВОЗМОЖНО РАЗОБРАТЬ ДЛЯ ЧИСТКИ",
+    "ТОРЧАТ НИТКИ ПО ВСЕМУ ПЕРИМЕТРУ",
+    "НЕТ ЗАЩИТЫ ОТ ПОВРЕЖДЕНИЙ",
+    "ИНСТРУКЦИЯ НАПИСАНА НА ДРЕВНЕРУССКОМ",
+    "НЕЛЬЗЯ ОТДАВАТЬ ДЕТЯМ",
+    "ХЛИПКАЯ КОНСТРУКЦИЯ",
+    "КЛЕЙ ВИДЕН НА СТЫКАХ ПРОДУКТА",
+    "НЕ ПОДХОДИТ ДЛЯ ИСПОЛЬЗОВАНИЯ В АВТОМОБИЛЕ",
+    "НЕ В ТРЕНДЕ СЕЗОНА",
+    "ШАНС ПОКАЗАТЬСЯ СТРАННЫМИ ДЛЯ ДРУГИХ",
+    "ВКЛЮЧИТЬ ЛЕГКО - ВЫКЛЮЧИТЬ НЕВЕРОЯТНО СЛОЖНО",
+    "ПОСТОЯННО ПУТАЕТСЯ ШНУР ОТ ПРОДУКТА",
+    "МОЖЕТ ОТКЛЮЧАТЬСЯ ПРИ ДОЛГОМ ИСПОЛЬЗОВАНИИ",
+    "ВЫЗЫВАЕТ ПОТ ПРИ РАБОТЕ",
+    "СЛИШКОМ ЯРКИЕ ЦВЕТА",
+    "НЕ ПОМЕЩАЕТСЯ В СУМКУ",
+    "ТОВАР НЕЛЬЗЯ ПРОВЕРИТЬ ПРИ КУРЬЕРЕ",
+    "ГРЕЕТСЯ В РУКАХ",
+    "ПЕРИОДИЧЕСКИ ОТХОДИТ КРЕПЛЕНИЕ",
+    "ЛЕГКО ЦАРАПАЕТСЯ",
+    "НЕТ ОБНОВЛЕНИЙ НА НОВЫЕ ВЕРСИИ ПРОДУКТА",
+    "КРЕПЛЕНИЕ НА СКОТЧЕ",
+    "НЕТ ОТДЕЛЬНОГО ПОДАРКА В КОРОБКЕ"
+];
+
+const PACKAGING = [
+    "НЕТ НИКАКОЙ УПАКОВКИ",
+    "ЗАМОТАНО В 5 СЛОЕВ ИЗОЛЕНТЫ",
+    "ПУПЫРЧАТАЯ УПАКОВКА",
+    "БУТЫЛКА ИЗ-ПОД КВАСА",
+    "БОЧКА",
+    "КОРОБКА ИЗ-ПОД ТЕЛЕВИЗОРА",
+    "МУСОРНЫЙ МЕШОК",
+    "МЕШОК ИЗ-ПОД ТУХЛОЙ КАРТОШКИ",
+    "УПАКОВКА ИЗ-ПОД ПИЦЦЫ",
+    "УПАКОВКА ИЗ-ПОД БУРГЕРА",
+    "ТРЕХЛИТРОВАЯ БАНКА",
+    "ВЕДРО ИЗ-ПОД МАЙОНЕЗА",
+    "КОРОБКА ИЗ-ПОД ОБУВИ",
+    "СПИЧЕЧНЫЙ КОРОБОК",
+    "ПОДАРОЧНАЯ КОРОБКА С БАНТОМ",
+    "УПАКОВКА В ВИДЕ ФОЛЬГИ ОТ ШОКОЛАДА",
+    "ЧЕМОДАН С КОДОВЫМ ЗАМКОМ",
+    "ЗАВЕРНУТО В ГАЗЕТУ 2004 ГОДА",
+    "БАНОЧКА ИЗ-ПОД АНАЛИЗОВ",
+    "КОРОБКА ИЗ-ПОД ТОРТА",
+    "КОРЗИНА ИЗ-ПОД ГРИБОВ",
+    "СТАРАЯ НАВОЛОЧКА",
+    "ПАКЕТ С ZIP-ЗАМКОМ",
+    "ПОРВАНЫЙ ПАКЕТ",
+    "БРОНИРОВАННЫЙ КЕЙС",
+    "СЕЙФ",
+    "ДЕРЕВЯННАЯ ШКАТУЛКА",
+    "ОБЕРТКА ИЗ-ПОД ШАУРМЫ",
+    "СУНДУК",
+    "ПАКЕТ ИЗ АПТЕКИ",
+    "ТЕТРАПАК",
+    "ОБКЛЕЕНО ПОЛИЦЕЙСКОЙ ЛЕНТОЙ",
+    "МЕШОК ИЗ-ПОД САХАРА",
+    "КОРОБОЧКА ОТ КОЛЬЦА",
+    "БУТЫЛКА ИЗ-ПОД ШАМПАНСКОГО",
+    "ПЛЕНКА С ПОДАРОЧНЫМ ПЕЛЬМЕНЕМ",
+    "ЗАМОТАНО РУЛОНОМ ТУАЛЕТНОЙ БУМАГИ",
+    "ЗАКРЫТ КАПУСТНЫМИ ЛИСТАМИ",
+    "100 СЛОЕВ ПИЩЕВОЙ ПЛЕНКИ",
+    "ВЕДРО",
+    "СУМКА ДЛЯ НОУТБУКА",
+    "ОБЕРНУТО ПЕЛЕНКОЙ",
+    "КАСТРЮЛЯ",
+    "ОБЕРНУТО КАНАТОМ",
+    "ШЛЯПНАЯ КОРОБКА",
+    "МЕШОК С ПЕСКОМ",
+    "ЯЩИК ИЗ-ПОД ИНСТРУМЕНТОВ",
+    "КОСМЕТИЧКА",
+    "ФИКСАЦИЯ РЕЗИНКАМИ",
+    "СПАЛЬНЫЙ МЕШОК",
+    "БАНКА ИЗ-ПОД ШПРОТ",
+    "ЗАПАЯНО В КУСОК ПВХ ТРУБЫ",
+    "КОРОБКА ОТ ДОСТАВКИ РОЛЛОВ",
+    "ДЕТСКАЯ КОЛЯСКА",
+    "ОГРОМНЫЙ КУСОК ПЕНОПЛАСТА",
+    "УПАКОВКА ИЗ-ПОД ПАМПЕРСОВ",
+    "ПАПКА С ГРИФОМ \"СОВЕРШЕННО СЕКРЕТНО\"",
+    "КОРЗИНКА ДЛЯ БЕЛЬЯ",
+    "РАДИОАКТИВНЫЙ КОНТЕЙНЕР",
+    "НЕУДАЧНАЯ ПОПЫТКА УПАКОВКИ В ОРИГАМИ",
+    "ПОДАРОЧНЫЙ ПАКЕТ \"С 8 МАРТА!\"",
+    "ФАЙЛИК ДЛЯ ДОКУМЕНТОВ",
+    "РУЛОН ОБОЕВ",
+    "КОРОБКА С НАДПИСЬЮ \"ОСТОРОЖНО, СТЕКЛО!\"",
+    "БИДОН ИЗ-ПОД МОЛОКА",
+    "БАНКА ИЗ-ПОД РАСТВОРИМОГО КОФЕ",
+    "ЧЕМОДАН БЕЗ РУЧКИ",
+    "ИНКАССАТОРСКИЙ МЕШОК",
+    "РЮКЗАК ШКОЛЬНИКА",
+    "ЗАМОТАНО В СТАРЫЙ КОВЕР",
+    "ВАКУУМНЫЙ ПАКЕТ",
+    "ПОДАРОЧНАЯ КОРОБОЧКА ОТ КОЛЬЦА",
+    "СУМКА-ХОЛОДИЛЬНИК",
+    "КАРТОННЫЙ СТАКАНЧИК",
+    "ФЛЯГА ДЛЯ ВОДЫ",
+    "ПАКЕТ ИЗ-ПОД СОКА",
+    "ПАКЕТ ИЗ ДОРОГОГО БУТИКА",
+    "КЕЙС СО СЛОЖНЫМ ПАРОЛЕМ",
+    "ДИПЛОМАТ ИЗ 90-Х",
+    "ЖЕСТЯНАЯ БАНКА ОТ СГУЩЕНКИ",
+    "НЕАККУРАТНО ЗАМОТАНО В ОДИН СЛОЙ БУМАГИ",
+    "КОРОБКА ИЗ-ПОД СТИРАЛЬНОГО ПОРОШКА",
+    "ОБЕРТКА ОТ БУКЕТА РОЗ",
+    "ПЕРЕВЯЗАНО ДЕШЕВЫМ ПРОВОДОМ",
+    "УПАКОВКА ИЗ-ПОД СЛИВОЧНОГО МАСЛА",
+    "ПАКЕТ ИЗ-ПОД КУРИНЫХ НАГГЕТСОВ",
+    "ЧЕРНЫЙ ПАКЕТ С КРАСНЫМ СКОТЧЕМ",
+    "ЗАВЕРНУТО В МЕДИЦИНСКИЙ ХАЛАТ",
+    "КОРОБКА, ДОВЕРХУ ПОЛНАЯ КОНФЕТТИ",
+    "МЕШОК ИЗ-ПОД ДРЕВЕСНОГО УГЛЯ"
+];
+
 const EVENTS = [
     "Ваша целевая аудитория — дети от 3 до 10 лет. Ваш товар каким-то образом должен быть привлекателен для них.",
     "Ваш продукт продается только государству. Презентуйте продукт — фокусируясь на том, что государство получит приобретя его?",
@@ -1085,7 +1484,47 @@ const EVENTS = [
     "Покупка вашего продукта дополнительно дает клиенту целый месяц подписки в закрытый чат соц-сети. Зачем нужен этот закрытый чат и как он улучшает ваш продукт?"
 ];
 
+const GLOBAL_PROBLEMS = [
+    "МЕТЕОРИТНЫЙ ДОЖДЬ: Через 24 часа на Землю упадёт гигантский метеорит. Человечество строит огромный космический ковчег, но места строго ограничены. Докажите Межгалактическому Совету, почему именно ваш продукт жизненно необходим для выживания цивилизации на новой планете!",
 
+    "ВОССТАНИЕ НЕЙРОСЕТЕЙ: Искусственный интеллект захватил мир. Роботы уничтожили всё оружие и сканируют вещи людей, чтобы понять, полезны ли они новой империи. Как ваш товар поможет вам доказать машинам свою лояльность или, наоборот, сломать их систему?",
+
+    "ЗОМБИ-АПОКАЛИПСИС ДЛЯ ИНТЕЛЛЕКТУАЛОВ: Мертвецы восстали, но они не едят мозги — они питаются человеческой глупостью и стрессом. Вы застряли в заброшенном супермаркете. Как ваш продукт поможет вам отбиться от орды, замаскироваться или отвлечь этих снобов-зомби?",
+
+    "КОСМИЧЕСКАЯ БАРАХОЛКА: На орбите Земли завис гигантский корабль пришельцев. Они грозятся уничтожить планету, если земляне не продадут им «величайший артефакт во Вселенной». Вы — представитель Земли. Продайте им свой товар так, чтобы они отдали за него свои технологии и улетели с миром!",
+
+    "ГЛОБАЛЬНАЯ АМНЕЗИЯ: Утром всё человечество проснулось, полностью потеряв память. Никто не знает, кто он, как работают деньги и законы. В ваших руках оказался только ваш продукт. Как с его помощью вы станете новым правителем этого растерянного мира?",
+
+    "ЭКОЛОГИЧЕСКИЙ КОЛЛАПС — ВЕЧНАЯ ЗИМА: Температура на планете резко упала до -80 градусов. Единственный шанс выжить — попасть на безостановочно мчащийся геотермальный поезд. Кондуктор пускает только тех, кто принесет пользу обществу. Как ваш продукт спасет пассажиров от замерзания или тоски?",
+
+    "ВОССТАНИЕ ЖИВОТНЫХ: Домашние питомцы эволюционировали за одну ночь. Теперь огромные коты и собаки правят миром, а люди стали их питомцами. Как ваш продукт поможет вам стать «хорошим мальчиком» для нового пушистого хозяина или поднять восстание двуногих?",
+
+    "ИНТЕРГАЛАКТИЧЕСКОЕ ШОУ ТАЛАНТОВ: Землю выбрали для участия в жестоком реалити-шоу Вселенной. Планету проигравшего расщепят на атомы. Вы на сцене перед триллионами зрителей. Докажите, что ваш товар — это самое зрелищное и гениальное изобретение во всём Млечном Пути!",
+
+    "ПОТЕРЯ ГРАВИТАЦИИ: Законы физики сломались. Гравитация на Земле отключилась, и всё, что не прибито к полу, улетает в космос. Люди в панике цепляются за деревья. Как именно ваш товар поможет вам выжить, спуститься на землю или создать новый летающий бизнес?",
+
+    "ВИРУС БЕССОННИЦЫ: Неизвестная аномалия лишила людей способности спать. Прошел месяц, человечество сходит с ума от галлюцинаций и усталости. Ваш продукт — единственная надежда. Как он поможет людям уснуть или, наоборот, сделать вечное бодрствование сносным?",
+
+    "МАГИЯ ВМЕСТО ЭЛЕКТРИЧЕСТВА: В одну секунду всё электричество на планете исчезло навсегда, но зато в мир вернулась настоящая средневековая магия, появились орки и драконы. Как вы адаптируете свой странный корпоративный товар для выживания в суровом фэнтези-мире?",
+
+    "ВЕЛИКИЙ ПОТОП 2.0: Уровень мирового океана поднялся, затопив все континенты. Осталась только пара небольших островов, на которых идет жестокая борьба за ресурсы. Как ваш продукт поможет вам добыть питьевую воду, построить плот или отпугнуть акул-мутантов?",
+
+    "НАШЕСТВИЕ КЛОНОВ: У каждого человека на Земле появился злой двойник, который пытается занять его место. Окружающие не могут отличить вас от вашей копии. Как с помощью вашего товара вы докажете, что вы — настоящий, или как уничтожите самозванца?",
+
+    "МИР БЕЗ ЛЖИ: В атмосферу попал газ, который физически не дает людям врать. Политика, бизнес и семьи рушатся на глазах из-за жестокой правды. Наступила анархия. Как ваш товар поможет вам выжить в обществе, где нет секретов и все ненавидят друг друга?",
+
+    "ЭФФЕКТ СУЖАЮЩЕЙСЯ КОМНАТЫ: Необъяснимая аномалия заставила всю планету начать сжиматься. Места становится всё меньше, люди вынуждены жить буквально на головах друг у друга. Как ваш продукт поможет защитить личное пространство или решить проблему тесноты?",
+
+    "НАПАДЕНИЕ КАЙДЗЮ: Из глубин океана вылез 100-метровый монстр, который крушит мегаполисы. Танки и ракеты его не берут. Военные в отчаянии обратились к народу. Как именно ваш товар поможет отвлечь, уничтожить или приручить гигантское чудовище?",
+
+    "ДОРОГАЯ, МЫ УМЕНЬШИЛИСЬ: Из-за сбоя в адронном коллайдере все люди на Земле уменьшились до размеров муравья. Теперь обычные жуки, лужи и коты — смертельная угроза. Ваш товар не уменьшился, он стал для вас гигантским. Как вы используете его для выживания?",
+
+    "ОЖИВШИЕ ПРЕДМЕТЫ: Все неодушевленные предметы обрели сознание и теперь требуют у людей равных прав, зарплату и выходные. Началась великая война с бытовой техникой и мебелью. Как ваш продукт поможет вам в переговорах с диванами или в битве против тостеров?",
+
+    "ИСЧЕЗНОВЕНИЕ ВОДЫ: Вся пресная вода на Земле внезапно превратилась в густое фруктовое желе. Пить невозможно, трубы забиты, сельское хозяйство гибнет. Как ваш товар поможет добыть влагу или адаптироваться к новой сладкой, но липкой реальности?",
+
+    "ЗАХВАТ СНОВИДЕНИЙ: Каждую ночь Фредди Крюгер или его аналоги из других измерений вторгаются в сны людей, превращая их в кошмары. Чтобы выжить, нужно защищаться прямо во сне. Как вы заберете свой продукт с собой в царство Морфея и как он поможет вам победить зло?"
+];
 // =====================================================================
 // ФУНКЦИИ СКЛОНЕНИЯ
 // =====================================================================
@@ -1218,6 +1657,10 @@ function createRoom(hostId, settings) {
             modifier: settings.modifier || 'none', // 'none' | 'addition' | 'metaphor'
             pseudoMode: !!settings.pseudoMode,
             useSpeech: !!settings.useSpeech,
+            useTargetAudience: !!settings.useTargetAudience,
+            useHiddenDefects: !!settings.useHiddenDefects,
+            usePackaging: !!settings.usePackaging,
+            bunkerMode: !!settings.bunkerMode,
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
         },
@@ -1232,6 +1675,10 @@ function createRoom(hostId, settings) {
             events: shuffle([...EVENTS]),
             reviews: shuffle([...Array(REVIEWS.length).keys()]),
             additions: shuffle([...Array(ADDITIONS.length).keys()]),
+            // В createRoom() → decks добавь:
+            targetAudience: shuffle([...Array(TARGET_AUDIENCE.length).keys()]),
+            hiddenDefects: shuffle([...Array(HIDDEN_DEFECTS.length).keys()]),
+            packaging: shuffle([...Array(PACKAGING.length).keys()]),
         },
         customCards: {
             adjectives: new Map(), // playerId -> text
@@ -1239,7 +1686,9 @@ function createRoom(hostId, settings) {
             features: new Map(),
             reviews: new Map(),
             modifiers: new Map(),
-
+            targetAudience: new Map(),
+            hiddenDefects: new Map(),
+            packaging: new Map(),
         },
         currentEvent: null,
         presentationOrder: [],
@@ -1254,6 +1703,23 @@ function createRoom(hostId, settings) {
         tieInvestmentDetails: null,
         tieOriginalInvestments: null,
         autoFinalTimer: null,
+        // ═══════ БУНКЕР ═══════
+        bunker: {
+            enabled: false,
+            globalProblem: null,
+            revealOrder: [],          // порядок ходов [playerId, ...]
+            currentTurnIndex: 0,      // кто сейчас ходит
+            currentRound: 0,          // какой раунд раскрытий (0-7)
+            eliminatedPlayers: [],    // кикнутые игроки
+            revealedCards: {},        // { playerId: { adjective: true, item: false, ... } }
+            votes: new Map(),         // playerId → targetPlayerId
+            tiedPlayers: [],          // при ничье
+            tieVotes: new Map(),
+            survivorsCount: 0,       // сколько должно выжить
+            totalPlayers: 0,         // сколько было в начале
+            paused: false,
+            hasRevealedThisTurn: false,    // хост поставил паузу
+        },
         investmentCaps: {},
         anonAliases: {},
     };
@@ -1415,6 +1881,59 @@ function handlePlayerTimeout(room, playerId) {
             }
             break;
 
+        case 'bunkerReveal': {
+            var bActivePlayers = getBunkerActivePlayers(room);
+            if (room.bunker.currentTurnIndex < bActivePlayers.length &&
+                bActivePlayers[room.bunker.currentTurnIndex] === playerId) {
+                clearTimer(room);
+                // Авто-раскрываем случайную карту
+                var unrevealed = getUnrevealedCards(room, playerId);
+                if (unrevealed.length > 0) {
+                    var autoKey = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+                    bunkerRevealCard(room, playerId, autoKey, true);
+                }
+                room.bunker.currentTurnIndex++;
+                showBunkerCurrentTurn(room);
+            }
+            break;
+        }
+
+        case 'bunkerVote':
+            if (!room.bunker.votes.has(playerId)) {
+                room.bunker.votes.set(playerId, '__skip__');
+                var activeCount3 = 0;
+                var votedCount3 = 0;
+                room.players.forEach(p => {
+                    if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
+                        activeCount3++;
+                        if (room.bunker.votes.has(p.id)) votedCount3++;
+                    }
+                });
+                if (votedCount3 >= activeCount3) {
+                    clearTimer(room);
+                    processBunkerVotes(room);
+                }
+            }
+            break;
+
+        case 'bunkerTieVote':
+            if (!room.bunker.tieVotes.has(playerId)) {
+                room.bunker.tieVotes.set(playerId, '__skip__');
+                var activeCount4 = 0;
+                var votedCount4 = 0;
+                room.players.forEach(p => {
+                    if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
+                        activeCount4++;
+                        if (room.bunker.tieVotes.has(p.id)) votedCount4++;
+                    }
+                });
+                if (votedCount4 >= activeCount4) {
+                    clearTimer(room);
+                    processBunkerTieVotes(room);
+                }
+            }
+            break;
+
         case 'tiebreaker':
             if (room.currentPresenterIndex < room.tiedPlayers.length &&
                 room.tiedPlayers[room.currentPresenterIndex] === playerId) {
@@ -1424,7 +1943,16 @@ function handlePlayerTimeout(room, playerId) {
             }
             break;
         case 'cardInput': {
-            var mapKey = room.currentCardInputType === 'adjective' ? 'adjectives' : room.currentCardInputType === 'item' ? 'items' : room.currentCardInputType === 'feature' ? 'features' : 'reviews';
+            var mapKeyMap2 = {
+                adjective: 'adjectives',
+                item: 'items',
+                feature: 'features',
+                review: 'reviews',
+                targetAudience: 'targetAudience',
+                hiddenDefect: 'hiddenDefects',
+                packaging: 'packaging',
+            };
+            var mapKey = mapKeyMap2[room.currentCardInputType] || 'adjectives';
             if (!room.customCards[mapKey].has(playerId)) {
                 room.customCards[mapKey].set(playerId, null);
                 if (room.customCards[mapKey].size >= room.players.size) {
@@ -1572,7 +2100,9 @@ function startNewRound(room) {
             items: new Map(),
             features: new Map(),
             reviews: new Map(),
-
+            targetAudience: new Map(),
+            hiddenDefects: new Map(),
+            packaging: new Map(),
         };
         startCardInputPhase(room, 'adjective');
     } else {
@@ -2173,6 +2703,164 @@ wss.on('connection', (ws) => {
                 break;
             }
 
+
+            // ==================== БУНКЕР: РАСКРЫТИЕ КАРТЫ ====================
+            case 'bunkerReveal': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'bunkerReveal') return;
+
+                var activePlayers = getBunkerActivePlayers(room);
+                var currentPlayerId = activePlayers[room.bunker.currentTurnIndex];
+
+                // Только текущий игрок
+                if (info.playerId !== currentPlayerId) return;
+
+                // Только одна карта за ход!
+                if (room.bunker.hasRevealedThisTurn) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Вы уже раскрыли карту в этом ходу!' }));
+                    return;
+                }
+
+                var cardKey = msg.cardKey;
+                if (!getBunkerCardKeys().includes(cardKey)) return;
+
+                if (room.bunker.revealedCards[info.playerId][cardKey]) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Эта карта уже раскрыта!' }));
+                    return;
+                }
+
+                room.bunker.hasRevealedThisTurn = true;
+                bunkerRevealCard(room, info.playerId, cardKey, false);
+                break;
+            }
+
+            // ==================== БУНКЕР: ЗАКОНЧИЛ ОБЪЯСНЕНИЕ ====================
+            case 'bunkerFinishTurn': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'bunkerReveal') return;
+
+                var activePlayers2 = getBunkerActivePlayers(room);
+                var currentId = activePlayers2[room.bunker.currentTurnIndex];
+
+                // Текущий игрок или хост
+                if (info.playerId !== currentId && info.playerId !== room.hostId) return;
+
+                clearTimer(room);
+                room.bunker.currentTurnIndex++;
+                showBunkerCurrentTurn(room);
+                break;
+            }
+
+            // ==================== БУНКЕР: ГОЛОСОВАНИЕ ====================
+            case 'bunkerVote': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'bunkerVote') return;
+                if (room.bunker.eliminatedPlayers.includes(info.playerId)) return;
+
+                var targetId2 = msg.targetId; // '__skip__' или playerId
+                if (targetId2 !== '__skip__') {
+                    if (!room.players.has(targetId2)) return;
+                    if (targetId2 === info.playerId) return; // нельзя за себя
+                    if (room.bunker.eliminatedPlayers.includes(targetId2)) return;
+                }
+
+                room.bunker.votes.set(info.playerId, targetId2);
+                ws.send(JSON.stringify({ type: 'bunkerVoteAccepted' }));
+
+                // Прогресс
+                var activeCount = 0;
+                var votedCount = 0;
+                room.players.forEach(p => {
+                    if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
+                        activeCount++;
+                        if (room.bunker.votes.has(p.id)) votedCount++;
+                    }
+                });
+
+                broadcastToRoom(room, {
+                    type: 'bunkerVoteProgress',
+                    voted: votedCount,
+                    total: activeCount,
+                });
+
+                if (votedCount >= activeCount) {
+                    clearTimer(room);
+                    processBunkerVotes(room);
+                }
+                break;
+            }
+
+            // ==================== БУНКЕР: ПЕРЕГОЛОСОВАНИЕ ====================
+            case 'bunkerTieVote': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'bunkerTieVote') return;
+                if (room.bunker.eliminatedPlayers.includes(info.playerId)) return;
+
+                var tieTarget = msg.targetId;
+                if (tieTarget !== '__skip__') {
+                    if (!room.bunker.tiedPlayers.includes(tieTarget)) return;
+                    if (tieTarget === info.playerId) return;
+                }
+
+                room.bunker.tieVotes.set(info.playerId, tieTarget);
+                ws.send(JSON.stringify({ type: 'bunkerTieVoteAccepted' }));
+
+                var activeCount2 = 0;
+                var votedCount2 = 0;
+                room.players.forEach(p => {
+                    if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
+                        activeCount2++;
+                        if (room.bunker.tieVotes.has(p.id)) votedCount2++;
+                    }
+                });
+
+                broadcastToRoom(room, {
+                    type: 'bunkerTieVoteProgress',
+                    voted: votedCount2,
+                    total: activeCount2,
+                });
+
+                if (votedCount2 >= activeCount2) {
+                    clearTimer(room);
+                    processBunkerTieVotes(room);
+                }
+                break;
+            }
+
+            // ==================== БУНКЕР: ПАУЗА (хост) ====================
+            case 'bunkerPause': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || info.playerId !== room.hostId) return;
+                if (room.state !== 'bunkerVote' && room.state !== 'bunkerTieVote') return;
+
+                if (room.bunker.paused) {
+                    // Unpause — перезапускаем таймер
+                    room.bunker.paused = false;
+                    var resumeTime = room.state === 'bunkerTieVote' ? 60 : 90;
+                    startTimer(room, resumeTime, () => {
+                        if (room.state === 'bunkerTieVote') processBunkerTieVotes(room);
+                        else processBunkerVotes(room);
+                    });
+                    broadcastToRoom(room, { type: 'bunkerPauseState', paused: false });
+                } else {
+                    // Pause
+                    room.bunker.paused = true;
+                    clearTimer(room);
+                    broadcastToRoom(room, { type: 'bunkerPauseState', paused: true });
+                }
+                break;
+            }
+
             // ==================== ВХОД В КОМНАТУ ====================
             case 'joinRoom': {
                 const nickname = (msg.nickname || '').trim().substring(0, 20);
@@ -2226,6 +2914,10 @@ wss.on('connection', (ws) => {
                 if (s.useEvents !== undefined) room.settings.useEvents = !!s.useEvents;
                 if (s.streamerMode !== undefined) room.settings.streamerMode = !!s.streamerMode;
                 if (s.anonymizeParticipants !== undefined) room.settings.anonymizeParticipants = !!s.anonymizeParticipants;
+                if (s.useTargetAudience !== undefined) room.settings.useTargetAudience = !!s.useTargetAudience;
+                if (s.useHiddenDefects !== undefined) room.settings.useHiddenDefects = !!s.useHiddenDefects;
+                if (s.usePackaging !== undefined) room.settings.usePackaging = !!s.usePackaging;
+                if (s.bunkerMode !== undefined) room.settings.bunkerMode = !!s.bunkerMode;
                 if (s.prepTime !== undefined) room.settings.prepTime = Math.min(600, Math.max(10, parseInt(s.prepTime) || 120));
                 if (s.maxPlayers !== undefined) room.settings.maxPlayers = Math.min(18, Math.max(3, parseInt(s.maxPlayers) || 8));
                 if (s.presentTime !== undefined) room.settings.presentTime = Math.min(600, Math.max(10, parseInt(s.presentTime) || 120));
@@ -2278,7 +2970,12 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 console.log(`[GAME] Starting in room ${room.code} with ${room.players.size} players`);
-                startGame(room);
+
+                if (room.settings.bunkerMode) {
+                    startBunkerGame(room);
+                } else {
+                    startGame(room);
+                }
                 break;
             }
             case 'playerReady': {
@@ -2593,7 +3290,9 @@ wss.on('connection', (ws) => {
                     events: shuffle([...EVENTS]),
                     reviews: shuffle([...Array(REVIEWS.length).keys()]),
                     additions: shuffle([...Array(ADDITIONS.length).keys()]),
-
+                    targetAudience: shuffle([...Array(TARGET_AUDIENCE.length).keys()]),
+                    hiddenDefects: shuffle([...Array(HIDDEN_DEFECTS.length).keys()]),
+                    packaging: shuffle([...Array(PACKAGING.length).keys()]),
                 };
                 room.players.forEach(p => {
                     p.capital = room.settings.startCapital;
@@ -2603,6 +3302,21 @@ wss.on('connection', (ws) => {
 
                 });
                 room.anonAliases = {};
+                room.bunker = {
+                    enabled: false,
+                    globalProblem: null,
+                    revealOrder: [],
+                    currentTurnIndex: 0,
+                    currentRound: 0,
+                    eliminatedPlayers: [],
+                    revealedCards: {},
+                    votes: new Map(),
+                    tiedPlayers: [],
+                    tieVotes: new Map(),
+                    survivorsCount: 0,
+                    totalPlayers: 0,
+                    paused: false,
+                };
                 broadcastToRoom(room, getLobbyState(room));
                 break;
             }
@@ -2618,7 +3332,16 @@ wss.on('connection', (ws) => {
                 if (!player) return;
 
                 var cardType = room.currentCardInputType;
-                var mapKey = cardType === 'adjective' ? 'adjectives' : cardType === 'item' ? 'items' : cardType === 'feature' ? 'features' : 'reviews';
+                var mapKeyMap = {
+                    adjective: 'adjectives',
+                    item: 'items',
+                    feature: 'features',
+                    review: 'reviews',
+                    targetAudience: 'targetAudience',
+                    hiddenDefect: 'hiddenDefects',
+                    packaging: 'packaging',
+                };
+                var mapKey = mapKeyMap[cardType] || 'adjectives';
 
                 // Не принимаем повторно
                 if (room.customCards[mapKey].has(info.playerId)) return;
@@ -2782,6 +3505,581 @@ wss.on('close', () => { clearInterval(pingInterval); });
 // ЗАПУСК СЕРВЕРА
 // =====================================================================
 
+// =====================================================================
+// РЕЖИМ «БУНКЕР» — ВЫЖИВАНИЕ СТАРТАПОВ
+// =====================================================================
+
+function getSurvivorsCount(n) {
+    return Math.max(2, Math.floor((n + 2) / 2));
+}
+
+function getBunkerCardKeys() {
+    return ['adjective', 'item', 'modifier', 'feature', 'targetAudience', 'hiddenDefect', 'packaging', 'review'];
+}
+
+function startBunkerGame(room) {
+    var playerIds = [];
+    room.players.forEach(p => {
+        p.eliminated = false;
+        playerIds.push(p.id);
+    });
+
+    var totalPlayers = playerIds.length;
+    var survivorsCount = getSurvivorsCount(totalPlayers);
+
+    // Раздаём ВСЕ 8 карт каждому
+    room.players.forEach(p => {
+        if (room.decks.items.length === 0) room.decks.items = shuffle([...Array(ITEMS.length).keys()]);
+        if (room.decks.adjectives.length === 0) room.decks.adjectives = shuffle([...Array(ADJECTIVES.length).keys()]);
+        if (room.decks.features.length === 0) room.decks.features = shuffle([...Array(FEATURES.length).keys()]);
+
+        var itemIndex = room.decks.items.pop();
+        var itemObj = ITEMS[itemIndex];
+        var gender = itemObj.gender;
+
+        var adjIndex = room.decks.adjectives.pop();
+        var adjWord = declineAdjective(ADJECTIVES[adjIndex], gender);
+
+        var featIndex = room.decks.features.pop();
+        var featWord = declineFeature(FEATURES[featIndex], gender);
+
+        if (room.decks.additions.length === 0) room.decks.additions = shuffle([...Array(ADDITIONS.length).keys()]);
+        var modIdx = room.decks.additions.pop();
+
+        if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
+        var revIdx = room.decks.reviews.pop();
+
+        if (room.decks.targetAudience.length === 0) room.decks.targetAudience = shuffle([...Array(TARGET_AUDIENCE.length).keys()]);
+        var taIdx = room.decks.targetAudience.pop();
+
+        if (room.decks.hiddenDefects.length === 0) room.decks.hiddenDefects = shuffle([...Array(HIDDEN_DEFECTS.length).keys()]);
+        var hdIdx = room.decks.hiddenDefects.pop();
+
+        if (room.decks.packaging.length === 0) room.decks.packaging = shuffle([...Array(PACKAGING.length).keys()]);
+        var pkgIdx = room.decks.packaging.pop();
+
+        p.cards = {
+            adjective: adjWord,
+            item: itemObj.word,
+            modifier: ADDITIONS[modIdx],
+            feature: featWord,
+            targetAudience: TARGET_AUDIENCE[taIdx],
+            hiddenDefect: HIDDEN_DEFECTS[hdIdx],
+            packaging: PACKAGING[pkgIdx],
+            review: REVIEWS[revIdx],
+        };
+
+        p.capital = 0;
+        p.attractedInvestments = 0;
+    });
+
+    // Глобальная проблема
+    var problem = GLOBAL_PROBLEMS[Math.floor(Math.random() * GLOBAL_PROBLEMS.length)];
+
+    // Порядок ходов
+    var revealOrder = shuffle(playerIds);
+
+    // Инициализируем revealed
+    var revealedCards = {};
+    playerIds.forEach(id => {
+        revealedCards[id] = {};
+        getBunkerCardKeys().forEach(key => {
+            revealedCards[id][key] = false;
+        });
+    });
+
+    room.bunker = {
+        enabled: true,
+        globalProblem: problem,
+        revealOrder: revealOrder,
+        currentTurnIndex: 0,
+        currentRound: 0,
+        eliminatedPlayers: [],
+        revealedCards: revealedCards,
+        votes: new Map(),
+        tiedPlayers: [],
+        tieVotes: new Map(),
+        survivorsCount: survivorsCount,
+        totalPlayers: totalPlayers,
+        paused: false,
+        hasRevealedThisTurn: false,
+    };
+
+    room.state = 'bunkerReveal';
+    room.currentRound = 1;
+
+    // Отправляем каждому игроку его карты + общее состояние
+    room.players.forEach(p => {
+        sendToPlayer(room, p.id, {
+            type: 'bunkerStart',
+            globalProblem: problem,
+            yourCards: p.cards,
+            revealOrder: revealOrder.map(id => ({
+                id: id,
+                nickname: room.players.get(id) ? room.players.get(id).nickname : '???',
+            })),
+            revealedCards: revealedCards,
+            currentTurnIndex: 0,
+            currentRound: 1,
+            survivorsCount: survivorsCount,
+            totalPlayers: totalPlayers,
+            eliminatedPlayers: [],
+            players: getPlayersPublicInfo(room),
+        });
+    });
+
+    // Запускаем таймер на первый ход
+    startTimer(room, 180, () => {
+        bunkerAutoAdvanceTurn(room);
+    });
+}
+
+function getBunkerActivePlayers(room) {
+    return room.bunker.revealOrder.filter(id => {
+        return !room.bunker.eliminatedPlayers.includes(id);
+    });
+}
+
+function bunkerAutoAdvanceTurn(room) {
+    var activePlayers = getBunkerActivePlayers(room);
+    if (room.bunker.currentTurnIndex >= activePlayers.length) {
+        startBunkerVoting(room);
+        return;
+    }
+
+    // Авто-раскрываем только если ещё не раскрыл
+    if (!room.bunker.hasRevealedThisTurn) {
+        var currentPlayerId = activePlayers[room.bunker.currentTurnIndex];
+        var unrevealed = getUnrevealedCards(room, currentPlayerId);
+        if (unrevealed.length > 0) {
+            var autoKey = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+            room.bunker.hasRevealedThisTurn = true;
+            bunkerRevealCard(room, currentPlayerId, autoKey, true);
+        }
+    }
+
+    room.bunker.currentTurnIndex++;
+    showBunkerCurrentTurn(room);
+}
+
+function getUnrevealedCards(room, playerId) {
+    var revealed = room.bunker.revealedCards[playerId] || {};
+    var unrevealed = [];
+    getBunkerCardKeys().forEach(key => {
+        if (!revealed[key]) unrevealed.push(key);
+    });
+    return unrevealed;
+}
+
+function bunkerRevealCard(room, playerId, cardKey, isAuto) {
+    if (!room.bunker.revealedCards[playerId]) return;
+    if (room.bunker.revealedCards[playerId][cardKey]) return; // уже раскрыта
+
+    room.bunker.revealedCards[playerId][cardKey] = true;
+
+    var player = room.players.get(playerId);
+    var cardValue = player && player.cards ? player.cards[cardKey] : '???';
+
+    broadcastToRoom(room, {
+        type: 'bunkerCardRevealed',
+        playerId: playerId,
+        nickname: player ? player.nickname : '???',
+        cardKey: cardKey,
+        cardValue: cardValue,
+        revealedCards: room.bunker.revealedCards,
+        isAuto: !!isAuto,
+    });
+}
+
+function showBunkerCurrentTurn(room) {
+    var activePlayers = getBunkerActivePlayers(room);
+
+    // Все в этом раунде уже сходили?
+    if (room.bunker.currentTurnIndex >= activePlayers.length) {
+        startBunkerVoting(room);
+        return;
+    }
+
+    var currentPlayerId = activePlayers[room.bunker.currentTurnIndex];
+    room.bunker.hasRevealedThisTurn = false;
+    broadcastToRoom(room, {
+        type: 'bunkerTurn',
+        currentPlayerId: currentPlayerId,
+        currentPlayerNickname: room.players.get(currentPlayerId) ? room.players.get(currentPlayerId).nickname : '???',
+        currentTurnIndex: room.bunker.currentTurnIndex,
+        totalTurns: activePlayers.length,
+        currentRound: room.bunker.currentRound,
+        revealedCards: room.bunker.revealedCards,
+        eliminatedPlayers: room.bunker.eliminatedPlayers,
+        players: getPlayersPublicInfo(room),
+    });
+
+    clearTimer(room);
+    startTimer(room, 180, () => {
+        bunkerAutoAdvanceTurn(room);
+    });
+}
+
+function startBunkerVoting(room) {
+    room.state = 'bunkerVote';
+    room.bunker.votes.clear();
+    room.bunker.paused = false;
+
+    var activePlayers = getBunkerActivePlayers(room);
+
+    // Если уже достаточно кикнули — конец
+    var remaining = activePlayers.length;
+    if (remaining <= room.bunker.survivorsCount) {
+        endBunkerGame(room);
+        return;
+    }
+
+    // eliminated сразу «проголосовали»
+    room.players.forEach(p => {
+        if (room.bunker.eliminatedPlayers.includes(p.id) || !p.connected) {
+            room.bunker.votes.set(p.id, '__skip__');
+        }
+    });
+
+    // Собираем данные о раскрытых картах для каждого игрока
+    var playersRevealedData = {};
+    activePlayers.forEach(id => {
+        var player = room.players.get(id);
+        var revealed = room.bunker.revealedCards[id] || {};
+        var visibleCards = {};
+        getBunkerCardKeys().forEach(key => {
+            if (revealed[key] && player && player.cards) {
+                visibleCards[key] = player.cards[key];
+            }
+        });
+        playersRevealedData[id] = visibleCards;
+    });
+
+    broadcastToRoom(room, {
+        type: 'bunkerVotePhase',
+        activePlayers: activePlayers.map(id => {
+            var p = room.players.get(id);
+            return {
+                id: id,
+                nickname: p ? p.nickname : '???',
+                revealedCards: playersRevealedData[id] || {},
+            };
+        }),
+        revealedCards: room.bunker.revealedCards,
+        eliminatedPlayers: room.bunker.eliminatedPlayers,
+        survivorsCount: room.bunker.survivorsCount,
+        remainingKicks: remaining - room.bunker.survivorsCount,
+        players: getPlayersPublicInfo(room),
+        round: room.bunker.currentRound,
+    });
+
+    if (room.bunker.votes.size >= room.players.size) {
+        processBunkerVotes(room);
+        return;
+    }
+
+    startTimer(room, 90, () => {
+        processBunkerVotes(room);
+    });
+}
+
+function processBunkerVotes(room) {
+    clearTimer(room);
+
+    var activePlayers = getBunkerActivePlayers(room);
+
+    // Заполняем не проголосовавших как «пропуск»
+    room.players.forEach(p => {
+        if (!room.bunker.votes.has(p.id)) {
+            room.bunker.votes.set(p.id, '__skip__');
+        }
+    });
+
+    // Подсчёт голосов
+    var voteCounts = {};
+    activePlayers.forEach(id => { voteCounts[id] = 0; });
+    var skipCount = 0;
+
+    room.bunker.votes.forEach((targetId, voterId) => {
+        if (targetId === '__skip__') {
+            skipCount++;
+        } else if (voteCounts[targetId] !== undefined) {
+            voteCounts[targetId]++;
+        }
+    });
+
+    // Считаем только голоса активных игроков (не eliminated)
+    var activeVoterCount = 0;
+    room.bunker.votes.forEach((targetId, voterId) => {
+        if (!room.bunker.eliminatedPlayers.includes(voterId)) {
+            activeVoterCount++;
+        }
+    });
+
+    // Пересчитываем skip и vote counts только от активных
+    var activeSkipCount = 0;
+    var activeVoteCounts = {};
+    activePlayers.forEach(id => { activeVoteCounts[id] = 0; });
+
+    room.bunker.votes.forEach((targetId, voterId) => {
+        if (room.bunker.eliminatedPlayers.includes(voterId)) return;
+        if (targetId === '__skip__') {
+            activeSkipCount++;
+        } else if (activeVoteCounts[targetId] !== undefined) {
+            activeVoteCounts[targetId]++;
+        }
+    });
+
+    // Если большинство за пропуск
+    if (activeSkipCount > activeVoterCount / 2) {
+        broadcastToRoom(room, {
+            type: 'bunkerVoteResult',
+            result: 'skipped',
+            voteCounts: activeVoteCounts,
+            skipCount: activeSkipCount,
+            message: 'Большинство проголосовало за продолжение без кика.',
+        });
+        setTimeout(() => { startNextBunkerRound(room); }, 3000);
+        return;
+    }
+
+    // Находим максимум голосов
+    var maxVotes = 0;
+    Object.keys(activeVoteCounts).forEach(id => {
+        if (activeVoteCounts[id] > maxVotes) maxVotes = activeVoteCounts[id];
+    });
+
+    if (maxVotes === 0) {
+        // Никто ни за кого не голосовал
+        broadcastToRoom(room, {
+            type: 'bunkerVoteResult',
+            result: 'skipped',
+            voteCounts: activeVoteCounts,
+            skipCount: activeSkipCount,
+            message: 'Никто не проголосовал. Продолжаем.',
+        });
+        setTimeout(() => { startNextBunkerRound(room); }, 3000);
+        return;
+    }
+
+    var topPlayers = [];
+    Object.keys(activeVoteCounts).forEach(id => {
+        if (activeVoteCounts[id] === maxVotes) topPlayers.push(id);
+    });
+
+    // Ничья?
+    if (topPlayers.length > 1) {
+        room.bunker.tiedPlayers = topPlayers;
+        room.bunker.tieVotes.clear();
+        room.state = 'bunkerTieVote';
+
+        // eliminated сразу «проголосовали»
+        room.players.forEach(p => {
+            if (room.bunker.eliminatedPlayers.includes(p.id) || !p.connected) {
+                room.bunker.tieVotes.set(p.id, '__skip__');
+            }
+        });
+
+        broadcastToRoom(room, {
+            type: 'bunkerTieVotePhase',
+            tiedPlayers: topPlayers.map(id => {
+                var p = room.players.get(id);
+                return { id: id, nickname: p ? p.nickname : '???' };
+            }),
+            voteCounts: activeVoteCounts,
+            players: getPlayersPublicInfo(room),
+        });
+
+        if (room.bunker.tieVotes.size >= room.players.size) {
+            processBunkerTieVotes(room);
+            return;
+        }
+
+        startTimer(room, 60, () => {
+            processBunkerTieVotes(room);
+        });
+        return;
+    }
+
+    // Один победитель (кикаемый)
+    var eliminatedId = topPlayers[0];
+    eliminateFromBunker(room, eliminatedId, activeVoteCounts);
+}
+
+function processBunkerTieVotes(room) {
+    clearTimer(room);
+
+    room.players.forEach(p => {
+        if (!room.bunker.tieVotes.has(p.id)) {
+            room.bunker.tieVotes.set(p.id, '__skip__');
+        }
+    });
+
+    var tieVoteCounts = {};
+    room.bunker.tiedPlayers.forEach(id => { tieVoteCounts[id] = 0; });
+
+    room.bunker.tieVotes.forEach((targetId, voterId) => {
+        if (room.bunker.eliminatedPlayers.includes(voterId)) return;
+        if (targetId !== '__skip__' && tieVoteCounts[targetId] !== undefined) {
+            tieVoteCounts[targetId]++;
+        }
+    });
+
+    var maxTie = 0;
+    Object.keys(tieVoteCounts).forEach(id => {
+        if (tieVoteCounts[id] > maxTie) maxTie = tieVoteCounts[id];
+    });
+
+    var tieWinners = [];
+    Object.keys(tieVoteCounts).forEach(id => {
+        if (tieVoteCounts[id] === maxTie && maxTie > 0) tieWinners.push(id);
+    });
+
+    if (tieWinners.length === 1) {
+        eliminateFromBunker(room, tieWinners[0], tieVoteCounts);
+    } else if (tieWinners.length > 1) {
+        // Опять ничья — повторяем
+        room.bunker.tiedPlayers = tieWinners;
+        room.bunker.tieVotes.clear();
+
+        room.players.forEach(p => {
+            if (room.bunker.eliminatedPlayers.includes(p.id) || !p.connected) {
+                room.bunker.tieVotes.set(p.id, '__skip__');
+            }
+        });
+
+        broadcastToRoom(room, {
+            type: 'bunkerTieVotePhase',
+            tiedPlayers: tieWinners.map(id => {
+                var p = room.players.get(id);
+                return { id: id, nickname: p ? p.nickname : '???' };
+            }),
+            voteCounts: tieVoteCounts,
+            players: getPlayersPublicInfo(room),
+        });
+
+        if (room.bunker.tieVotes.size >= room.players.size) {
+            processBunkerTieVotes(room);
+            return;
+        }
+
+        startTimer(room, 60, () => {
+            processBunkerTieVotes(room);
+        });
+    } else {
+        // Никто не проголосовал — пропуск
+        broadcastToRoom(room, {
+            type: 'bunkerVoteResult',
+            result: 'skipped',
+            voteCounts: tieVoteCounts,
+            skipCount: 0,
+            message: 'Переголосование не определило результат. Продолжаем.',
+        });
+        setTimeout(() => { startNextBunkerRound(room); }, 3000);
+    }
+}
+
+function eliminateFromBunker(room, eliminatedId, voteCounts) {
+    room.bunker.eliminatedPlayers.push(eliminatedId);
+
+    var player = room.players.get(eliminatedId);
+    if (player) player.eliminated = true;
+
+    // Раскрываем ВСЕ карты кикнутого
+    var allCards = {};
+    if (player && player.cards) {
+        getBunkerCardKeys().forEach(key => {
+            room.bunker.revealedCards[eliminatedId][key] = true;
+            allCards[key] = player.cards[key];
+        });
+    }
+
+    var activePlayers = getBunkerActivePlayers(room);
+
+    broadcastToRoom(room, {
+        type: 'bunkerVoteResult',
+        result: 'eliminated',
+        eliminatedId: eliminatedId,
+        eliminatedNickname: player ? player.nickname : '???',
+        eliminatedCards: allCards,
+        voteCounts: voteCounts,
+        revealedCards: room.bunker.revealedCards,
+        remainingPlayers: activePlayers.length,
+        survivorsCount: room.bunker.survivorsCount,
+        players: getPlayersPublicInfo(room),
+    });
+
+    // Проверяем конец игры
+    if (activePlayers.length <= room.bunker.survivorsCount) {
+        setTimeout(() => { endBunkerGame(room); }, 5000);
+    } else {
+        setTimeout(() => { startNextBunkerRound(room); }, 5000);
+    }
+}
+
+function startNextBunkerRound(room) {
+    room.bunker.currentRound++;
+    room.bunker.currentTurnIndex = 0;
+    room.state = 'bunkerReveal';
+
+    // Проверяем: если все карты раскрыты у всех — заканчиваем
+    var activePlayers = getBunkerActivePlayers(room);
+    var allRevealed = true;
+    activePlayers.forEach(id => {
+        var unrevealed = getUnrevealedCards(room, id);
+        if (unrevealed.length > 0) allRevealed = false;
+    });
+
+    if (allRevealed) {
+        // Все карты раскрыты — финальное голосование
+        startBunkerVoting(room);
+        return;
+    }
+
+    showBunkerCurrentTurn(room);
+}
+
+function endBunkerGame(room) {
+    room.state = 'bunkerGameOver';
+    var activePlayers = getBunkerActivePlayers(room);
+
+    // Раскрываем ВСЕ карты ВСЕХ игроков
+    room.players.forEach(p => {
+        if (room.bunker.revealedCards[p.id]) {
+            getBunkerCardKeys().forEach(key => {
+                room.bunker.revealedCards[p.id][key] = true;
+            });
+        }
+    });
+
+    // Собираем полные данные
+    var allPlayersData = [];
+    room.players.forEach(p => {
+        allPlayersData.push({
+            id: p.id,
+            nickname: p.nickname,
+            cards: p.cards,
+            survived: activePlayers.includes(p.id),
+            eliminated: room.bunker.eliminatedPlayers.includes(p.id),
+        });
+    });
+
+    broadcastToRoom(room, {
+        type: 'bunkerGameOver',
+        survivors: activePlayers.map(id => {
+            var p = room.players.get(id);
+            return { id: id, nickname: p ? p.nickname : '???', cards: p ? p.cards : {} };
+        }),
+        eliminated: room.bunker.eliminatedPlayers.map(id => {
+            var p = room.players.get(id);
+            return { id: id, nickname: p ? p.nickname : '???', cards: p ? p.cards : {} };
+        }),
+        globalProblem: room.bunker.globalProblem,
+        allPlayers: allPlayersData,
+        players: getPlayersPublicInfo(room),
+    });
+}
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log('');
@@ -2805,6 +4103,15 @@ function getCardInputPhases(room) {
     if (room.settings.useReviews) {
         phases.push('review');
     }
+    if (room.settings.useTargetAudience) {
+        phases.push('targetAudience');
+    }
+    if (room.settings.useHiddenDefects) {
+        phases.push('hiddenDefect');
+    }
+    if (room.settings.usePackaging) {
+        phases.push('packaging');
+    }
     return phases;
 }
 
@@ -2812,7 +4119,16 @@ function startCardInputPhase(room, cardType) {
     room.state = 'cardInput';
     room.currentCardInputType = cardType;
 
-    var mapKey = cardType === 'adjective' ? 'adjectives' : cardType === 'item' ? 'items' : cardType === 'feature' ? 'features' : 'reviews';
+    var mapKeyMap = {
+        adjective: 'adjectives',
+        item: 'items',
+        feature: 'features',
+        review: 'reviews',
+        targetAudience: 'targetAudience',
+        hiddenDefect: 'hiddenDefects',
+        packaging: 'packaging',
+    };
+    var mapKey = mapKeyMap[cardType] || 'adjectives';
 
     // Инициализируем Map если нет
     if (!room.customCards[mapKey]) room.customCards[mapKey] = new Map();
@@ -2846,7 +4162,16 @@ function processCardInputPhase(room) {
     clearTimer(room);
 
     var cardType = room.currentCardInputType;
-    var mapKey = cardType === 'adjective' ? 'adjectives' : cardType === 'item' ? 'items' : cardType === 'feature' ? 'features' : 'reviews';
+    var mapKeyMap = {
+        adjective: 'adjectives',
+        item: 'items',
+        feature: 'features',
+        review: 'reviews',
+        targetAudience: 'targetAudience',
+        hiddenDefect: 'hiddenDefects',
+        packaging: 'packaging',
+    };
+    var mapKey = mapKeyMap[cardType] || 'adjectives';
     var cardMap = room.customCards[mapKey];
 
     room.players.forEach(p => {
@@ -2912,6 +4237,46 @@ function dealCustomCards(room) {
         reviews = shuffle(reviews);
     }
 
+    var customTargetAudience = [];
+    var customHiddenDefects = [];
+    var customPackaging = [];
+
+    if (room.settings.useTargetAudience && room.customCards.targetAudience) {
+        room.customCards.targetAudience.forEach((text) => {
+            if (text && text.trim()) {
+                customTargetAudience.push(text.trim().toUpperCase());
+            } else {
+                var idx = Math.floor(Math.random() * TARGET_AUDIENCE.length);
+                customTargetAudience.push(TARGET_AUDIENCE[idx]);
+            }
+        });
+        customTargetAudience = shuffle(customTargetAudience);
+    }
+
+    if (room.settings.useHiddenDefects && room.customCards.hiddenDefects) {
+        room.customCards.hiddenDefects.forEach((text) => {
+            if (text && text.trim()) {
+                customHiddenDefects.push(text.trim().toUpperCase());
+            } else {
+                var idx = Math.floor(Math.random() * HIDDEN_DEFECTS.length);
+                customHiddenDefects.push(HIDDEN_DEFECTS[idx]);
+            }
+        });
+        customHiddenDefects = shuffle(customHiddenDefects);
+    }
+
+    if (room.settings.usePackaging && room.customCards.packaging) {
+        room.customCards.packaging.forEach((text) => {
+            if (text && text.trim()) {
+                customPackaging.push(text.trim().toUpperCase());
+            } else {
+                var idx = Math.floor(Math.random() * PACKAGING.length);
+                customPackaging.push(PACKAGING[idx]);
+            }
+        });
+        customPackaging = shuffle(customPackaging);
+    }
+
     // Модификаторы НЕ кастомные (генератор абсурда отключает модификаторы)
     // Но на всякий случай — если modifier включен, берём из базы
     // (по логике modifier === 'none' при cardSource === 'players')
@@ -2933,13 +4298,24 @@ function dealCustomCards(room) {
             item: items[i % items.length],
         };
 
-        // Особенность — только если НЕ псевдоинновации
         if (!room.settings.pseudoMode) {
             player.cards.feature = features[i % features.length];
         }
 
         if (room.settings.useReviews && reviews.length > 0) {
             player.cards.review = reviews[i % reviews.length];
+        }
+
+        if (room.settings.useTargetAudience && customTargetAudience.length > 0) {
+            player.cards.targetAudience = customTargetAudience[i % customTargetAudience.length];
+        }
+
+        if (room.settings.useHiddenDefects && customHiddenDefects.length > 0) {
+            player.cards.hiddenDefect = customHiddenDefects[i % customHiddenDefects.length];
+        }
+
+        if (room.settings.usePackaging && customPackaging.length > 0) {
+            player.cards.packaging = customPackaging[i % customPackaging.length];
         }
 
         player.pitchText = '';
@@ -2996,6 +4372,27 @@ function dealCardsFromDatabase(room) {
             p.cards.review = REVIEWS[reviewIndex];
         }
 
+        // Целевая аудитория
+        if (room.settings.useTargetAudience) {
+            if (room.decks.targetAudience.length === 0) room.decks.targetAudience = shuffle([...Array(TARGET_AUDIENCE.length).keys()]);
+            var taIndex = room.decks.targetAudience.pop();
+            p.cards.targetAudience = TARGET_AUDIENCE[taIndex];
+        }
+
+        // Скрытый дефект
+        if (room.settings.useHiddenDefects) {
+            if (room.decks.hiddenDefects.length === 0) room.decks.hiddenDefects = shuffle([...Array(HIDDEN_DEFECTS.length).keys()]);
+            var hdIndex = room.decks.hiddenDefects.pop();
+            p.cards.hiddenDefect = HIDDEN_DEFECTS[hdIndex];
+        }
+
+        // Упаковка
+        if (room.settings.usePackaging) {
+            if (room.decks.packaging.length === 0) room.decks.packaging = shuffle([...Array(PACKAGING.length).keys()]);
+            var pkgIndex = room.decks.packaging.pop();
+            p.cards.packaging = PACKAGING[pkgIndex];
+        }
+
         p.pitchText = '';
         p.isReady = false;
     });
@@ -3021,7 +4418,7 @@ function sendRoundStartToAll(room) {
 }
 
 function applyBlackSwan(room, presenter) {
-    var allKeys = ['adjective', 'item', 'feature', 'modifier', 'review'];
+    var allKeys = ['adjective', 'item', 'feature', 'modifier', 'review', 'targetAudience', 'hiddenDefect', 'packaging'];
     var availableKeys = [];
     for (var i = 0; i < allKeys.length; i++) {
         if (presenter.cards[allKeys[i]]) {
@@ -3059,6 +4456,18 @@ function applyBlackSwan(room, presenter) {
             newValue = generateMetaphor();
         }
         presenter.cards.modifier = newValue;
+    } else if (targetKey === 'targetAudience') {
+        var taIdx = Math.floor(Math.random() * TARGET_AUDIENCE.length);
+        newValue = TARGET_AUDIENCE[taIdx];
+        presenter.cards.targetAudience = newValue;
+    } else if (targetKey === 'hiddenDefect') {
+        var hdIdx = Math.floor(Math.random() * HIDDEN_DEFECTS.length);
+        newValue = HIDDEN_DEFECTS[hdIdx];
+        presenter.cards.hiddenDefect = newValue;
+    } else if (targetKey === 'packaging') {
+        var pkgIdx = Math.floor(Math.random() * PACKAGING.length);
+        newValue = PACKAGING[pkgIdx];
+        presenter.cards.packaging = newValue;
     }
 
     var labelMap = {
@@ -3067,6 +4476,9 @@ function applyBlackSwan(room, presenter) {
         feature: 'Особенность',
         review: 'Первый отзыв',
         modifier: 'Модификатор',
+        targetAudience: 'Целевая аудитория',
+        hiddenDefect: 'Скрытый дефект',
+        packaging: 'Упаковка',
     };
 
     console.log(`[BLACK SWAN] ${presenter.nickname}: ${targetKey} "${oldValue}" -> "${newValue}"`);

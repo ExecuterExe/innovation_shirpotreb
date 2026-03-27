@@ -10,11 +10,10 @@ var CARD_TYPES = [
     { key: 'item', label: 'Предмет', gradient: 'card-item-gradient', shadow: 'shadow-cyan-950/40' },
     { key: 'modifier', label: 'Модификатор', gradient: 'card-modifier-gradient', shadow: 'shadow-emerald-950/40' },
     { key: 'feature', label: 'Особенность', gradient: 'card-feature-gradient', shadow: 'shadow-purple-950/40' },
-    // Будущие карты:
-    // { key: 'modifier',  label: 'Модификатор',    gradient: 'card-modifier-gradient',  shadow: 'shadow-amber-950/40' },
-    // { key: 'audience',  label: 'Аудитория',      gradient: 'card-audience-gradient',   shadow: 'shadow-green-950/40' },
+    { key: 'targetAudience', label: 'Целевая аудитория', gradient: 'card-audience-gradient', shadow: 'shadow-pink-950/40' },
+    { key: 'hiddenDefect', label: 'Скрытый дефект', gradient: 'card-defect-gradient', shadow: 'shadow-orange-950/40' },
+    { key: 'packaging', label: 'Упаковка', gradient: 'card-packaging-gradient', shadow: 'shadow-teal-950/40' },
     { key: 'review', label: 'Первый отзыв', gradient: 'card-review-gradient', shadow: 'shadow-amber-950/40' },
-
 ];
 
 export function renderPresentation(container) {
@@ -336,8 +335,6 @@ function buildSpeechTexts(pres, presenterIndex, totalPresenters, streamerMode) {
         texts.push('Выступает следующий игрок.');
     }
 
-    // Имя
-    texts.push(pres.nickname + '.');
 
     // Продукт — собираем из карточек
     var productParts = [];
@@ -352,7 +349,7 @@ function buildSpeechTexts(pres, presenterIndex, totalPresenters, streamerMode) {
         productParts.push(pres.cards.modifier.toLowerCase());
     }
 
-    var productStr = 'Его продукт: ' + productParts.join(' ');
+    var productStr = 'Продукт: ' + productParts.join(' ');
 
     if (pres.cards.feature) {
         productStr += ', ' + pres.cards.feature.toLowerCase();
@@ -364,6 +361,21 @@ function buildSpeechTexts(pres, presenterIndex, totalPresenters, streamerMode) {
     // Отзыв
     if (pres.cards.review) {
         texts.push('Первый отзыв клиента: ' + pres.cards.review);
+    }
+
+    // Целевая аудитория
+    if (pres.cards.targetAudience) {
+        texts.push('Целевая аудитория: ' + pres.cards.targetAudience.toLowerCase() + '.');
+    }
+
+    // Скрытый дефект
+    if (pres.cards.hiddenDefect) {
+        texts.push('Скрытый дефект: ' + pres.cards.hiddenDefect.toLowerCase() + '.');
+    }
+
+    // Упаковка
+    if (pres.cards.packaging) {
+        texts.push('Упаковка: ' + pres.cards.packaging.toLowerCase() + '.');
     }
 
     // Текст питча (стримерский режим)

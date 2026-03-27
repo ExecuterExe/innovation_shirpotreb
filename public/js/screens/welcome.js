@@ -354,6 +354,42 @@ function buildRulesContent() {
     html += '</p>';
     html += '</div>';
 
+    // Target Audience
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎯 Целевая аудитория</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Опциональная карточка! Каждый игрок получает дополнительную карту — ';
+    html += '<span class="text-accent-gold font-bold">для кого предназначен продукт</span>. ';
+    html += 'Это может быть что-то вроде «Для геймеров», «Для инопланетян» или «Для людей с ипотекой». ';
+    html += 'Используйте аудиторию в презентации — объясните, почему именно эти люди нуждаются в вашем продукте!';
+    html += '</p>';
+    html += '</div>';
+
+    // Hidden Defects
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">⚠️ Скрытый дефект</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Опциональная карточка! У каждого продукта есть ';
+    html += '<span class="text-accent-gold font-bold">тайный недостаток</span>, ';
+    html += 'о котором знают все. Это может быть «Разряжается за 1 час», ';
+    html += '«Может взорваться в любой момент» или даже «Слишком хорош для дефектов». ';
+    html += 'Задача предпринимателя — убедить инвесторов, что этот дефект на самом деле не так страшен ';
+    html += '(или даже является преимуществом)!';
+    html += '</p>';
+    html += '</div>';
+
+    // Packaging
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">📦 Упаковка</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Опциональная карточка! Каждый продукт приходит в ';
+    html += '<span class="text-accent-gold font-bold">абсурдной упаковке</span>. ';
+    html += 'Это может быть «Мусорный мешок», «Бронированный кейс», ';
+    html += '«Замотано в старый ковёр» или «Папка с грифом СОВЕРШЕННО СЕКРЕТНО». ';
+    html += 'Обыграйте упаковку в презентации — возможно, она добавляет ценности продукту!';
+    html += '</p>';
+    html += '</div>';
+
     // Modifiers
     html += '<div>';
     html += '<h3 class="text-lg font-black text-accent-blue mb-3">📜 Модификаторы предмета</h3>';
@@ -399,6 +435,44 @@ function buildRulesContent() {
     html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-red/40">';
     html += '<span class="text-sm">⚠️</span>';
     html += '<span class="text-xs text-corp-dim">Не совместим с «Генератором абсурда» — работает только с нашей базой</span>';
+    html += '</div>';
+    html += '</div>';
+
+    // Bunker mode
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🏠 Выживание стартапов (Бункер)</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Альтернативный режим игры! Каждый игрок получает <span class="text-accent-gold font-bold">8 карточек</span>: ';
+    html += 'прилагательное, предмет, модификатор, особенность, аудиторию, скрытый дефект, упаковку и отзыв. ';
+    html += 'На экране появляется <span class="text-accent-red font-bold">глобальная проблема</span> — ';
+    html += 'ваш продукт должен помочь человечеству справиться с ней!';
+    html += '</p>';
+    html += '<div class="mt-3 space-y-2">';
+
+    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
+    html += '<span class="text-lg flex-shrink-0">🃏</span>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">Раскрытие карт</div>';
+    html += '<div class="text-xs text-corp-dim">Игроки ходят по очереди и открывают по одной карте за раунд. Остальные видят только уже раскрытые карты.</div>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
+    html += '<span class="text-lg flex-shrink-0">🗳</span>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">Голосование</div>';
+    html += '<div class="text-xs text-corp-dim">После каждого раунда раскрытий — голосование за кик. Можно пропустить голосование. При ничье — переголосование.</div>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
+    html += '<span class="text-lg flex-shrink-0">💀</span>';
+    html += '<div>';
+    html += '<div class="text-sm font-bold text-corp-light">Выбывание</div>';
+    html += '<div class="text-xs text-corp-dim">Кикнутый игрок выбывает, и все его карты раскрываются. Игра продолжается, пока не останется нужное количество выживших.</div>';
+    html += '</div>';
+    html += '</div>';
+
     html += '</div>';
     html += '</div>';
 
