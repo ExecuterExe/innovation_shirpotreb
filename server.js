@@ -29,6 +29,82 @@ app.get('/api/random-combo', (req, res) => {
         text: adjective + ' ' + item + ', ' + feature.toLowerCase()
     });
 });
+
+app.get('/api/solo-cards', (req, res) => {
+    var settings = req.query;
+    var useModifier = settings.modifier && settings.modifier !== 'none';
+    var modifierType = settings.modifier || 'none';
+    var useReviews = settings.useReviews === 'true';
+    var pseudoMode = settings.pseudoMode === 'true';
+    var useTargetAudience = settings.useTargetAudience === 'true';
+    var useHiddenDefects = settings.useHiddenDefects === 'true';
+    var usePackaging = settings.usePackaging === 'true';
+    var useEvents = settings.useEvents === 'true';
+
+    // Предмет
+    var itemObj = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+    var gender = itemObj.gender;
+
+    // Прилагательное
+    var adjRaw = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+    var adjective = declineAdjective(adjRaw, gender);
+
+    var cards = {
+        adjective: adjective,
+        item: itemObj.word,
+    };
+
+    // Особенность
+    if (!pseudoMode) {
+        var featRaw = FEATURES[Math.floor(Math.random() * FEATURES.length)];
+        cards.feature = declineFeature(featRaw, gender);
+    }
+
+    // Модификатор
+    if (modifierType === 'addition') {
+        cards.modifier = ADDITIONS[Math.floor(Math.random() * ADDITIONS.length)];
+    } else if (modifierType === 'metaphor') {
+        // Генерируем метафору
+        var useFemale = Math.random() < 0.5;
+        if (useFemale) {
+            var p1f = METAPHOR_PART1_F[Math.floor(Math.random() * METAPHOR_PART1_F.length)];
+            var p2f = METAPHOR_PART2_F[Math.floor(Math.random() * METAPHOR_PART2_F.length)];
+            cards.modifier = p1f + ' ' + p2f;
+        } else {
+            var p1m = METAPHOR_PART1_M[Math.floor(Math.random() * METAPHOR_PART1_M.length)];
+            var p2m = METAPHOR_PART2_M[Math.floor(Math.random() * METAPHOR_PART2_M.length)];
+            cards.modifier = p1m + ' ' + p2m;
+        }
+    }
+
+    // Отзыв
+    if (useReviews) {
+        cards.review = REVIEWS[Math.floor(Math.random() * REVIEWS.length)];
+    }
+
+    // Целевая аудитория
+    if (useTargetAudience) {
+        cards.targetAudience = TARGET_AUDIENCE[Math.floor(Math.random() * TARGET_AUDIENCE.length)];
+    }
+
+    // Скрытый дефект
+    if (useHiddenDefects) {
+        cards.hiddenDefect = HIDDEN_DEFECTS[Math.floor(Math.random() * HIDDEN_DEFECTS.length)];
+    }
+
+    // Упаковка
+    if (usePackaging) {
+        cards.packaging = PACKAGING[Math.floor(Math.random() * PACKAGING.length)];
+    }
+
+    // Событие
+    var event = null;
+    if (useEvents) {
+        event = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+    }
+
+    res.json({ cards, event });
+});
 // =====================================================================
 // ПОЛНЫЕ КОЛОДЫ КАРТ — 60 прилагательных, 60 предметов, 60 особенностей, 50 событий
 // =====================================================================

@@ -14,6 +14,7 @@ import { renderTied, renderTiebreaker, renderTiebreakerVoting } from './screens/
 import { initSpeech } from './components/speech.js';
 import { renderBunkerReveal, renderBunkerVoteResult } from './screens/bunker-game.js';
 import { renderBunkerVote, renderBunkerTieVote, renderBunkerGameOver } from './screens/bunker-vote.js';
+import { renderSoloSettings, renderSoloCards } from './screens/solo.js';
 
 // ==================== GLOBAL STATE ====================
 
@@ -62,6 +63,8 @@ export var state = {
     bestInvestor: null,
     bestEntrepreneur: null,
     blackSwan: null,
+    soloCards: null,
+    soloEvent: null,
     // Бункер
     bunker: {
         globalProblem: null,
@@ -125,6 +128,8 @@ export function navigate(phase) {
         case 'bunkerTieVote': renderBunkerTieVote(wrapper); break;
         case 'bunkerVoteResult': renderBunkerVoteResult(wrapper); break;
         case 'bunkerGameOver': renderBunkerGameOver(wrapper); break;
+        case 'soloSettings': renderSoloSettings(wrapper); break;
+        case 'soloCards': renderSoloCards(wrapper); break;
         default: renderWelcome(wrapper);
     }
 

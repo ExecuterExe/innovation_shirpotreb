@@ -1,5 +1,6 @@
 import { sendMsg } from '../socket.js';
 import { showNotification } from '../components/notification.js';
+import { navigate } from '../app.js';
 
 var startupInterval = null;
 
@@ -53,6 +54,14 @@ export function renderWelcome(container) {
     html += 'СОЗДАТЬ КОМНАТУ';
     html += '</button>';
 
+    // Одиночный режим
+    html += '<button id="btn-solo" class="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider cursor-pointer ';
+    html += 'bg-corp-graphite border border-corp-border text-corp-muted hover:text-corp-light hover:border-corp-border/80 transition-all">';
+    html += '  <span class="text-base">🎲</span>';
+    html += '  <span>Одиночный режим</span>';
+    html += '  <span class="text-xs text-corp-dim font-normal normal-case ml-1">— попробуй без регистрации</span>';
+    html += '</button>';
+
     // Divider
     html += '<div class="flex items-center gap-4">';
     html += '<div class="flex-1 h-px bg-corp-border"></div>';
@@ -90,6 +99,12 @@ export function renderWelcome(container) {
     // ═══════ LISTENERS ═══════
     var btnCreate = container.querySelector('#btn-create');
     var btnJoin = container.querySelector('#btn-join');
+    var btnSolo = container.querySelector('#btn-solo');
+    if (btnSolo) {
+        btnSolo.addEventListener('click', function () {
+            navigate('soloSettings');
+        });
+    }
     var nicknameInput = container.querySelector('#w-nickname');
     var codeInput = container.querySelector('#w-room-code');
     var btnRules = container.querySelector('#btn-rules');
