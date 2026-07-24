@@ -9,29 +9,34 @@ export function renderWelcome(container) {
     html += '<div class="flex flex-col items-center justify-center min-h-screen px-6 py-12">';
 
     // Logo
-    html += '<div class="mb-4 animate-float">';
-    html += '<div class="text-7xl md:text-8xl select-none" style="filter: drop-shadow(0 0 30px rgba(0,180,255,0.3));">🚀</div>';
+    html += '<div class="mb-5 animate-float">';
+    html += '<div class="text-7xl md:text-8xl select-none" style="filter: drop-shadow(0 0 40px rgba(0,180,255,0.35)) drop-shadow(0 0 80px rgba(0,180,255,0.12));">🚀</div>';
     html += '</div>';
 
-    // Title
-    html += '<h1 class="font-display font-black text-3xl md:text-5xl text-corp-white text-center tracking-tight leading-tight mb-3">';
-    html += 'ИННОВАЦИОННЫЙ<br>ШИРПОТРЕБ';
+    // Title — градиент синий→голубой
+    html += '<h1 class="font-display font-black text-3xl md:text-5xl text-center tracking-tight leading-none mb-1" style="text-wrap:balance">';
+    html += '<span class="text-gradient-blue">ИННОВАЦИОННЫЙ</span>';
+    html += '<br>';
+    html += '<span class="text-corp-white" style="letter-spacing:-0.01em">ШИРПОТРЕБ</span>';
     html += '</h1>';
 
-    // Rotating startup
-    html += '<div class="h-12 md:h-14 flex items-center justify-center mb-8 overflow-hidden">';
-    html += '<p id="rotating-startup" class="text-corp-muted text-sm md:text-base font-mono text-center italic">';
+    // Подзаголовок
+    html += '<p class="text-xs font-bold text-corp-muted uppercase tracking-[0.18em] mb-6">Питчинг · Инвестиции · Хаос</p>';
+
+    // Rotating startup — в рамке как цитата
+    html += '<div class="h-10 flex items-center justify-center mb-8 overflow-hidden w-full max-w-sm">';
+    html += '<p id="rotating-startup" class="text-corp-dim text-xs md:text-sm font-mono text-center italic px-4 py-2 rounded-xl bg-white/[0.025] border border-white/[0.06]">';
     html += 'Загрузка гениальных идей...';
     html += '</p>';
     html += '</div>';
 
     // ═══════ RULES BUTTON ═══════
     html += '<div class="w-full max-w-md mb-6">';
-    html += '<button id="btn-rules" class="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer group ';
-    html += 'bg-accent-gold-dim border-2 border-accent-gold/30 text-accent-gold hover:bg-accent-gold/20 hover:border-accent-gold/50 transition-all">';
-    html += '  <span class="text-xl">📖</span>';
-    html += '  <span>ОБЯЗАТЕЛЬНО ПРОЧИТАЙТЕ ПРАВИЛА!</span>';
-    html += '  <span id="rules-arrow" class="text-sm transition-transform">▼</span>';
+    html += '<button id="btn-rules" class="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer ';
+    html += 'bg-accent-gold-dim border border-accent-gold/25 text-accent-gold hover:bg-accent-gold/15 hover:border-accent-gold/45 transition-all">';
+    html += '  <span>📖</span>';
+    html += '  <span>Обязательно прочитайте правила!</span>';
+    html += '  <span id="rules-arrow" class="text-xs text-accent-gold/60 transition-transform">▼</span>';
     html += '</button>';
     html += '</div>';
 
@@ -41,32 +46,31 @@ export function renderWelcome(container) {
     html += '</div>';
 
     // Main card
-    html += '<div class="corp-card-elevated w-full max-w-md p-8 space-y-6">';
+    html += '<div class="corp-card-elevated w-full max-w-md p-7 space-y-5">';
 
     // Nickname
     html += '<div>';
-    html += '<label class="block text-xs font-bold text-corp-dim uppercase tracking-widest mb-2">Ваш позывной</label>';
+    html += '<label class="block text-[0.6rem] font-black text-corp-muted uppercase tracking-[0.16em] mb-2">Ваш позывной</label>';
     html += '<input type="text" id="w-nickname" class="input-corp" placeholder="Как вас называть?" maxlength="20" autocomplete="off">';
     html += '</div>';
 
     // Create
-    html += '<button id="btn-create" class="btn-neon-solid w-full py-4 rounded-2xl text-base font-black tracking-wide uppercase cursor-pointer">';
-    html += 'СОЗДАТЬ КОМНАТУ';
+    html += '<button id="btn-create" class="btn-neon-solid w-full py-4 rounded-2xl text-sm font-black tracking-wider uppercase cursor-pointer">';
+    html += '🚀 Создать комнату';
     html += '</button>';
 
-    // Одиночный режим
-    html += '<button id="btn-solo" class="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider cursor-pointer ';
-    html += 'bg-corp-graphite border border-corp-border text-corp-muted hover:text-corp-light hover:border-corp-border/80 transition-all">';
-    html += '  <span class="text-base">🎲</span>';
-    html += '  <span>Одиночный режим</span>';
-    html += '  <span class="text-xs text-corp-dim font-normal normal-case ml-1">— попробуй без регистрации</span>';
+    // Solo
+    html += '<button id="btn-solo" class="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-bold cursor-pointer btn-ghost rounded-2xl">';
+    html += '  <span>🎲</span>';
+    html += '  <span class="text-corp-dim">Одиночный режим</span>';
+    html += '  <span class="text-xs text-corp-muted font-normal">— без регистрации</span>';
     html += '</button>';
 
     // Divider
-    html += '<div class="flex items-center gap-4">';
-    html += '<div class="flex-1 h-px bg-corp-border"></div>';
-    html += '<span class="text-xs font-bold text-corp-muted uppercase tracking-widest">или</span>';
-    html += '<div class="flex-1 h-px bg-corp-border"></div>';
+    html += '<div class="flex items-center gap-3">';
+    html += '<div class="flex-1 h-px" style="background:linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)"></div>';
+    html += '<span class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-[0.15em]">или войти</span>';
+    html += '<div class="flex-1 h-px" style="background:linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)"></div>';
     html += '</div>';
 
     // Join
@@ -80,10 +84,12 @@ export function renderWelcome(container) {
     html += '</div>'; // end card
 
     // Footer
-    html += '<div class="flex flex-wrap items-center justify-center gap-4 mt-10">';
-    html += '<a href="https://t.me/innovative_shirpotreb" target="_blank" class="flex items-center gap-2 text-xs font-semibold text-corp-muted hover:text-accent-blue transition-colors"><span>⚡</span> Telegram</a>';
-    html += '<a href="https://www.donationalerts.com/r/tortyaka" target="_blank" class="flex items-center gap-2 text-xs font-semibold text-corp-muted hover:text-accent-gold transition-colors"><span>🍕</span> Поддержать</a>';
-    html += '<a href="mailto:lokomas@inbox.ru" class="flex items-center gap-2 text-xs font-semibold text-corp-muted hover:text-corp-light transition-colors"><span>✉</span> Фидбек</a>';
+    html += '<div class="flex flex-wrap items-center justify-center gap-5 mt-8">';
+    html += '<a href="https://t.me/innovative_shirpotreb" target="_blank" class="flex items-center gap-1.5 text-[0.65rem] font-semibold text-corp-muted hover:text-accent-blue transition-colors uppercase tracking-wider">⚡ Telegram</a>';
+    html += '<div class="w-px h-3 bg-corp-border"></div>';
+    html += '<a href="https://www.donationalerts.com/r/tortyaka" target="_blank" class="flex items-center gap-1.5 text-[0.65rem] font-semibold text-corp-muted hover:text-accent-gold transition-colors uppercase tracking-wider">🍕 Поддержать</a>';
+    html += '<div class="w-px h-3 bg-corp-border"></div>';
+    html += '<a href="mailto:lokomas@inbox.ru" class="flex items-center gap-1.5 text-[0.65rem] font-semibold text-corp-muted hover:text-corp-light transition-colors uppercase tracking-wider">✉ Фидбек</a>';
     html += '</div>';
 
     // Connection

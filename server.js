@@ -1527,6 +1527,42 @@ const TARGET_AUDIENCE = [
     "ДЛЯ ПРЕСТУПНИКОВ"
 ];
 
+const GIFTS = [
+    "ПАРА ФИРМЕННЫХ НОСКОВ","ДОСТУП В ЗАКРЫТЫЙ ЧАТ ЭНТУЗИАСТОВ","СВЕЧА СТРАННОГО ЗАПАХА","КАРТА МЕСТНОСТИ",
+    "АНТИСТРЕСС-КУБИК","РЕЗИНОВЫЙ БРАСЛЕТ","МИНИ-ФОНАРИК","ЗЕРКАЛЬЦЕ КАРМАННОЕ","СВИСТОК","БУТЫЛКА ДЛЯ ВОДЫ",
+    "КНИГА «ВОЙНА И МИР»","КОВРИК ДЛЯ ЙОГИ","ОЧЕНЬ КИСЛЫЕ КОНФЕТЫ","НАБОР КАРАНДАШЕЙ","НАБОР ПАКЕТОВ",
+    "СЕРТИФИКАТ НА МАССАЖ","НАДУВНОЙ КРУГ","СОЛНЦЕЗАЩИТНЫЕ ОЧКИ","СЛОМАННЫЙ ПИСТОЛЕТ",
+    "ПЛАСТИКОВЫЙ СТАКАНЧИК С СЕМЕЧКАМИ","КУСОК МЫЛА","ПАКЕТИК САХАРА","ИСПОЛЬЗОВАННАЯ САЛФЕТКА",
+    "БАНКА ПИВА","КРУЖКА С ТРЕЩИНОЙ","ПРОСРОЧЕННЫЕ СУХАРИКИ","КОРОБОК СПИЧЕК","ИГРУШЕЧНЫЙ ТАРАКАН",
+    "СОВЕТСКИЙ НОЖИК","СТАРАЯ ТЕТРАДЬ В ЛИНЕЙКУ","БУКВАРЬ","5 ЖУРНАЛОВ СУДОКУ","ОДИН ПЛАСТЫРЬ",
+    "МАЗЬ «ЗВЁЗДОЧКА»","AIRPODS","ОБРЫВОК ФОТОГРАФИИ","ТОНКИЙ ПЛЕД","ТАБЛИЧКА «НЕ БЕСПОКОИТЬ»",
+    "ФАРТУК","АНГЛО-РУССКИЙ СЛОВАРЬ","ЛОТЕРЕЙНЫЙ БИЛЕТ","МЕРНЫЙ СТАКАН","КОСМЕТИЧКА",
+    "РЕМЕНЬ ДЛЯ ЧЕМОДАНА","СКАКАЛКА","СКОТЧ","ТЕРМОКЛЕЙ","ЛУПА","ШИШКА С ЕЛИ","ЧЕРТЕЖ ПРОДУКТА",
+    "МАСКА","НАБОР ГАЕК","НАБОР СКРЕПОК","ИЗОЛЕНТА ЧЁРНАЯ","ДЕРЕВЯННАЯ ПРИЩЕПКА",
+    "МАНИКЮРНЫЕ НОЖНИЦЫ","ЧЬЯ-ТО ФЛЕШКА 8 ГБ","ДВЕ БАТАРЕЙКИ","СКЛАДНАЯ ВИЛКА","ХЛЕБНОЕ КОЛЕЧКО",
+    "БЕРУШИ","МИНИ-АККУМУЛЯТОР","ШАРФ","МИНИ-АПТЕЧКА","ХИЖИНА С ИПОТЕКОЙ НА 50 ЛЕТ","СОСКА",
+    "ЛИЧНАЯ БЛАГОДАРНОСТЬ ОТ ПРОИЗВОДИТЕЛЯ","СПРЕЙ ОТ КОМАРОВ","ДИПЛОМ С ОТЛИЧИЕМ",
+    "ПАЧКА СИГАРЕТ","РЖАВЫЙ ГВОЗДЬ","КУСОК РАДИОАКТИВНОГО СВИНЦА","ТАБЛЕТКА БЕЗ НАЗВАНИЯ",
+    "ОСКОЛОК РАЗБИТОГО ЗЕРКАЛА","СГОРЕВШАЯ ЛАМПОЧКА","МУХА В СТЕКЛЯННОЙ БАНОЧКЕ","СТАЛЬНАЯ ТРУБА",
+    "ПАЧКА НАКЛЕЕК","СТУЛ НА ТРЁХ НОЖКАХ","БРЕЛОК С ЦИТАТОЙ","ВОЗДУШНЫЙ ШАРИК",
+    "ТОЧИЛКА ДЛЯ КАРАНДАШЕЙ","СБОРНИК АНЕКДОТОВ","КАМЕНЬ С ЛУНЫ","КРЕМ ОТ ЗАГАРА","ПЛАСТИЛИН",
+    "СТОПКА БУМАГИ А4","НАБОР МЕЛКИХ ПУГОВИЦ","ТЁРКА","МЕШОК ГНИЛОЙ КАРТОШКИ",
+    "СЕРТИФИКАТ НА 100% СКИДКУ НА БИЗНЕС-КУРС ДЛЯ ЧЕТВЕРЫХ","СЛОМАННАЯ ЧАШКА",
+    "ПАУТИНА (НЕСКОЛЬКО СМ)","БАНКА СОЛЁНЫХ ОГУРЦОВ","ДЕЗОДОРАНТ","ШАР ДЛЯ БОУЛИНГА",
+    "НЕСКОЛЬКО РУЛОНОВ ТУАЛЕТНОЙ БУМАГИ","АНТИСЕПТИК","СЛОВАРЬ ТОКСИЧНЫХ СЛОВ","ШПРИЦ",
+    "САЖЕНЕЦ ДУБА","ГУБНАЯ ПОМАДА","БУТЫЛКА ШАМПУНЯ","ИЛ И КЛУБОК НИТОК","КИРПИЧ",
+    "ПОРВАНАЯ ФУТБОЛКА","ОЧКИ","ГРЯЗНАЯ ПОДУШКА","СЕРТИФИКАЦИЯ О ПРОДУКТЕ","КОЛОДА КАРТ ТАРО",
+    "АЛМАЗНАЯ МОЗАИКА","СУХОЙ ЛИМОН","КРЫШКА ОТ МУСОРНОГО БАКА","ГИГАНТСКИЕ ТАПКИ",
+    "ПАКЕТИК ЛАВРОВОГО ЛИСТА","НАШАТЫРНЫЙ СПИРТ","МАЛЕНЬКАЯ ГАНТЕЛЯ","ФОТОАППАРАТ",
+    "БОКСЕРСКАЯ ПЕРЧАТКА","СТАРЫЙ КОМПАС","СВЕТООТРАЖАЮЩИЙ БРЕЛОК","ЗУБНАЯ ЩЁТКА",
+    "КИЛОГРАММ ОРЕХОВ","СЛОМАННЫЙ ГРАДУСНИК","СКЛАДНАЯ ЛОЖКА","МИНИ-РАДИО","ПУСТАЯ ФОТОРАМКА",
+    "ИГРУШЕЧНАЯ МАШИНКА","ИНСТРУКЦИЯ ПО ВЫЖИВАНИЮ","СТЕКЛЯННАЯ ПЕПЕЛЬНИЦА","КУСОК ПЛОДОРОДНОЙ ПОЧВЫ",
+    "НАБОР ПАЛОЧЕК ДЛЯ СУШИ","ПАЧКА КОФЕ","СУВЕНИРНЫЙ КОЛОКОЛЬЧИК","МИНИАТЮРНЫЙ МОЛОТОК ДЛЯ МЯСА",
+    "ПЛАЩ ОТ ДОЖДЯ","КЛЕЙ-КАРАНДАШ","КОМПЛЕКТ ОДНОРАЗОВЫХ ЛОЖЕК","МАТЕРИНСКАЯ ПЛАТА",
+    "НАКЛАДНЫЕ УСЫ","НАБОР КУХОННЫХ ИНСТРУМЕНТОВ","КАРТА ЗВЁЗДНОГО НЕБА","СВЕТЛЯЧОК",
+    "ПАКЕТ КОШАЧЬЕГО КОРМА","БУМЕРАНГ",
+];
+
 const HIDDEN_DEFECTS = [
     "НЕ ИМЕЕТ СКРЫТОГО ДЕФФЕКТА",
     "У ЧЕЛОВЕКА УХУДШАЕТСЯ ЗДОРОВЬЕ",
@@ -2193,6 +2229,7 @@ function createRoom(hostId, settings) {
             additions: shuffle([...Array(ADDITIONS.length).keys()]),
             // В createRoom() → decks добавь:
             targetAudience: shuffle([...Array(TARGET_AUDIENCE.length).keys()]),
+            gifts: shuffle([...Array(GIFTS.length).keys()]),
             hiddenDefects: shuffle([...Array(HIDDEN_DEFECTS.length).keys()]),
             packaging: shuffle([...Array(PACKAGING.length).keys()]),
         },
@@ -3351,6 +3388,22 @@ wss.on('connection', (ws) => {
                 break;
             }
 
+            // ==================== БУНКЕР: КАРТА ДЕЙСТВИЯ ====================
+            case 'bunkerPlayActionCard': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room) return;
+                const player = room.players.get(info.playerId);
+                if (!player || !player.actionCards) return;
+                if (room.state !== 'bunkerReveal' && room.state !== 'bunkerVote') return;
+                var acResult = handleBunkerActionCard(room, player, msg);
+                if (acResult && acResult.error) {
+                    ws.send(JSON.stringify({ type: 'error', message: acResult.error }));
+                }
+                break;
+            }
+
             // ==================== БУНКЕР: ПАУЗА (хост) ====================
             case 'bunkerPause': {
                 const info = playerRooms.get(ws);
@@ -3373,6 +3426,25 @@ wss.on('connection', (ws) => {
                     room.bunker.paused = true;
                     clearTimer(room);
                     broadcastToRoom(room, { type: 'bunkerPauseState', paused: true });
+                }
+                break;
+            }
+
+            // ==================== БУНКЕР: ВЕДУЩИЙ ПРОДВИГАЕТ ФАЗУ ====================
+            case 'bunkerHostAdvance': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || info.playerId !== room.hostId) return;
+                if (!room.settings.bunkerHostMode) return;
+
+                clearTimer(room);
+                if (room.state === 'bunkerReveal') {
+                    bunkerAutoAdvanceTurn(room);
+                } else if (room.state === 'bunkerVote') {
+                    processBunkerVotes(room);
+                } else if (room.state === 'bunkerTieVote') {
+                    processBunkerTieVotes(room);
                 }
                 break;
             }
@@ -3434,6 +3506,7 @@ wss.on('connection', (ws) => {
                 if (s.useHiddenDefects !== undefined) room.settings.useHiddenDefects = !!s.useHiddenDefects;
                 if (s.usePackaging !== undefined) room.settings.usePackaging = !!s.usePackaging;
                 if (s.bunkerMode !== undefined) room.settings.bunkerMode = !!s.bunkerMode;
+                if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.prepTime !== undefined) room.settings.prepTime = Math.min(600, Math.max(10, parseInt(s.prepTime) || 120));
                 if (s.maxPlayers !== undefined) room.settings.maxPlayers = Math.min(18, Math.max(3, parseInt(s.maxPlayers) || 8));
                 if (s.presentTime !== undefined) room.settings.presentTime = Math.min(600, Math.max(10, parseInt(s.presentTime) || 120));
@@ -3807,6 +3880,7 @@ wss.on('connection', (ws) => {
                     reviews: shuffle([...Array(REVIEWS.length).keys()]),
                     additions: shuffle([...Array(ADDITIONS.length).keys()]),
                     targetAudience: shuffle([...Array(TARGET_AUDIENCE.length).keys()]),
+                    gifts: shuffle([...Array(GIFTS.length).keys()]),
                     hiddenDefects: shuffle([...Array(HIDDEN_DEFECTS.length).keys()]),
                     packaging: shuffle([...Array(PACKAGING.length).keys()]),
                 };
@@ -4030,7 +4104,289 @@ function getSurvivorsCount(n) {
 }
 
 function getBunkerCardKeys() {
-    return ['adjective', 'item', 'modifier', 'feature', 'targetAudience', 'hiddenDefect', 'packaging', 'review'];
+    return ['adjective', 'item', 'modifier', 'feature', 'gift', 'hiddenDefect', 'packaging', 'review'];
+}
+
+// ============================================================
+// КАРТЫ ДЕЙСТВИЯ БУНКЕРА
+// ============================================================
+
+const BUNKER_ACTION_CARDS = [
+    // A: Сброс своей карты
+    { type: 'selfSwap', cardKey: 'adjective',      name: 'Ребрендинг',                         emoji: '🎨', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось своё «Прилагательное» и вытяни новое.' },
+    { type: 'selfSwap', cardKey: 'item',            name: 'Смена курса',                        emoji: '🚀', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Предмет» и вытяни новый.' },
+    { type: 'selfSwap', cardKey: 'modifier',        name: 'Техническое обслуживание',           emoji: '🔧', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Модификатор» и вытяни новый.' },
+    { type: 'selfSwap', cardKey: 'feature',         name: 'Патч первого дня',                   emoji: '✨', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свою «Особенность» и вытяни новую.' },
+    { type: 'selfSwap', cardKey: 'gift',             name: 'Апгрейд бонуса',                     emoji: '🎁', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Бонус к продукту» и вытяни новый.' },
+    { type: 'selfSwap', cardKey: 'hiddenDefect',    name: 'Отзывная кампания',                  emoji: '⚠️', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Скрытый дефект» и вытяни новый.' },
+    { type: 'selfSwap', cardKey: 'packaging',       name: 'Новый поставщик',                    emoji: '📬', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свою «Упаковку» и вытяни новую.' },
+    { type: 'selfSwap', cardKey: 'review',          name: 'Накрутка рейтинга',                  emoji: '⭐', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Первый отзыв» и вытяни новый.' },
+    // B: Перемешать карты всех игроков
+    { type: 'shuffleAll', cardKey: 'adjective',     name: 'Кризис идей',                       emoji: '🌪️', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Прилагательные» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'item',          name: 'Сбой логистики',                     emoji: '🚚', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Предметы» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'modifier',      name: 'Унификация ГОСТа',                   emoji: '📋', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Модификаторы» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'feature',       name: 'Открытый исходный код',              emoji: '💻', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Особенности» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'gift',           name: 'Перераздача бонусов',                emoji: '🎀', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Бонусы к продукту» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'hiddenDefect',  name: 'Массовый брак',                      emoji: '💀', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Скрытые дефекты» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'packaging',     name: 'Путаница на складе',                 emoji: '🗃️', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Упаковки» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'review',        name: 'Атака ботов-парсеров',               emoji: '🤖', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Первые отзывы» перемешиваются и раздаются заново.' },
+    // C: Обмен с выбранным игроком
+    { type: 'swapWithPlayer', cardKey: 'adjective',      name: 'Кража айдентики',               emoji: '🎭', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Прилагательным» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'item',           name: 'Рейдерский захват',             emoji: '🏢', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Предметом» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'modifier',       name: 'Обмен технологиями',            emoji: '🤝', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Модификатором» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'feature',        name: 'Кража патента',                 emoji: '📄', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Особенностью» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'gift',            name: 'Подмена бонуса',                emoji: '🔄', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Бонусом к продукту» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'hiddenDefect',   name: 'Перекладывание ответственности',emoji: '🙈', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Скрытым дефектом» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'packaging',      name: 'Подмена на таможне',            emoji: '📮', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Упаковкой» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'review',         name: 'Кража репутации',               emoji: '💬', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Первым отзывом» с выбранным игроком.' },
+    // D: Специальные
+    { type: 'shareFeature',  name: 'Общие ресурсы',      emoji: '🔗', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Скопируй «Особенность» выбранного игрока — она работает и на твой товар.' },
+    { type: 'forceReveal',   name: 'Анонс продукта',     emoji: '📢', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Заставь игрока немедленно вскрыть свою «Особенность».' },
+    { type: 'extraCard',     name: 'Двойная порция',      emoji: '🍕', needsTarget: false, needsCardKey: true,  phase: 'reveal', desc: 'Вытяни вторую карту любой категории на выбор.' },
+    { type: 'voteDouble',    name: 'Голос инвестора',     emoji: '💎', needsTarget: false, needsCardKey: false, phase: 'vote',   desc: 'Твой голос в этом голосовании считается за двух.' },
+    { type: 'blackPR',       name: 'Чёрный пиар',         emoji: '🗞', needsTarget: true,  needsCardKey: false, phase: 'vote',   desc: 'Выбери игрока — все голоса ПРОТИВ него в этом раунде удваиваются.' },
+    { type: 'absorb',        name: 'Поглощение',          emoji: '🍴', needsTarget: true,  needsCardKey: true,  phase: 'reveal', desc: 'Забери карту у уже выбывшего игрока.' },
+    { type: 'wildcard',      name: 'Биткоин-прыжок',      emoji: '🎲', needsTarget: false, needsCardKey: true,  phase: 'reveal', desc: 'Замени одну свою карту на случайную из любой другой колоды.' },
+    { type: 'removeDefect',  name: 'Донат',               emoji: '💊', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Навсегда удали «Скрытый дефект» другого игрока.' },
+];
+
+function drawBunkerCard(room, cardKey, itemGender) {
+    var g = itemGender || 'm';
+    switch (cardKey) {
+        case 'adjective':
+            if (room.decks.adjectives.length === 0) room.decks.adjectives = shuffle([...Array(ADJECTIVES.length).keys()]);
+            return { value: declineAdjective(ADJECTIVES[room.decks.adjectives.pop()], g) };
+        case 'item': {
+            if (room.decks.items.length === 0) room.decks.items = shuffle([...Array(ITEMS.length).keys()]);
+            var itemObj = ITEMS[room.decks.items.pop()];
+            return { value: itemObj.word, gender: itemObj.gender };
+        }
+        case 'modifier':
+            if (room.decks.additions.length === 0) room.decks.additions = shuffle([...Array(ADDITIONS.length).keys()]);
+            return { value: ADDITIONS[room.decks.additions.pop()] };
+        case 'feature':
+            if (room.decks.features.length === 0) room.decks.features = shuffle([...Array(FEATURES.length).keys()]);
+            return { value: declineFeature(FEATURES[room.decks.features.pop()], g) };
+        case 'gift':
+            if (room.decks.gifts.length === 0) room.decks.gifts = shuffle([...Array(GIFTS.length).keys()]);
+            return { value: GIFTS[room.decks.gifts.pop()] };
+        case 'hiddenDefect':
+            if (room.decks.hiddenDefects.length === 0) room.decks.hiddenDefects = shuffle([...Array(HIDDEN_DEFECTS.length).keys()]);
+            return { value: HIDDEN_DEFECTS[room.decks.hiddenDefects.pop()] };
+        case 'packaging':
+            if (room.decks.packaging.length === 0) room.decks.packaging = shuffle([...Array(PACKAGING.length).keys()]);
+            return { value: PACKAGING[room.decks.packaging.pop()] };
+        case 'review':
+            if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
+            return { value: REVIEWS[room.decks.reviews.pop()] };
+        default: return null;
+    }
+}
+
+function handleBunkerActionCard(room, player, msg) {
+    var cardId = msg.cardId;
+    var targetPlayerId = msg.targetPlayerId || null;
+    var targetCardKey = msg.targetCardKey || null;
+    var myCardKey = msg.myCardKey || null;
+
+    var cardDef = null;
+    var cardIdx = -1;
+    for (var i = 0; i < player.actionCards.length; i++) {
+        if (player.actionCards[i].id === cardId) { cardDef = player.actionCards[i]; cardIdx = i; break; }
+    }
+    if (!cardDef) return { error: 'Карта не найдена в вашей руке.' };
+    if (room.bunker.usedActionCards.has(cardId)) return { error: 'Эта карта уже сыграна.' };
+
+    if (cardDef.phase === 'vote' && room.state !== 'bunkerVote') return { error: 'Эту карту можно сыграть только во время голосования.' };
+    if (cardDef.phase === 'reveal' && room.state !== 'bunkerReveal') return { error: 'Эту карту можно сыграть только в фазе раскрытия.' };
+
+    var myGender = player.itemGender || 'm';
+    var activePlayers = getBunkerActivePlayers(room);
+
+    function markUsed() {
+        room.bunker.usedActionCards.add(cardId);
+        player.actionCards.splice(cardIdx, 1);
+    }
+    function sendMyUpdate(extra) {
+        sendToPlayer(room, player.id, Object.assign({ type: 'bunkerActionCardUpdate', updatedCards: player.cards, myActionCards: player.actionCards }, extra || {}));
+    }
+    function broadcastPlayed(effect, extra) {
+        broadcastToRoom(room, Object.assign({
+            type: 'bunkerActionCardPlayed',
+            playerId: player.id,
+            nickname: player.nickname,
+            cardName: cardDef.name,
+            emoji: cardDef.emoji,
+            effect: effect,
+            cardId: cardId,
+        }, extra || {}));
+    }
+    function redeclineForItem(p, newGender) {
+        p.itemGender = newGender;
+        var pRevealed = room.bunker.revealedCards[p.id] || {};
+        if (!pRevealed['adjective']) {
+            var a = drawBunkerCard(room, 'adjective', newGender); if (a) p.cards.adjective = a.value;
+        }
+        if (!pRevealed['feature']) {
+            var f = drawBunkerCard(room, 'feature', newGender); if (f) p.cards.feature = f.value;
+        }
+    }
+
+    switch (cardDef.type) {
+
+        case 'selfSwap': {
+            var key = cardDef.cardKey;
+            var drawn = drawBunkerCard(room, key, myGender);
+            if (!drawn) return { error: 'Не удалось вытянуть карту.' };
+            player.cards[key] = drawn.value;
+            if (key === 'item' && drawn.gender) redeclineForItem(player, drawn.gender);
+            markUsed(); sendMyUpdate();
+            broadcastPlayed(player.nickname + ' сыграл «' + cardDef.name + '»');
+            return { ok: true };
+        }
+
+        case 'shuffleAll': {
+            var key = cardDef.cardKey;
+            var eligible = [];
+            activePlayers.forEach(id => {
+                var p = room.players.get(id);
+                if (p && p.cards) eligible.push(id);
+            });
+            if (eligible.length < 2) return { error: 'Недостаточно игроков для перемешивания.' };
+            var values = shuffle(eligible.map(id => room.players.get(id).cards[key]));
+            eligible.forEach((id, i) => {
+                var p = room.players.get(id);
+                p.cards[key] = values[i];
+                if (key === 'item') {
+                    var itemObj = null;
+                    for (var ii = 0; ii < ITEMS.length; ii++) { if (ITEMS[ii].word === values[i]) { itemObj = ITEMS[ii]; break; } }
+                    if (itemObj) redeclineForItem(p, itemObj.gender);
+                }
+                sendToPlayer(room, id, { type: 'bunkerActionCardUpdate', updatedCards: p.cards, myActionCards: p.actionCards || [] });
+            });
+            markUsed(); sendMyUpdate();
+            broadcastPlayed(player.nickname + ' сыграл «' + cardDef.name + '»: ' + eligible.length + ' игроков получили новые карты', { affectedCount: eligible.length });
+            return { ok: true };
+        }
+
+        case 'swapWithPlayer': {
+            var key = cardDef.cardKey;
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || !target.cards) return { error: 'Игрок не найден.' };
+            if (room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Нельзя меняться с выбывшим игроком.' };
+            var tmp = player.cards[key]; player.cards[key] = target.cards[key]; target.cards[key] = tmp;
+            if (key === 'item') {
+                var myItem = null, theirItem = null;
+                for (var ii = 0; ii < ITEMS.length; ii++) {
+                    if (ITEMS[ii].word === player.cards.item) myItem = ITEMS[ii];
+                    if (ITEMS[ii].word === target.cards.item) theirItem = ITEMS[ii];
+                }
+                if (myItem) redeclineForItem(player, myItem.gender);
+                if (theirItem) redeclineForItem(target, theirItem.gender);
+            }
+            markUsed();
+            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, myActionCards: player.actionCards });
+            sendToPlayer(room, targetPlayerId, { type: 'bunkerActionCardUpdate', updatedCards: target.cards, myActionCards: target.actionCards || [] });
+            broadcastPlayed(player.nickname + ' поменялся «' + key + '» с ' + target.nickname, { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        case 'shareFeature': {
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || !target.cards || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
+            if (!room.bunker.extraCards[player.id]) room.bunker.extraCards[player.id] = {};
+            room.bunker.extraCards[player.id].feature = target.cards.feature;
+            markUsed();
+            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, extraCards: room.bunker.extraCards[player.id], myActionCards: player.actionCards });
+            broadcastPlayed(player.nickname + ' скопировал «Особенность» у ' + target.nickname, { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        case 'forceReveal': {
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
+            if ((room.bunker.revealedCards[targetPlayerId] || {})['feature']) return { error: 'Особенность этого игрока уже раскрыта.' };
+            bunkerRevealCard(room, targetPlayerId, 'feature', false);
+            markUsed(); sendMyUpdate();
+            broadcastPlayed(player.nickname + ' вынудил ' + target.nickname + ' вскрыть «Особенность»!', { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        case 'extraCard': {
+            if (!targetCardKey || !getBunkerCardKeys().includes(targetCardKey)) return { error: 'Укажите категорию карты.' };
+            var drawn = drawBunkerCard(room, targetCardKey, myGender);
+            if (!drawn) return { error: 'Не удалось вытянуть карту.' };
+            if (!room.bunker.extraCards[player.id]) room.bunker.extraCards[player.id] = {};
+            room.bunker.extraCards[player.id][targetCardKey] = drawn.value;
+            markUsed();
+            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, extraCards: room.bunker.extraCards[player.id], myActionCards: player.actionCards });
+            broadcastPlayed(player.nickname + ' вытянул вторую карту «' + targetCardKey + '»!');
+            return { ok: true };
+        }
+
+        case 'voteDouble': {
+            room.bunker.voteMultipliers[player.id] = 2;
+            markUsed(); sendMyUpdate();
+            broadcastPlayed(player.nickname + ' удвоил свой голос в этом голосовании!');
+            return { ok: true };
+        }
+
+        case 'blackPR': {
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
+            room.bunker.voteTargetMultipliers[targetPlayerId] = 2;
+            markUsed(); sendMyUpdate();
+            broadcastPlayed(player.nickname + ' запустил «Чёрный пиар» против ' + target.nickname + '! Голоса против него удваиваются.', { targetNickname: target.nickname, targetPlayerId: targetPlayerId });
+            return { ok: true };
+        }
+
+        case 'absorb': {
+            if (!targetPlayerId) return { error: 'Выберите выбывшего игрока.' };
+            if (!room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Можно взять карту только у выбывшего игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || !target.cards) return { error: 'Игрок не найден.' };
+            if (!targetCardKey || !getBunkerCardKeys().includes(targetCardKey)) return { error: 'Укажите категорию карты.' };
+            var sourceVal = target.cards[targetCardKey];
+            if (!sourceVal) return { error: 'Карта не найдена у выбывшего игрока.' };
+            if ((room.bunker.revealedCards[player.id] || {})[targetCardKey]) return { error: 'Ваша карта уже раскрыта.' };
+            player.cards[targetCardKey] = sourceVal;
+            markUsed(); sendMyUpdate();
+            broadcastPlayed(player.nickname + ' поглотил карту «' + targetCardKey + '» у ' + target.nickname, { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        case 'wildcard': {
+            if (!myCardKey || !getBunkerCardKeys().includes(myCardKey)) return { error: 'Укажите какую из своих карт заменить.' };
+            if ((room.bunker.revealedCards[player.id] || {})[myCardKey]) return { error: 'Эта карта уже раскрыта.' };
+            var otherKeys = getBunkerCardKeys().filter(k => k !== myCardKey);
+            var randomKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+            var drawn = drawBunkerCard(room, randomKey, myGender);
+            if (!drawn) return { error: 'Не удалось вытянуть карту.' };
+            player.cards[myCardKey] = drawn.value;
+            markUsed();
+            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, myActionCards: player.actionCards, wildcardNote: { slot: myCardKey, fromDeck: randomKey } });
+            broadcastPlayed(player.nickname + ' сыграл «Биткоин-прыжок»: случайная карта вместо «' + myCardKey + '»!');
+            return { ok: true };
+        }
+
+        case 'removeDefect': {
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || !target.cards || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
+            if (!target.cards.hiddenDefect) return { error: 'У этого игрока нет скрытого дефекта.' };
+            target.cards.hiddenDefect = null;
+            markUsed(); sendMyUpdate();
+            sendToPlayer(room, targetPlayerId, { type: 'bunkerActionCardUpdate', updatedCards: target.cards, myActionCards: target.actionCards || [] });
+            broadcastPlayed(player.nickname + ' «Донатил» ' + target.nickname + ': скрытый дефект удалён!', { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        default: return { error: 'Неизвестный тип карты.' };
+    }
 }
 
 function startBunkerGame(room) {
@@ -4052,6 +4408,7 @@ function startBunkerGame(room) {
         var itemIndex = room.decks.items.pop();
         var itemObj = ITEMS[itemIndex];
         var gender = itemObj.gender;
+        p.itemGender = gender;
 
         var adjIndex = room.decks.adjectives.pop();
         var adjWord = declineAdjective(ADJECTIVES[adjIndex], gender);
@@ -4065,8 +4422,8 @@ function startBunkerGame(room) {
         if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
         var revIdx = room.decks.reviews.pop();
 
-        if (room.decks.targetAudience.length === 0) room.decks.targetAudience = shuffle([...Array(TARGET_AUDIENCE.length).keys()]);
-        var taIdx = room.decks.targetAudience.pop();
+        if (room.decks.gifts.length === 0) room.decks.gifts = shuffle([...Array(GIFTS.length).keys()]);
+        var giftIdx = room.decks.gifts.pop();
 
         if (room.decks.hiddenDefects.length === 0) room.decks.hiddenDefects = shuffle([...Array(HIDDEN_DEFECTS.length).keys()]);
         var hdIdx = room.decks.hiddenDefects.pop();
@@ -4079,7 +4436,7 @@ function startBunkerGame(room) {
             item: itemObj.word,
             modifier: ADDITIONS[modIdx],
             feature: featWord,
-            targetAudience: TARGET_AUDIENCE[taIdx],
+            gift: GIFTS[giftIdx],
             hiddenDefect: HIDDEN_DEFECTS[hdIdx],
             packaging: PACKAGING[pkgIdx],
             review: REVIEWS[revIdx],
@@ -4087,6 +4444,18 @@ function startBunkerGame(room) {
 
         p.capital = 0;
         p.attractedInvestments = 0;
+        p.actionCards = [];
+    });
+
+    // Раздаём карты действия — 2 каждому игроку, без повторов в пуле
+    var actionPool = shuffle(BUNKER_ACTION_CARDS.map((c, i) => i));
+    var actionPoolIdx = 0;
+    room.players.forEach(p => {
+        for (var ai = 0; ai < 2; ai++) {
+            var template = BUNKER_ACTION_CARDS[actionPool[actionPoolIdx % actionPool.length]];
+            actionPoolIdx++;
+            p.actionCards.push(Object.assign({ id: uuidv4() }, template));
+        }
     });
 
     // Глобальная проблема
@@ -4119,6 +4488,10 @@ function startBunkerGame(room) {
         totalPlayers: totalPlayers,
         paused: false,
         hasRevealedThisTurn: false,
+        usedActionCards: new Set(),
+        voteMultipliers: {},
+        voteTargetMultipliers: {},
+        extraCards: {},
     };
 
     room.state = 'bunkerReveal';
@@ -4130,6 +4503,7 @@ function startBunkerGame(room) {
             type: 'bunkerStart',
             globalProblem: problem,
             yourCards: p.cards,
+            yourActionCards: p.actionCards,
             revealOrder: revealOrder.map(id => ({
                 id: id,
                 nickname: room.players.get(id) ? room.players.get(id).nickname : '???',
@@ -4141,13 +4515,16 @@ function startBunkerGame(room) {
             totalPlayers: totalPlayers,
             eliminatedPlayers: [],
             players: getPlayersPublicInfo(room),
+            hostMode: !!room.settings.bunkerHostMode,
         });
     });
 
-    // Запускаем таймер на первый ход
-    startTimer(room, 180, () => {
-        bunkerAutoAdvanceTurn(room);
-    });
+    // Запускаем таймер на первый ход (в режиме ведущего таймера нет)
+    if (!room.settings.bunkerHostMode) {
+        startTimer(room, 180, () => {
+            bunkerAutoAdvanceTurn(room);
+        });
+    }
 }
 
 function getBunkerActivePlayers(room) {
@@ -4168,7 +4545,13 @@ function bunkerAutoAdvanceTurn(room) {
         var currentPlayerId = activePlayers[room.bunker.currentTurnIndex];
         var unrevealed = getUnrevealedCards(room, currentPlayerId);
         if (unrevealed.length > 0) {
-            var autoKey = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+            // В раунде 1 всегда авто-раскрываем предмет, чтобы не выбралась случайная карта
+            var autoKey;
+            if (room.bunker.currentRound === 0 && unrevealed.includes('item')) {
+                autoKey = 'item';
+            } else {
+                autoKey = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+            }
             room.bunker.hasRevealedThisTurn = true;
             bunkerRevealCard(room, currentPlayerId, autoKey, true);
         }
@@ -4231,15 +4614,30 @@ function showBunkerCurrentTurn(room) {
     });
 
     clearTimer(room);
-    startTimer(room, 180, () => {
-        bunkerAutoAdvanceTurn(room);
-    });
+    if (!room.settings.bunkerHostMode) {
+        startTimer(room, 180, () => {
+            bunkerAutoAdvanceTurn(room);
+        });
+    }
 }
 
 function startBunkerVoting(room) {
+    // После раунда 1 голосование пропускаем — по одному предмету нечестно оценивать
+    if (room.bunker.currentRound === 0) {
+        broadcastToRoom(room, {
+            type: 'bunkerSkipVote',
+            reason: 'Голосование пропускается после первого раунда — раскрыто слишком мало карт.',
+            round: room.bunker.currentRound,
+        });
+        setTimeout(() => { startNextBunkerRound(room); }, 3000);
+        return;
+    }
+
     room.state = 'bunkerVote';
     room.bunker.votes.clear();
     room.bunker.paused = false;
+    room.bunker.voteMultipliers = {};
+    room.bunker.voteTargetMultipliers = {};
 
     var activePlayers = getBunkerActivePlayers(room);
 
@@ -4294,9 +4692,11 @@ function startBunkerVoting(room) {
         return;
     }
 
-    startTimer(room, 90, () => {
-        processBunkerVotes(room);
-    });
+    if (!room.settings.bunkerHostMode) {
+        startTimer(room, 90, () => {
+            processBunkerVotes(room);
+        });
+    }
 }
 
 function processBunkerVotes(room) {
@@ -4342,7 +4742,9 @@ function processBunkerVotes(room) {
         if (targetId === '__skip__') {
             activeSkipCount++;
         } else if (activeVoteCounts[targetId] !== undefined) {
-            activeVoteCounts[targetId]++;
+            var voterWeight = room.bunker.voteMultipliers[voterId] || 1;
+            var targetWeight = room.bunker.voteTargetMultipliers[targetId] || 1;
+            activeVoteCounts[targetId] += voterWeight * targetWeight;
         }
     });
 
@@ -4411,9 +4813,11 @@ function processBunkerVotes(room) {
             return;
         }
 
-        startTimer(room, 60, () => {
-            processBunkerTieVotes(room);
-        });
+        if (!room.settings.bunkerHostMode) {
+            startTimer(room, 60, () => {
+                processBunkerTieVotes(room);
+            });
+        }
         return;
     }
 
@@ -4479,9 +4883,11 @@ function processBunkerTieVotes(room) {
             return;
         }
 
-        startTimer(room, 60, () => {
-            processBunkerTieVotes(room);
-        });
+        if (!room.settings.bunkerHostMode) {
+            startTimer(room, 60, () => {
+                processBunkerTieVotes(room);
+            });
+        }
     } else {
         // Никто не проголосовал — пропуск
         broadcastToRoom(room, {

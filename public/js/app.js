@@ -66,6 +66,8 @@ export var state = {
     soloCards: null,
     soloEvent: null,
     // Бункер
+    myActionCards: [],
+    myExtraCards: {},
     bunker: {
         globalProblem: null,
         revealOrder: [],
@@ -85,6 +87,7 @@ export var state = {
         survivors: [],
         eliminated: [],
         paused: false,
+        playedActionCards: {},
     },
 };
 

@@ -28,7 +28,11 @@ export function renderBunkerVote(container) {
     html += '</div>';
 
     // Timer
-    if (!paused) {
+    if (bunker.hostMode) {
+        html += '<div class="text-center mb-4">';
+        html += '  <div class="text-sm font-black text-accent-gold">🎙 Ведущий завершит голосование вручную</div>';
+        html += '</div>';
+    } else if (!paused) {
         html += '<div class="text-center mb-4">';
         html += '  <div data-timer-text class="font-mono text-3xl font-black text-corp-white"></div>';
         html += '  <div class="max-w-xs mx-auto mt-2">';
@@ -113,14 +117,53 @@ export function renderBunkerVote(container) {
         html += '<button id="btn-bunker-confirm-vote" class="btn-neon-solid w-full py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">';
         html += '✓ ПОДТВЕРДИТЬ ГОЛОС';
         html += '</button>';
+
+        // Карты действия (фаза vote)
+        var voteActionCards = [];
+        var myActionCards = state.myActionCards || [];
+        for (var vai = 0; vai < myActionCards.length; vai++) {
+            if (myActionCards[vai].phase === 'vote' || myActionCards[vai].phase === 'any') {
+                voteActionCards.push(myActionCards[vai]);
+            }
+        }
+        if (voteActionCards.length > 0) {
+            html += '<div id="bunker-vote-action-hand" class="mt-4">';
+            html += '  <h3 class="text-xs font-bold text-accent-gold uppercase tracking-widest mb-2">⚡ Карты действия</h3>';
+            html += '  <div class="flex gap-3 flex-wrap">';
+            for (var vac = 0; vac < voteActionCards.length; vac++) {
+                var vc = voteActionCards[vac];
+                html += '<div class="bunker-action-card bunker-vote-action-btn flex-1 min-w-[140px] max-w-[200px] p-3.5"';
+                html += '  data-action-id="' + escapeHtml(vc.id) + '"';
+                html += '  data-action-type="' + escapeHtml(vc.type) + '"';
+                html += '  data-needs-target="' + (vc.needsTarget ? 'true' : 'false') + '"';
+                html += '  data-action-name="' + escapeHtml(vc.name) + '"';
+                html += '  data-action-emoji="' + escapeHtml(vc.emoji) + '"';
+                html += '  data-action-desc="' + escapeHtml(vc.desc) + '"';
+                html += '>';
+                html += '  <div class="bunker-action-card-corner">⚡</div>';
+                html += '  <div class="text-2xl mb-2 relative z-10">' + escapeHtml(vc.emoji) + '</div>';
+                html += '  <div class="text-[0.62rem] font-black uppercase tracking-wider mb-1.5 relative z-10" style="color:#f5b731">' + escapeHtml(vc.name) + '</div>';
+                html += '  <div class="text-[0.55rem] leading-snug relative z-10" style="color:rgba(200,180,120,0.7)">' + escapeHtml(vc.desc) + '</div>';
+                html += '</div>';
+            }
+            html += '  </div>';
+            html += '</div>';
+        }
     }
 
-    // Хост: пауза
+    // Модальное окно для карт действия
+    html += '<div id="vote-action-modal" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-black/75 backdrop-blur-sm"></div><div class="relative flex items-center justify-center min-h-screen p-4"><div id="vote-action-modal-content" class="max-w-sm w-full corp-card-elevated p-5"></div></div></div>';
+
+    // Хост: управление голосованием
     if (isHost) {
-        html += '<div class="text-center mt-4">';
-        html += '  <button id="btn-bunker-pause" class="btn-neon px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">';
-        html += paused ? '▶ Продолжить таймер' : '⏸ Пауза';
-        html += '  </button>';
+        html += '<div class="flex items-center justify-center gap-2 mt-4">';
+        if (bunker.hostMode) {
+            html += '<button id="btn-bunker-host-advance" class="btn-neon-solid px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer">🗳 Завершить голосование</button>';
+        } else {
+            html += '<button id="btn-bunker-pause" class="btn-neon px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">';
+            html += paused ? '▶ Продолжить таймер' : '⏸ Пауза';
+            html += '</button>';
+        }
         html += '</div>';
     }
 
@@ -170,11 +213,118 @@ export function renderBunkerVote(container) {
         });
     }
 
+    var btnHostAdvanceVote = container.querySelector('#btn-bunker-host-advance');
+    if (btnHostAdvanceVote) {
+        btnHostAdvanceVote.addEventListener('click', function () {
+            btnHostAdvanceVote.disabled = true;
+            btnHostAdvanceVote.textContent = 'Подводим итоги...';
+            sendMsg({ type: 'bunkerHostAdvance' });
+        });
+    }
+
     var btnPause = container.querySelector('#btn-bunker-pause');
     if (btnPause) {
         btnPause.addEventListener('click', function () {
             sendMsg({ type: 'bunkerPause' });
         });
+    }
+
+    // ═══════ Vote action cards ═══════
+    var voteActionBtns = container.querySelectorAll('.bunker-vote-action-btn');
+    for (var vab = 0; vab < voteActionBtns.length; vab++) {
+        (function (btn) {
+            btn.addEventListener('click', function () {
+                var cardId = btn.getAttribute('data-action-id');
+                var cardType = btn.getAttribute('data-action-type');
+                var needsTarget = btn.getAttribute('data-needs-target') === 'true';
+                var cardName = btn.getAttribute('data-action-name');
+                var cardEmoji = btn.getAttribute('data-action-emoji');
+                var cardDesc = btn.getAttribute('data-action-desc');
+
+                openVoteActionFlow(container, { cardId: cardId, cardType: cardType, needsTarget: needsTarget, name: cardName, emoji: cardEmoji, desc: cardDesc });
+            });
+        })(voteActionBtns[vab]);
+    }
+}
+
+function openVoteActionModal(container, contentHtml) {
+    var modal = container.querySelector('#vote-action-modal');
+    var content = container.querySelector('#vote-action-modal-content');
+    if (!modal || !content) return;
+    content.innerHTML = contentHtml;
+    modal.classList.remove('hidden');
+
+    var btnCancel = content.querySelector('#btn-vote-action-cancel');
+    if (btnCancel) {
+        btnCancel.addEventListener('click', function () { modal.classList.add('hidden'); });
+    }
+    modal.addEventListener('click', function handler(e) {
+        if (e.target === modal) { modal.classList.add('hidden'); modal.removeEventListener('click', handler); }
+    });
+}
+
+function closeVoteActionModal(container) {
+    var modal = container.querySelector('#vote-action-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function openVoteActionFlow(container, card) {
+    var activePlayers = (state.bunker && state.bunker.activePlayers) || [];
+    var myId = state.playerId;
+
+    if (card.needsTarget) {
+        // blackPR: pick active player (not self)
+        var targets = [];
+        for (var i = 0; i < activePlayers.length; i++) {
+            if (activePlayers[i].id !== myId) targets.push(activePlayers[i]);
+        }
+        var html = '';
+        html += '<div class="text-2xl mb-1 text-center">' + escapeHtml(card.emoji) + '</div>';
+        html += '<div class="text-xs font-black text-accent-gold text-center mb-1">' + escapeHtml(card.name) + '</div>';
+        html += '<div class="text-[0.6rem] text-corp-muted text-center mb-3">Выберите цель:</div>';
+        if (targets.length === 0) {
+            html += '<div class="text-xs text-accent-red text-center mb-3">Нет доступных целей</div>';
+            html += '<div class="flex justify-center"><button id="btn-vote-action-cancel" class="btn-ghost px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Закрыть</button></div>';
+            openVoteActionModal(container, html);
+            return;
+        }
+        html += '<div class="space-y-1.5 mb-3 max-h-48 overflow-y-auto">';
+        for (var j = 0; j < targets.length; j++) {
+            html += '<button class="btn-vote-target w-full text-left px-3 py-2 rounded-xl corp-card hover:border-accent-gold/40 text-sm font-bold text-corp-light cursor-pointer transition-colors" data-target-id="' + escapeHtml(targets[j].id) + '">' + escapeHtml(targets[j].nickname) + '</button>';
+        }
+        html += '</div>';
+        html += '<div class="flex justify-center"><button id="btn-vote-action-cancel" class="btn-ghost px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">Отмена</button></div>';
+        openVoteActionModal(container, html);
+
+        var tBtns = container.querySelectorAll('#vote-action-modal-content .btn-vote-target');
+        for (var tb = 0; tb < tBtns.length; tb++) {
+            (function (tbtn) {
+                tbtn.addEventListener('click', function () {
+                    closeVoteActionModal(container);
+                    sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId, targetPlayerId: tbtn.getAttribute('data-target-id') });
+                    playSound('start');
+                });
+            })(tBtns[tb]);
+        }
+    } else {
+        // voteDouble: confirm
+        var html2 = '<div class="text-center">';
+        html2 += '<div class="text-4xl mb-2">' + escapeHtml(card.emoji) + '</div>';
+        html2 += '<div class="text-sm font-black text-accent-gold mb-1">' + escapeHtml(card.name) + '</div>';
+        html2 += '<div class="text-xs text-corp-muted mb-4">' + escapeHtml(card.desc) + '</div>';
+        html2 += '<div class="flex gap-2 justify-center">';
+        html2 += '<button id="btn-vote-action-cancel" class="btn-ghost px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Отмена</button>';
+        html2 += '<button id="btn-vote-action-confirm" class="btn-neon px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Сыграть</button>';
+        html2 += '</div></div>';
+        openVoteActionModal(container, html2);
+        var btnConfirm = container.querySelector('#btn-vote-action-confirm');
+        if (btnConfirm) {
+            btnConfirm.addEventListener('click', function () {
+                closeVoteActionModal(container);
+                sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId });
+                playSound('start');
+            });
+        }
     }
 }
 
@@ -198,12 +348,18 @@ export function renderBunkerTieVote(container) {
     html += '</div>';
 
     // Timer
-    html += '<div class="text-center mb-6">';
-    html += '  <div data-timer-text class="font-mono text-3xl font-black text-corp-white"></div>';
-    html += '  <div class="max-w-xs mx-auto mt-2">';
-    html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
-    html += '  </div>';
-    html += '</div>';
+    if (bunker.hostMode) {
+        html += '<div class="text-center mb-6">';
+        html += '  <div class="text-sm font-black text-accent-gold">🎙 Ведущий завершит переголосование вручную</div>';
+        html += '</div>';
+    } else {
+        html += '<div class="text-center mb-6">';
+        html += '  <div data-timer-text class="font-mono text-3xl font-black text-corp-white"></div>';
+        html += '  <div class="max-w-xs mx-auto mt-2">';
+        html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
+        html += '  </div>';
+        html += '</div>';
+    }
 
     if (isEliminated) {
         html += '<div class="corp-card p-6 text-center"><span class="text-corp-muted">Вы выбыли</span></div>';
@@ -238,12 +394,16 @@ export function renderBunkerTieVote(container) {
         html += '</button>';
     }
 
-    // Пауза
+    // Пауза / ведущий
     if (isHost) {
-        html += '<div class="text-center mt-4">';
-        html += '  <button id="btn-bunker-tie-pause" class="btn-neon px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">';
-        html += bunker.paused ? '▶ Продолжить' : '⏸ Пауза';
-        html += '  </button>';
+        html += '<div class="flex items-center justify-center gap-2 mt-4">';
+        if (bunker.hostMode) {
+            html += '<button id="btn-bunker-host-advance" class="btn-neon-solid px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer">🗳 Завершить переголосование</button>';
+        } else {
+            html += '<button id="btn-bunker-tie-pause" class="btn-neon px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">';
+            html += bunker.paused ? '▶ Продолжить' : '⏸ Пауза';
+            html += '</button>';
+        }
         html += '</div>';
     }
 
@@ -285,6 +445,15 @@ export function renderBunkerTieVote(container) {
             btnConfirm.disabled = true;
             btnConfirm.classList.add('opacity-50');
             playSound('invest');
+        });
+    }
+
+    var btnHostAdvanceTie = container.querySelector('#btn-bunker-host-advance');
+    if (btnHostAdvanceTie) {
+        btnHostAdvanceTie.addEventListener('click', function () {
+            btnHostAdvanceTie.disabled = true;
+            btnHostAdvanceTie.textContent = 'Подводим итоги...';
+            sendMsg({ type: 'bunkerHostAdvance' });
         });
     }
 
@@ -519,7 +688,7 @@ function generateBunkerAIPrompt(bunker, survivors, eliminated) {
     lines.push('1. 🏅 ОЦЕНКА ПОЛЕЗНОСТИ (для каждого выжившего):');
     lines.push('   — Оцени продукт по шкале 1-10: насколько он полезен при данной катастрофе?');
     lines.push('   — Учитывай ВСЕ карточки: прилагательное, предмет, особенность,');
-    lines.push('     скрытый дефект, упаковку, целевую аудиторию и первый отзыв.');
+    lines.push('     бонус к продукту, скрытый дефект, упаковку и первый отзыв.');
     lines.push('   — Объясни, как конкретно этот продукт помогает (или мешает) выживанию.');
     lines.push('');
     lines.push('2. 📖 ИСТОРИЯ ПЕРВОЙ НЕДЕЛИ В БУНКЕРЕ:');
@@ -581,7 +750,7 @@ function formatPlayerForPrompt(player, index) {
         { key: 'item', label: '📦 Предмет' },
         { key: 'modifier', label: '📜 Модификатор' },
         { key: 'feature', label: '✨ Особенность' },
-        { key: 'targetAudience', label: '🎯 Целевая аудитория' },
+        { key: 'gift', label: '🎁 Бонус к продукту' },
         { key: 'hiddenDefect', label: '⚠️ Скрытый дефект' },
         { key: 'packaging', label: '📦 Упаковка' },
         { key: 'review', label: '💬 Первый отзыв клиента' },

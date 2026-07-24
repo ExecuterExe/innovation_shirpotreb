@@ -307,6 +307,10 @@ function handleMessage(msg) {
             handleBunkerCardRevealed(msg);
             break;
 
+        case 'bunkerSkipVote':
+            showNotification('⏭ ' + msg.reason, 'info');
+            break;
+
         case 'bunkerVotePhase':
             handleBunkerVotePhase(msg);
             break;
@@ -346,6 +350,14 @@ function handleMessage(msg) {
 
         case 'bunkerGameOver':
             handleBunkerGameOver(msg);
+            break;
+
+        case 'bunkerActionCardPlayed':
+            handleBunkerActionCardPlayed(msg);
+            break;
+
+        case 'bunkerActionCardUpdate':
+            handleBunkerActionCardUpdate(msg);
             break;
     }
 }
@@ -532,6 +544,8 @@ function handleBunkerStart(msg) {
     // Сохраняем свои карты
     setState({
         myCards: msg.yourCards,
+        myActionCards: msg.yourActionCards || [],
+        myExtraCards: {},
         players: msg.players,
         bunker: {
             globalProblem: msg.globalProblem,
@@ -552,6 +566,8 @@ function handleBunkerStart(msg) {
             survivors: [],
             eliminated: [],
             paused: false,
+            playedActionCards: {},
+            hostMode: !!msg.hostMode,
         },
     });
 
@@ -700,4 +716,46 @@ function handleBunkerGameOver(msg) {
 
     navigate('bunkerGameOver');
     playSound('fanfare');
+}
+
+function handleBunkerActionCardPlayed(msg) {
+    showNotification(msg.emoji + ' ' + msg.effect, 'info');
+    playSound('start');
+
+    // Сохраняем сыгранную карту в историю этого игрока
+    var pid = msg.playerId;
+    if (pid) {
+        var bunker = state.bunker || {};
+        var played = bunker.playedActionCards || {};
+        if (!played[pid]) played[pid] = [];
+        played[pid] = played[pid].concat([{ name: msg.cardName, emoji: msg.emoji, effect: msg.effect }]);
+        setState({ bunker: Object.assign({}, bunker, { playedActionCards: played }) });
+    }
+
+    // Обновляем DOM если он есть (рука карт)
+    var handEl = document.getElementById('bunker-action-hand');
+    if (handEl && typeof window.renderBunkerActionHand === 'function') {
+        window.renderBunkerActionHand();
+    }
+}
+
+function handleBunkerActionCardUpdate(msg) {
+    if (msg.updatedCards) {
+        setState({ myCards: msg.updatedCards });
+    }
+    if (msg.myActionCards !== undefined) {
+        setState({ myActionCards: msg.myActionCards });
+    }
+    if (msg.extraCards !== undefined) {
+        setState({ myExtraCards: msg.extraCards });
+    }
+    // Перерисовываем текущий экран
+    if (state.phase === 'bunkerReveal') {
+        var remainingTime = state.timerRemaining;
+        navigate('bunkerReveal');
+        if (remainingTime > 0) startTimer(remainingTime);
+    } else if (state.phase === 'bunkerVote') {
+        navigate('bunkerVote');
+    }
+    playSound('success');
 }

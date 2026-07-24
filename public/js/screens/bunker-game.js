@@ -11,7 +11,7 @@ var BUNKER_CARD_TYPES = [
     { key: 'item', label: 'Предмет', emoji: '📦', gradient: 'card-item-gradient', color: 'text-cyan-400', bg: 'bg-cyan-900/30', border: 'border-cyan-800/30' },
     { key: 'modifier', label: 'Модификатор', emoji: '📜', gradient: 'card-modifier-gradient', color: 'text-emerald-400', bg: 'bg-emerald-900/30', border: 'border-emerald-800/30' },
     { key: 'feature', label: 'Особенность', emoji: '✨', gradient: 'card-feature-gradient', color: 'text-purple-400', bg: 'bg-purple-900/30', border: 'border-purple-800/30' },
-    { key: 'targetAudience', label: 'Аудитория', emoji: '🎯', gradient: 'card-audience-gradient', color: 'text-pink-400', bg: 'bg-pink-900/30', border: 'border-pink-800/30' },
+    { key: 'gift', label: 'Бонус к продукту', emoji: '🎁', gradient: 'card-gift-gradient', color: 'text-pink-400', bg: 'bg-pink-900/30', border: 'border-pink-800/30' },
     { key: 'hiddenDefect', label: 'Скрытый дефект', emoji: '⚠️', gradient: 'card-defect-gradient', color: 'text-orange-400', bg: 'bg-orange-900/30', border: 'border-orange-800/30' },
     { key: 'packaging', label: 'Упаковка', emoji: '📦', gradient: 'card-packaging-gradient', color: 'text-teal-400', bg: 'bg-teal-900/30', border: 'border-teal-800/30' },
     { key: 'review', label: 'Первый отзыв', emoji: '💬', gradient: 'card-review-gradient', color: 'text-amber-400', bg: 'bg-amber-900/30', border: 'border-amber-800/30' },
@@ -55,9 +55,17 @@ export function renderBunkerReveal(container) {
     html += '  <div class="flex-1 max-w-sm mx-4">';
     html += '    <div class="flex justify-between text-[0.6rem] font-bold text-corp-muted mb-1">';
     html += '      <span>ХОД ' + ((bunker.currentTurnIndex || 0) + 1) + ' / ' + (bunker.totalTurns || '?') + '</span>';
-    html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
+    if (bunker.hostMode) {
+        html += '      <span class="text-accent-gold font-black">🎙 ведущий управляет</span>';
+    } else {
+        html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
+    }
     html += '    </div>';
-    html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
+    if (bunker.hostMode) {
+        html += '    <div class="h-1.5 rounded-full" style="background:rgba(245,183,49,0.15);border:1px solid rgba(245,183,49,0.2)"></div>';
+    } else {
+        html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
+    }
     html += '  </div>';
     html += '  <div class="text-right">';
     html += '    <div class="text-[0.5rem] font-bold text-corp-muted uppercase tracking-widest">Выживших</div>';
@@ -111,7 +119,14 @@ export function renderBunkerReveal(container) {
             html += '<div class="text-xs text-corp-muted italic">⬇ Сначала раскройте одну карту ниже</div>';
         }
 
-        if (isHost && !isMyTurn) {
+        if (isHost && bunker.hostMode) {
+            // Режим ведущего — большая кнопка "Следующий" всегда видна хосту
+            var allDone = bunker.currentTurnIndex >= (bunker.totalTurns || 0) - 1;
+            var btnLabel = allDone ? '🗳 Начать голосование' : '⏭ Следующий игрок';
+            html += '<button id="btn-bunker-host-advance" class="btn-neon-solid px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer">';
+            html += btnLabel;
+            html += '</button>';
+        } else if (isHost && !isMyTurn) {
             html += '<button id="btn-bunker-skip-turn" class="btn-neon px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">';
             html += '⏭ Следующий';
             html += '</button>';
@@ -180,15 +195,48 @@ export function renderBunkerReveal(container) {
         }
     }
     html += '  </div>';
+
+    // ═══════ ДОПОЛНИТЕЛЬНЫЕ КАРТЫ (от «Двойной порции» и др.) ═══════
+    var myExtraCards = state.myExtraCards || {};
+    var extraKeys = Object.keys(myExtraCards).filter(function(k) { return myExtraCards[k]; });
+    if (extraKeys.length > 0) {
+        html += '  <div class="mt-2 pt-2 border-t border-accent-gold/10">';
+        html += '    <div class="text-[0.5rem] font-bold text-accent-gold uppercase tracking-widest mb-1.5">🍕 Дополнительные карты</div>';
+        html += '    <div class="flex gap-2 flex-wrap">';
+        for (var eki = 0; eki < extraKeys.length; eki++) {
+            var ek = extraKeys[eki];
+            var ect = null;
+            for (var ecti = 0; ecti < BUNKER_CARD_TYPES.length; ecti++) {
+                if (BUNKER_CARD_TYPES[ecti].key === ek) { ect = BUNKER_CARD_TYPES[ecti]; break; }
+            }
+            if (!ect) continue;
+            html += '<div class="rounded-xl p-2.5 ' + ect.bg + ' ' + ect.border + ' border text-center min-w-[110px] ring-1 ring-accent-gold/30">';
+            html += '  <div class="text-[0.45rem] font-bold text-accent-gold uppercase tracking-widest mb-1">+1 ' + ect.emoji + ' ' + ect.label + '</div>';
+            html += '  <div class="text-[0.65rem] font-bold ' + ect.color + ' leading-snug">' + escapeHtml(myExtraCards[ek]) + '</div>';
+            html += '</div>';
+        }
+        html += '    </div>';
+        html += '  </div>';
+    }
+
     html += '</div>';
 
     // ═══════ СЕТКА ИГРОКОВ ═══════
     html += renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCards, revealOrder, currentPlayerId);
 
+    // ═══════ КАРТЫ ДЕЙСТВИЯ ═══════
+    var actionCards = state.myActionCards || [];
+    if (actionCards.length > 0) {
+        html += renderActionHand(actionCards, 'reveal');
+    }
+
     html += '</div>'; // end main
 
     // ═══════ МОДАЛЬНОЕ ОКНО для раскрытия (скрыто) ═══════
     html += renderRevealModal();
+
+    // ═══════ МОДАЛЬНОЕ ОКНО для карты действия (скрыто) ═══════
+    html += renderActionCardModal();
 
     container.innerHTML = html;
 
@@ -234,7 +282,16 @@ export function renderBunkerReveal(container) {
         });
     }
 
-    // Хост: пропустить ход
+    // Хост (режим ведущего): продвинуть фазу
+    var btnHostAdvance = container.querySelector('#btn-bunker-host-advance');
+    if (btnHostAdvance) {
+        btnHostAdvance.addEventListener('click', function () {
+            btnHostAdvance.disabled = true;
+            sendMsg({ type: 'bunkerHostAdvance' });
+        });
+    }
+
+    // Хост: пропустить ход (обычный режим)
     var btnSkip = container.querySelector('#btn-bunker-skip-turn');
     if (btnSkip) {
         btnSkip.addEventListener('click', function () {
@@ -260,7 +317,297 @@ export function renderBunkerReveal(container) {
             pendingReveal = null;
         }, 100);
     }
+
+    // ═══════ LISTENERS — карты действия ═══════
+    var actionBtns = container.querySelectorAll('.bunker-action-card-btn');
+    for (var acbi = 0; acbi < actionBtns.length; acbi++) {
+        (function (btn) {
+            btn.addEventListener('click', function () {
+                var cardId = btn.getAttribute('data-action-id');
+                var cardType = btn.getAttribute('data-action-type');
+                var needsTarget = btn.getAttribute('data-needs-target') === 'true';
+                var needsCardKey = btn.getAttribute('data-needs-card-key') === 'true';
+                var cardName = btn.getAttribute('data-action-name');
+                var cardEmoji = btn.getAttribute('data-action-emoji');
+                var cardDesc = btn.getAttribute('data-action-desc');
+
+                openActionCardFlow(container, {
+                    cardId: cardId, cardType: cardType,
+                    needsTarget: needsTarget, needsCardKey: needsCardKey,
+                    name: cardName, emoji: cardEmoji, desc: cardDesc
+                });
+            });
+        })(actionBtns[acbi]);
+    }
 }
+
+// ═══════════════════════════════════════════
+// РУКА — карты действия (reveal фаза)
+// ═══════════════════════════════════════════
+
+// currentPhase: 'reveal' | 'vote' — determines which cards are greyed out
+function renderActionHand(cards, currentPhase) {
+    var html = '';
+    html += '<div id="bunker-action-hand" class="mt-4 mb-2">';
+    html += '  <h3 class="text-xs font-bold text-accent-gold uppercase tracking-widest mb-2">⚡ Карты действия</h3>';
+    html += '  <div class="flex gap-3 flex-wrap">';
+
+    for (var i = 0; i < cards.length; i++) {
+        var c = cards[i];
+        var isActive = !currentPhase || c.phase === currentPhase || c.phase === 'any';
+        if (isActive) {
+            html += '<div class="bunker-action-card bunker-action-card-btn flex-1 min-w-[140px] max-w-[200px] p-3.5"';
+            html += '  data-action-id="' + escapeHtml(c.id) + '"';
+            html += '  data-action-type="' + escapeHtml(c.type) + '"';
+            html += '  data-needs-target="' + (c.needsTarget ? 'true' : 'false') + '"';
+            html += '  data-needs-card-key="' + (c.needsCardKey ? 'true' : 'false') + '"';
+            html += '  data-action-name="' + escapeHtml(c.name) + '"';
+            html += '  data-action-emoji="' + escapeHtml(c.emoji) + '"';
+            html += '  data-action-desc="' + escapeHtml(c.desc) + '"';
+            html += '>';
+            html += '  <div class="bunker-action-card-corner">⚡</div>';
+            html += '  <div class="text-2xl mb-2 relative z-10">' + escapeHtml(c.emoji) + '</div>';
+            html += '  <div class="text-[0.62rem] font-black uppercase tracking-wider mb-1.5 relative z-10" style="color:#f5b731">' + escapeHtml(c.name) + '</div>';
+            html += '  <div class="text-[0.55rem] leading-snug relative z-10" style="color:rgba(200,180,120,0.7)">' + escapeHtml(c.desc) + '</div>';
+            html += '</div>';
+        } else {
+            // Wrong phase — show greyed out, non-clickable
+            var phaseLabel = c.phase === 'vote' ? '🗳 при голосовании' : '📤 при раскрытии';
+            html += '<div class="bunker-action-card flex-1 min-w-[140px] max-w-[200px] p-3.5" style="opacity:0.38;pointer-events:none;filter:grayscale(0.7)">';
+            html += '  <div class="bunker-action-card-corner">⚡</div>';
+            html += '  <div class="text-2xl mb-2 relative z-10">' + escapeHtml(c.emoji) + '</div>';
+            html += '  <div class="text-[0.62rem] font-black uppercase tracking-wider mb-1.5 relative z-10" style="color:#f5b731">' + escapeHtml(c.name) + '</div>';
+            html += '  <div class="text-[0.55rem] leading-snug relative z-10" style="color:rgba(200,180,120,0.7)">' + escapeHtml(c.desc) + '</div>';
+            html += '  <div class="text-[0.5rem] font-bold mt-2 relative z-10" style="color:rgba(245,183,49,0.55)">' + phaseLabel + '</div>';
+            html += '</div>';
+        }
+    }
+
+    html += '  </div>';
+    html += '</div>';
+    return html;
+}
+
+// ═══════════════════════════════════════════
+// МОДАЛЬНОЕ ОКНО — карта действия
+// ═══════════════════════════════════════════
+
+function renderActionCardModal() {
+    return '<div id="action-card-modal" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-black/75 backdrop-blur-sm"></div><div class="relative flex items-center justify-center min-h-screen p-4"><div id="action-card-modal-content" class="max-w-sm w-full corp-card-elevated p-5"></div></div></div>';
+}
+
+function openActionCardModal(container, contentHtml, onClose) {
+    var modal = container.querySelector('#action-card-modal');
+    var content = container.querySelector('#action-card-modal-content');
+    if (!modal || !content) return;
+    content.innerHTML = contentHtml;
+    modal.classList.remove('hidden');
+
+    var btnCancel = content.querySelector('#btn-action-cancel');
+    if (btnCancel) {
+        btnCancel.addEventListener('click', function () {
+            modal.classList.add('hidden');
+            if (onClose) onClose();
+        });
+    }
+    modal.addEventListener('click', function handler(e) {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+            modal.removeEventListener('click', handler);
+            if (onClose) onClose();
+        }
+    });
+}
+
+function closeActionCardModal(container) {
+    var modal = container.querySelector('#action-card-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Основной флоу: в зависимости от типа карты — разные шаги
+function openActionCardFlow(container, card) {
+    // extraCard: выбрать targetCardKey (какую колоду)
+    if (card.cardType === 'extraCard') {
+        showCardKeyPicker(container, card, '🃏 Выберите категорию для вытяжки', false, function (pickedKey) {
+            closeActionCardModal(container);
+            sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId, targetCardKey: pickedKey });
+            playSound('start');
+        });
+        return;
+    }
+    // wildcard: выбрать myCardKey (какую из своих заменить)
+    if (card.cardType === 'wildcard') {
+        showMyCardKeyPicker(container, card, function (myKey) {
+            closeActionCardModal(container);
+            sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId, myCardKey: myKey });
+            playSound('start');
+        });
+        return;
+    }
+    // absorb: выбрать eliminated игрока, потом targetCardKey
+    if (card.cardType === 'absorb') {
+        showTargetPicker(container, card, true /* onlyEliminated */, function (targetId) {
+            showCardKeyPicker(container, card, '📦 Какую карту взять?', false, function (pickedKey) {
+                closeActionCardModal(container);
+                sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId, targetPlayerId: targetId, targetCardKey: pickedKey });
+                playSound('start');
+            });
+        });
+        return;
+    }
+    // needsTarget (без cardKey): выбрать активного игрока
+    if (card.needsTarget && !card.needsCardKey) {
+        showTargetPicker(container, card, false, function (targetId) {
+            closeActionCardModal(container);
+            sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId, targetPlayerId: targetId });
+            playSound('start');
+        });
+        return;
+    }
+    // ни target ни cardKey — подтверждение
+    showConfirmPlay(container, card, function () {
+        closeActionCardModal(container);
+        sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId });
+        playSound('start');
+    });
+}
+
+function showConfirmPlay(container, card, onConfirm) {
+    var html = '';
+    html += '<div class="text-center">';
+    html += '  <div class="text-4xl mb-2">' + escapeHtml(card.emoji) + '</div>';
+    html += '  <div class="text-sm font-black text-accent-gold mb-1">' + escapeHtml(card.name) + '</div>';
+    html += '  <div class="text-xs text-corp-muted mb-4">' + escapeHtml(card.desc) + '</div>';
+    html += '  <div class="flex gap-2 justify-center">';
+    html += '    <button id="btn-action-cancel" class="btn-ghost px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Отмена</button>';
+    html += '    <button id="btn-action-confirm" class="btn-neon px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Сыграть</button>';
+    html += '  </div>';
+    html += '</div>';
+    openActionCardModal(container, html);
+    var btnConfirm = container.querySelector('#btn-action-confirm');
+    if (btnConfirm) btnConfirm.addEventListener('click', onConfirm);
+}
+
+function showTargetPicker(container, card, onlyEliminated, onPick) {
+    var players = state.players || [];
+    var myId = state.playerId;
+    var eliminated = (state.bunker && state.bunker.eliminatedPlayers) || [];
+
+    var targets = [];
+    if (onlyEliminated) {
+        for (var i = 0; i < players.length; i++) {
+            if (eliminated.includes(players[i].id)) targets.push(players[i]);
+        }
+    } else {
+        for (var j = 0; j < players.length; j++) {
+            if (players[j].id !== myId && !eliminated.includes(players[j].id)) targets.push(players[j]);
+        }
+    }
+
+    var html = '';
+    html += '<div class="text-2xl mb-1 text-center">' + escapeHtml(card.emoji) + '</div>';
+    html += '<div class="text-xs font-black text-accent-gold text-center mb-1">' + escapeHtml(card.name) + '</div>';
+    html += '<div class="text-[0.6rem] text-corp-muted text-center mb-3">' + (onlyEliminated ? 'Выберите выбывшего игрока:' : 'Выберите цель:') + '</div>';
+
+    if (targets.length === 0) {
+        html += '<div class="text-xs text-accent-red text-center mb-3">' + (onlyEliminated ? 'Нет выбывших игроков' : 'Нет доступных целей') + '</div>';
+        html += '<div class="flex justify-center"><button id="btn-action-cancel" class="btn-ghost px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Закрыть</button></div>';
+        openActionCardModal(container, html);
+        return;
+    }
+
+    html += '<div class="space-y-1.5 mb-3 max-h-48 overflow-y-auto">';
+    for (var k = 0; k < targets.length; k++) {
+        html += '<button class="btn-target-player w-full text-left px-3 py-2 rounded-xl corp-card hover:border-accent-gold/40 text-sm font-bold text-corp-light cursor-pointer transition-colors"';
+        html += ' data-target-id="' + escapeHtml(targets[k].id) + '">' + escapeHtml(targets[k].nickname) + '</button>';
+    }
+    html += '</div>';
+    html += '<div class="flex justify-center"><button id="btn-action-cancel" class="btn-ghost px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">Отмена</button></div>';
+
+    openActionCardModal(container, html);
+
+    var targetBtns = container.querySelectorAll('#action-card-modal-content .btn-target-player');
+    for (var tb = 0; tb < targetBtns.length; tb++) {
+        (function (tbtn) {
+            tbtn.addEventListener('click', function () {
+                onPick(tbtn.getAttribute('data-target-id'));
+            });
+        })(targetBtns[tb]);
+    }
+}
+
+function showCardKeyPicker(container, card, title, skipRevealed, onPick) {
+    var myRevealed = (state.bunker && state.bunker.revealedCards && state.bunker.revealedCards[state.playerId]) || {};
+
+    var html = '';
+    html += '<div class="text-2xl mb-1 text-center">' + escapeHtml(card.emoji) + '</div>';
+    html += '<div class="text-xs font-black text-accent-gold text-center mb-1">' + escapeHtml(card.name) + '</div>';
+    html += '<div class="text-[0.6rem] text-corp-muted text-center mb-3">' + escapeHtml(title) + '</div>';
+    html += '<div class="grid grid-cols-2 gap-1.5 mb-3">';
+
+    for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
+        var ct = BUNKER_CARD_TYPES[ci];
+        var disabled = skipRevealed && myRevealed[ct.key];
+        html += '<button class="btn-card-key-pick w-full px-2 py-2 rounded-xl text-[0.6rem] font-bold text-center cursor-pointer transition-all ' + ct.bg + ' ' + ct.border + ' border ' + ct.color;
+        html += disabled ? ' opacity-30 pointer-events-none' : ' hover:scale-[1.02] hover:border-white/20';
+        html += '" data-card-key="' + ct.key + '">';
+        html += ct.emoji + ' ' + ct.label;
+        html += '</button>';
+    }
+
+    html += '</div>';
+    html += '<div class="flex justify-center"><button id="btn-action-cancel" class="btn-ghost px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">Отмена</button></div>';
+
+    openActionCardModal(container, html);
+
+    var keyBtns = container.querySelectorAll('#action-card-modal-content .btn-card-key-pick');
+    for (var kb = 0; kb < keyBtns.length; kb++) {
+        (function (kbtn) {
+            kbtn.addEventListener('click', function () {
+                onPick(kbtn.getAttribute('data-card-key'));
+            });
+        })(keyBtns[kb]);
+    }
+}
+
+function showMyCardKeyPicker(container, card, onPick) {
+    // Wildcard: выбираем СВОЮ карту (нераскрытую) для замены
+    showCardKeyPicker(container, card, '🔄 Какую из своих карт заменить?', true /* skipRevealed */, onPick);
+}
+
+// Экспортируем функцию перерисовки руки для вызова из socket.js
+window.renderBunkerActionHand = function () {
+    var container = document.getElementById('app');
+    if (!container) return;
+    var handEl = container.querySelector('#bunker-action-hand');
+    if (!handEl) return;
+    var actionCards = state.myActionCards || [];
+    if (actionCards.length === 0) {
+        handEl.remove();
+        return;
+    }
+    var currentPhase = state.phase === 'bunkerVote' ? 'vote' : 'reveal';
+    handEl.outerHTML = renderActionHand(actionCards, currentPhase);
+    // Re-attach listeners for the new element
+    var newHand = container.querySelector('#bunker-action-hand');
+    if (!newHand) return;
+    var actionBtns = newHand.querySelectorAll('.bunker-action-card-btn');
+    for (var acbi = 0; acbi < actionBtns.length; acbi++) {
+        (function (btn) {
+            btn.addEventListener('click', function () {
+                openActionCardFlow(container, {
+                    cardId: btn.getAttribute('data-action-id'),
+                    cardType: btn.getAttribute('data-action-type'),
+                    needsTarget: btn.getAttribute('data-needs-target') === 'true',
+                    needsCardKey: btn.getAttribute('data-needs-card-key') === 'true',
+                    name: btn.getAttribute('data-action-name'),
+                    emoji: btn.getAttribute('data-action-emoji'),
+                    desc: btn.getAttribute('data-action-desc')
+                });
+            });
+        })(actionBtns[acbi]);
+    }
+};
 
 // ═══════════════════════════════════════════
 // МОДАЛЬНОЕ ОКНО — большое раскрытие карты
@@ -405,6 +752,26 @@ function showPlayerDetailModal(container, playerId, players, revealedCards, myId
     }
     html += '    </div>';
 
+    // Сыгранные карты действия
+    var playedCards = (state.bunker && state.bunker.playedActionCards && state.bunker.playedActionCards[playerId]) || [];
+    if (playedCards.length > 0) {
+        html += '    <div class="mt-4 pt-3 border-t border-corp-border/30">';
+        html += '      <div class="text-[0.55rem] font-bold text-accent-gold uppercase tracking-widest mb-2">⚡ Сыгранные карты действия</div>';
+        html += '      <div class="space-y-1">';
+        for (var pci = 0; pci < playedCards.length; pci++) {
+            var pc = playedCards[pci];
+            html += '<div class="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-amber-900/15 border border-amber-800/20">';
+            html += '  <span class="text-sm flex-shrink-0">' + escapeHtml(pc.emoji) + '</span>';
+            html += '  <div>';
+            html += '    <div class="text-[0.6rem] font-bold text-accent-gold">' + escapeHtml(pc.name) + '</div>';
+            html += '    <div class="text-[0.55rem] text-corp-muted leading-snug">' + escapeHtml(pc.effect) + '</div>';
+            html += '  </div>';
+            html += '</div>';
+        }
+        html += '      </div>';
+        html += '    </div>';
+    }
+
     html += '  </div>';
     html += '</div>';
 
@@ -541,6 +908,19 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
             for (var hi = 0; hi < hiddenKeys.length; hi++) {
                 html += '<div class="w-4 h-4 rounded bg-corp-graphite border border-corp-border flex items-center justify-center opacity-40" title="' + escapeHtml(hiddenKeys[hi].label) + ' — скрыто">';
                 html += '<span class="text-[0.4rem]">' + hiddenKeys[hi].emoji + '</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        // Сыгранные карты действия (иконки)
+        var pPlayed = (state.bunker && state.bunker.playedActionCards && state.bunker.playedActionCards[p.id]) || [];
+        if (pPlayed.length > 0) {
+            html += '<div class="flex gap-1 mt-1.5 px-2 flex-wrap">';
+            for (var ppi = 0; ppi < pPlayed.length; ppi++) {
+                html += '<div class="px-1.5 py-0.5 rounded bg-amber-900/20 border border-amber-800/25 flex items-center gap-1" title="' + escapeHtml(pPlayed[ppi].name) + ': ' + escapeHtml(pPlayed[ppi].effect) + '">';
+                html += '<span class="text-[0.55rem]">' + escapeHtml(pPlayed[ppi].emoji) + '</span>';
+                html += '<span class="text-[0.5rem] text-amber-500/70 font-bold">⚡</span>';
                 html += '</div>';
             }
             html += '</div>';
