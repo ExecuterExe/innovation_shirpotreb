@@ -1779,6 +1779,187 @@ const PACKAGING = [
     "МЕШОК ИЗ-ПОД ДРЕВЕСНОГО УГЛЯ"
 ];
 
+const HISTORICAL_FACTS = [
+    "Пережил падение метеорита",
+    "Был создан ради желания уничтожить всё человечество",
+    "Разрабатывался для контроля населения",
+    "Имеет награду как самый экологичный товар",
+    "Его тестировали на заключённых",
+    "На создание этого продукта ушло больше 300 лет",
+    "Был запрещён Женевской конвенцией",
+    "Его трижды крали",
+    "Тестировался на беременных",
+    "Один из работников уволился после выпуска продукта",
+    "Идея продукта пришла автору во сне",
+    "Гадалка похвалила продукт",
+    "Автор придумал продукт, находясь в психбольнице",
+    "Этот продукт помог автору найти свою вторую половинку",
+    "Его использовали для пыток",
+    "Вошёл в топ-3 товаров «худшие подарки для свадьбы»",
+    "Помог пациентам вылечиться",
+    "Помог в борьбе с насекомыми",
+    "Его тестировали быстрее, чем обычно",
+    "Его запуск сопровождался скандалом",
+    "Стал вирусным мемом в интернете",
+    "Некоторые больницы стали его использовать",
+    "Уронил экономику целой страны",
+    "Смог спасти жизнь человеку при нападении",
+    "Оказался намного прочнее, чем ожидалось",
+    "Тестеры назвали его «необходимым злом»",
+    "После его внедрения пропал целый водоём",
+    "Был создан с целью сделать добро миру",
+    "Был создан из-за любви к человеку",
+    "Был создан для военных целей",
+    "Был создан в закрытой лаборатории",
+    "Массово закуплен государственными структурами",
+    "Стал предметом культуры",
+    "Успел побывать в космосе",
+    "Менял своё название больше 10 раз",
+    "В честь продукта поставили статую",
+    "Его разработка финансировалась анонимно",
+    "Был создан после личной трагедии автора",
+    "Был признан самым недооценённым продуктом года",
+    "Его пытались выкупить конкуренты",
+    "Его внедрение вызвало массовую панику",
+    "Стал причиной закрытия одного завода",
+    "Его эффективность оказалась выше прогнозов",
+    "Разработчик получил международную премию",
+    "Его тестировали в экстремальном климате",
+    "Помог спасти редкий вид животных",
+    "Его признали слишком инновационным",
+    "Был создан из переработанных материалов",
+    "Был создан как шутка, которая зашла слишком далеко",
+    "Его считали невозможным реализовать",
+    "Стал самым продаваемым продуктом месяца",
+    "Помог восстановить город",
+    "Автор получил миллион рублей за выпуск продукта",
+    "Идея продукта пришла автору в бреду",
+    "Каждый обладатель продукта стал богатым",
+    "Был создан из-за спора в баре",
+    "Его хотели запретить после первого же использования",
+    "Создатель скрывался от журналистов полгода",
+    "О нём сняли разоблачительный фильм",
+    "Помог выиграть конкурс домашних питомцев",
+    "Его продавали на базаре вместе с арбузами",
+    "Его чертежи нашли в древней рукописи",
+    "По легенде, он дарует своему владельцу удачу",
+    "Автор создал его в день своей свадьбы",
+    "Его собирали вручную в подвале жилого дома",
+    "Для создания использовали советские детали",
+    "Прототип переделали 43 раза, прежде чем он заработал",
+    "Прошёл краш-тест с результатом «превосходно»",
+    "Работает в 95% случаев",
+    "Тестировщик уснул во время эксперимента",
+    "В честь него назвали улицу в небольшом городе",
+    "В интернете появился фан-клуб продукта",
+    "Фермеры использовали его для отпугивания ворон",
+    "Однажды помог открыть запертый сейф",
+    "Смог остановить кровотечение в полевых условиях",
+    "Его чертёж был написан кровью неизвестного",
+    "Имеет рейтинг 4,9 из 5 на маркетплейсе",
+    "Министр экономики хвалил его в интервью",
+    "В некоторых странах считается символом прогресса",
+    "Его видели инопланетяне",
+    "С его помощью поймали банду мошенников",
+    "В день запуска произошло солнечное затмение",
+    "Оказался идеальным инструментом для открывания бутылок",
+    "Европейские эксперты назвали его «объектом будущего»",
+    "Получил титул «Прорыв десятилетия»",
+    "Стал худшим товаром за последние 100 лет",
+    "Часть чертежей потеряли и восстановили по памяти",
+    "Использовали подорожник для улучшения предмета",
+    "Есть легенда, что предмет даёт вторую жизнь",
+    "После выпуска на автора начали охотиться",
+    "Ему предсказывают роль в освоении Марса",
+    "Прогнозируют, что станет обязательным для школ",
+    "После контакта с ним молочные продукты скисли",
+    "В небольшом радиусе погибли все насекомые",
+    "Создан, чтобы заглушать шум соседей",
+    "Один владелец использовал его как будильник",
+    "Помог восстановить засохшее озеро",
+    "Появился случайно из-за ошибки автора",
+    "На всех снимках становился размытым",
+    "Использовался для спиритических сеансов",
+    "Упал с 10-го этажа и не поцарапался",
+    "Пожар уничтожил всё в доме, кроме него",
+    "Пережил взрыв на заводе",
+    "Его нашли в обломках самолёта",
+    "Помог студенту сдать экзамен",
+    "Стал персонажем олимпиадной задачи",
+    "Автор оказался филантропом",
+    "В Амазонии использовался как оберег от змей",
+    "Побывал на дне Марианской впадины",
+    "Голуби использовали его как гнездо",
+    "Мыши прогрызли в нём дырку",
+    "Сверчок поселился внутри",
+    "Был закончен 29 февраля в високосный год",
+    "Врачи рекомендовали его для улучшения самочувствия",
+    "Побочный эффект — помогает лечить бессонницу",
+    "Был сделан по неверному чертежу",
+    "Одна женщина призналась продукту в любви",
+    "Успокаивал агрессивных людей, превращая их в философов",
+    "Вызвал у тестировщиков желание танцевать",
+    "Стал персонажем комиксов про супергероев",
+    "Архитектор построил дом в его форме и обанкротился",
+    "Его тень иногда движется сама по себе",
+    "На нём нет царапин, хотя ему много лет",
+    "Стал поводом для знакомства сотен людей",
+    "Был причиной разрыва дружбы",
+    "По поверью, владелец управляет судьбой",
+    "Опроверг один из законов физики",
+    "Стал экспонатом научного музея",
+    "Использовали как приз в лотерее",
+    "Признан самым загадочным устройством века",
+    "Стал талисманом музыкального фестиваля",
+    "Первые версии нельзя было ставить на пол",
+    "Отказывался работать по воскресеньям",
+    "Стал причиной новой мутации у лабораторных мышей",
+    "Использовали для передачи секретных сообщений",
+    "Агенты ЦРУ пытались его украсть",
+    "Чертежи продавали на чёрном рынке за миллион долларов",
+    "Рядом с ним цветы расцветают ярче",
+    "В народе считается оберегом от сглаза",
+    "Муравьи построили вокруг него колонию",
+    "Документы на продукт сгорели при странных обстоятельствах",
+    "Стал объектом изучения психологов",
+    "Стал причиной, по которой работники уехали в деревню",
+    "Отличный помощник для рыбаков",
+    "В его честь переименовали город",
+    "Автор получил Нобелевскую премию",
+    "Стал мотивацией для других начать своё дело",
+    "Автор не окончил и пяти классов",
+    "Создан на средства от лотерейного выигрыша",
+    "Помог слепым людям обрести зрение",
+    "Стал центральной фигурой в детективном романе",
+    "Финансирование было только за биткоины",
+    "Не пострадал при извержении вулкана",
+    "После создания автор стал верить в магию",
+    "Автора посадили в тюрьму после внедрения",
+    "Животные становились агрессивнее при виде продукта",
+    "Стал самым часто крадущимся предметом",
+    "Вызывает выпадение волос без перчаток",
+    "Его нельзя было застраховать",
+    "В честь продукта создали видеоигру",
+    "Стал альтернативой нашатырному спирту",
+    "Все, кто пытался его уничтожить, пропадали без вести",
+    "Уменьшает тревожность, если сжать в ладони",
+    "Объехал все страны мира",
+    "При высокой температуре может взорваться",
+    "При тестах рыбы отплывали от него",
+    "Автору оторвало руку при использовании",
+    "Автор плакал во время сборки",
+    "Был создан, чтобы найти потерянного кота",
+    "Автор хотел создать идеальное оружие, но получилось нечто другое",
+    "Создан в студенческой общаге во время сессии",
+    "Автор использовал свои волосы для укрепления конструкции",
+    "Содержит кусочек метеорита",
+    "Автор добавил каплю своей крови",
+    "В день завершения работы пошёл снег летом",
+    "В продукт заложена программа самоуничтожения",
+    "Идея пришла после шаурмы на вокзале",
+    "Создавался, чтобы улучшить жизнь стариков"
+];
+
 const EVENTS = [
     "Ваша целевая аудитория — дети от 3 до 10 лет. Ваш товар каким-то образом должен быть привлекателен для них.",
     "Ваш продукт продается только государству. Презентуйте продукт — фокусируясь на том, что государство получит приобретя его?",
@@ -2153,7 +2334,7 @@ function declineFeature(feature, gender) {
 const rooms = new Map();
 const playerRooms = new Map(); // ws -> { roomCode, playerId }
 const disconnectTimers = new Map(); // playerId -> setTimeout id
-const RECONNECT_TIMEOUT = 15000; // 15 секунд на возврат
+const RECONNECT_TIMEOUT = 300000; // 5 минут на возврат (мобильные могут долго переподключаться)
 const ANON_NAMES = [
     'Богатый Волк', 'Миллионер из трущоб', 'Тихий Единорог', 'Крипто-Барон', 'Смелый Кальмар',
     'Железный Инвестор', 'Ночной Брокер', 'Солнечный Капиталист', 'Лазерный Банкир', 'Громкий Фонд',
@@ -2217,6 +2398,7 @@ function createRoom(hostId, settings) {
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
         },
         players: new Map(),
+        spectators: new Map(), // наблюдатели (зашли пока шла игра)
         state: 'lobby',
         currentRound: 0,
         totalRounds: Math.min(7, Math.max(1, parseInt(settings.rounds) || 3)),
@@ -2232,6 +2414,7 @@ function createRoom(hostId, settings) {
             gifts: shuffle([...Array(GIFTS.length).keys()]),
             hiddenDefects: shuffle([...Array(HIDDEN_DEFECTS.length).keys()]),
             packaging: shuffle([...Array(PACKAGING.length).keys()]),
+            historicalFacts: shuffle([...Array(HISTORICAL_FACTS.length).keys()]),
         },
         customCards: {
             adjectives: new Map(), // playerId -> text
@@ -2303,6 +2486,13 @@ function broadcastToRoom(room, message) {
             try { player.ws.send(msg); } catch (e) { /* ignore */ }
         }
     });
+    if (room.spectators) {
+        room.spectators.forEach(spectator => {
+            if (spectator.ws && spectator.ws.readyState === WebSocket.OPEN) {
+                try { spectator.ws.send(msg); } catch (e) { /* ignore */ }
+            }
+        });
+    }
 }
 
 function sendToPlayer(room, playerId, message) {
@@ -2521,6 +2711,94 @@ function handlePlayerTimeout(room, playerId) {
                 checkAllTieVoted(room);
             }
             break;
+    }
+}
+
+// Отправить игроку его текущее состояние при реконнекте
+function sendCurrentStateToPlayer(room, player, ws) {
+    var roomState = room.state;
+
+    if (roomState === 'bunkerReveal' || roomState === 'bunkerVote' || roomState === 'bunkerTieVote') {
+        // Восстанавливаем значения раскрытых карт из данных на сервере
+        var revealedCardValues = {};
+        room.players.forEach(function(p, pid) {
+            if (!p.cards) return;
+            var revealed = (room.bunker.revealedCards || {})[pid] || {};
+            revealedCardValues[pid] = {};
+            Object.keys(revealed).forEach(function(key) {
+                if (revealed[key] && p.cards[key] !== undefined) {
+                    revealedCardValues[pid][key] = p.cards[key];
+                }
+            });
+        });
+
+        var activePlayers = getBunkerActivePlayers(room);
+        var currentPlayerId = (activePlayers.length > 0 && room.bunker.currentTurnIndex < activePlayers.length)
+            ? activePlayers[room.bunker.currentTurnIndex]
+            : null;
+        var extraCards = ((room.bunker.extraCards || {})[player.id]) || {};
+        var remaining = activePlayers.length;
+
+        ws.send(JSON.stringify({
+            type: 'gameStateSync',
+            roomState: roomState,
+            yourCards: player.cards || {},
+            yourActionCards: player.actionCards || [],
+            extraCards: extraCards,
+            revealedCards: room.bunker.revealedCards || {},
+            revealedCardValues: revealedCardValues,
+            players: getPlayersPublicInfo(room),
+            globalProblem: room.bunker.globalProblem,
+            revealOrder: (room.bunker.revealOrder || []).map(function(id) {
+                var p = room.players.get(id);
+                return { id: id, nickname: p ? p.nickname : '???' };
+            }),
+            eliminatedPlayers: room.bunker.eliminatedPlayers || [],
+            survivorsCount: room.bunker.survivorsCount,
+            totalPlayers: room.bunker.totalPlayers,
+            currentPlayerId: currentPlayerId,
+            currentTurnIndex: room.bunker.currentTurnIndex,
+            currentRound: room.bunker.currentRound,
+            totalTurns: activePlayers.length,
+            hostMode: !!room.settings.bunkerHostMode,
+            paused: !!room.bunker.paused,
+            activePlayers: activePlayers,
+            remainingKicks: remaining - room.bunker.survivorsCount,
+            tiedPlayers: room.bunker.tiedPlayers || [],
+        }));
+    } else if (roomState === 'preparation') {
+        ws.send(JSON.stringify({
+            type: 'roundStart',
+            round: room.currentRound,
+            totalRounds: room.totalRounds,
+            yourCards: player.cards,
+            event: room.currentEvent,
+            players: getPlayersPublicInfo(room),
+            presentationOrder: room.presentationOrder || [],
+        }));
+    } else if (roomState === 'presentation') {
+        var presId = room.presentationOrder[room.currentPresenterIndex];
+        var presPlayer = room.players.get(presId);
+        ws.send(JSON.stringify({
+            type: 'presentationPhase',
+            currentPresenter: presPlayer ? {
+                id: presPlayer.id,
+                nickname: presPlayer.nickname,
+                cards: presPlayer.cards,
+                pitchText: presPlayer.pitchText,
+            } : null,
+            presenterIndex: room.currentPresenterIndex,
+            totalPresenters: room.presentationOrder.length,
+            previousPresentations: room.previousPresentations || [],
+            event: room.currentEvent,
+            round: room.currentRound,
+            totalRounds: room.totalRounds,
+        }));
+    } else {
+        ws.send(JSON.stringify({
+            type: 'reconnectSuccess',
+            roomState: roomState,
+        }));
     }
 }
 
@@ -3449,6 +3727,107 @@ wss.on('connection', (ws) => {
                 break;
             }
 
+            // ==================== РЕКОННЕКТ ====================
+            case 'reconnect': {
+                var reconnPlayerId = msg.playerId;
+                var reconnCode = (msg.roomCode || '').toUpperCase().trim();
+                var reconnRoom = rooms.get(reconnCode);
+                if (!reconnRoom) {
+                    ws.send(JSON.stringify({ type: 'reconnectFailed', reason: 'Комната не найдена.' }));
+                    break;
+                }
+                var reconnPlayer = reconnRoom.players.get(reconnPlayerId);
+                if (!reconnPlayer) {
+                    // Может это зритель переподключается?
+                    var reconnSpectator = reconnRoom.spectators && reconnRoom.spectators.get(reconnPlayerId);
+                    if (reconnSpectator) {
+                        reconnSpectator.ws = ws;
+                        playerRooms.set(ws, { roomCode: reconnCode, playerId: reconnPlayerId, isSpectator: true });
+                        sendCurrentStateToPlayer(reconnRoom, { id: reconnPlayerId, cards: {}, actionCards: [] }, ws);
+                    } else {
+                        ws.send(JSON.stringify({ type: 'reconnectFailed', reason: 'Игрок не найден.' }));
+                    }
+                    break;
+                }
+                // Сбрасываем таймер отключения
+                var dTimerR = disconnectTimers.get(reconnPlayerId);
+                if (dTimerR) { clearTimeout(dTimerR); disconnectTimers.delete(reconnPlayerId); }
+                reconnPlayer.ws = ws;
+                reconnPlayer.connected = true;
+                playerRooms.set(ws, { roomCode: reconnCode, playerId: reconnPlayerId });
+                console.log(`[RECONNECT] "${reconnPlayer.nickname}" reconnected to ${reconnCode}`);
+                broadcastToRoom(reconnRoom, {
+                    type: 'playerReconnected',
+                    playerId: reconnPlayerId,
+                    nickname: reconnPlayer.nickname,
+                    players: getPlayersPublicInfo(reconnRoom),
+                });
+                sendCurrentStateToPlayer(reconnRoom, reconnPlayer, ws);
+                break;
+            }
+
+            // ==================== ЗАНОВО НАЧАТЬ ИГРУ ====================
+            case 'playAgain': {
+                var paInfo = playerRooms.get(ws);
+                if (!paInfo) break;
+                var paRoom = rooms.get(paInfo.roomCode);
+                if (!paRoom || paRoom.hostId !== paInfo.playerId) break;
+                // Перемещаем зрителей в игроки
+                if (paRoom.spectators) {
+                    paRoom.spectators.forEach(function(spec, specId) {
+                        paRoom.players.set(specId, {
+                            id: specId,
+                            nickname: spec.nickname,
+                            ws: spec.ws,
+                            capital: paRoom.settings.startCapital,
+                            attractedInvestments: 0,
+                            cards: null,
+                            connected: true,
+                            isHost: false,
+                            pitchText: '',
+                            investorCups: 0,
+                            entrepreneurMoneybags: 0,
+                        });
+                        playerRooms.set(spec.ws, { roomCode: paRoom.code, playerId: specId });
+                    });
+                    paRoom.spectators.clear();
+                }
+                // Сбрасываем состояние комнаты в лобби
+                clearTimer(paRoom);
+                disconnectTimers.forEach(function(tid, pid) {
+                    var p = paRoom.players.get(pid);
+                    if (p) { clearTimeout(tid); disconnectTimers.delete(pid); }
+                });
+                paRoom.state = 'lobby';
+                paRoom.currentRound = 0;
+                paRoom.currentEvent = null;
+                paRoom.presentationOrder = [];
+                paRoom.currentPresenterIndex = 0;
+                paRoom.investments = new Map();
+                paRoom.roundHistory = [];
+                paRoom.tiedPlayers = [];
+                paRoom.bunker = {
+                    enabled: false, globalProblem: null, revealOrder: [], currentTurnIndex: 0,
+                    currentRound: 0, eliminatedPlayers: [], revealedCards: {}, votes: new Map(),
+                    tiedPlayers: [], tieVotes: new Map(), survivorsCount: 0, totalPlayers: 0,
+                    paused: false, hasRevealedThisTurn: false,
+                };
+                paRoom.players.forEach(function(p) {
+                    p.capital = paRoom.settings.startCapital;
+                    p.attractedInvestments = 0;
+                    p.cards = null;
+                    p.eliminated = false;
+                    p.isReady = false;
+                    p.pitchText = '';
+                    p.investorCups = 0;
+                    p.entrepreneurMoneybags = 0;
+                    p.actionCards = undefined;
+                });
+                console.log(`[PLAY AGAIN] Room ${paRoom.code} reset to lobby`);
+                broadcastToRoom(paRoom, getLobbyState(paRoom));
+                break;
+            }
+
             // ==================== ВХОД В КОМНАТУ ====================
             case 'joinRoom': {
                 const nickname = (msg.nickname || '').trim().substring(0, 20);
@@ -3463,7 +3842,45 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 if (room.state !== 'lobby') {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Игра в этой комнате уже началась.' }));
+                    // Игра идёт — проверяем, может это реконнект по никнейму
+                    let rejoinPlayer = null;
+                    room.players.forEach(function(p) {
+                        if (p.nickname.toLowerCase() === nickname.toLowerCase() && !p.connected) {
+                            rejoinPlayer = p;
+                        }
+                    });
+                    if (rejoinPlayer) {
+                        // Возвращаем игрока в игру
+                        var djTimer = disconnectTimers.get(rejoinPlayer.id);
+                        if (djTimer) { clearTimeout(djTimer); disconnectTimers.delete(rejoinPlayer.id); }
+                        rejoinPlayer.ws = ws;
+                        rejoinPlayer.connected = true;
+                        playerRooms.set(ws, { roomCode: room.code, playerId: rejoinPlayer.id });
+                        ws.send(JSON.stringify({ type: 'roomJoined', roomCode: room.code, playerId: rejoinPlayer.id, rejoining: true }));
+                        broadcastToRoom(room, {
+                            type: 'playerReconnected',
+                            playerId: rejoinPlayer.id,
+                            nickname: rejoinPlayer.nickname,
+                            players: getPlayersPublicInfo(room),
+                        });
+                        sendCurrentStateToPlayer(room, rejoinPlayer, ws);
+                        console.log(`[REJOIN] "${nickname}" rejoined ${code}`);
+                    } else {
+                        // Новый ник — добавляем зрителем
+                        var specId = uuidv4();
+                        var spectator = { id: specId, nickname: nickname, ws: ws };
+                        if (!room.spectators) room.spectators = new Map();
+                        room.spectators.set(specId, spectator);
+                        playerRooms.set(ws, { roomCode: room.code, playerId: specId, isSpectator: true });
+                        ws.send(JSON.stringify({
+                            type: 'joinedAsSpectator',
+                            roomCode: room.code,
+                            playerId: specId,
+                            message: 'Игра уже идёт. Вы смотрите как зритель.',
+                        }));
+                        sendCurrentStateToPlayer(room, { id: specId, cards: {}, actionCards: [] }, ws);
+                        console.log(`[SPECTATOR] "${nickname}" joined ${code} as spectator`);
+                    }
                     return;
                 }
                 if (room.players.size >= (room.settings.maxPlayers || 8)) {
@@ -3883,6 +4300,7 @@ wss.on('connection', (ws) => {
                     gifts: shuffle([...Array(GIFTS.length).keys()]),
                     hiddenDefects: shuffle([...Array(HIDDEN_DEFECTS.length).keys()]),
                     packaging: shuffle([...Array(PACKAGING.length).keys()]),
+                    historicalFacts: shuffle([...Array(HISTORICAL_FACTS.length).keys()]),
                 };
                 room.players.forEach(p => {
                     p.capital = room.settings.startCapital;
@@ -4031,6 +4449,12 @@ wss.on('connection', (ws) => {
         if (info) {
             const room = rooms.get(info.roomCode);
             if (room) {
+                // Если это зритель — просто удаляем без лишних уведомлений
+                if (info.isSpectator && room.spectators) {
+                    room.spectators.delete(info.playerId);
+                    playerRooms.delete(ws);
+                    return;
+                }
                 const player = room.players.get(info.playerId);
                 if (player) {
                     player.connected = false;
@@ -4104,7 +4528,7 @@ function getSurvivorsCount(n) {
 }
 
 function getBunkerCardKeys() {
-    return ['adjective', 'item', 'modifier', 'feature', 'gift', 'hiddenDefect', 'packaging', 'review'];
+    return ['adjective', 'item', 'modifier', 'feature', 'gift', 'hiddenDefect', 'packaging', 'review', 'historicalFact'];
 }
 
 // ============================================================
@@ -4121,6 +4545,7 @@ const BUNKER_ACTION_CARDS = [
     { type: 'selfSwap', cardKey: 'hiddenDefect',    name: 'Отзывная кампания',                  emoji: '⚠️', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Скрытый дефект» и вытяни новый.' },
     { type: 'selfSwap', cardKey: 'packaging',       name: 'Новый поставщик',                    emoji: '📬', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свою «Упаковку» и вытяни новую.' },
     { type: 'selfSwap', cardKey: 'review',          name: 'Накрутка рейтинга',                  emoji: '⭐', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Первый отзыв» и вытяни новый.' },
+    { type: 'selfSwap', cardKey: 'historicalFact', name: 'Фальсификация истории',               emoji: '📜', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Сбрось свой «Исторический факт» и вытяни новый.' },
     // B: Перемешать карты всех игроков
     { type: 'shuffleAll', cardKey: 'adjective',     name: 'Кризис идей',                       emoji: '🌪️', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Прилагательные» перемешиваются и раздаются заново.' },
     { type: 'shuffleAll', cardKey: 'item',          name: 'Сбой логистики',                     emoji: '🚚', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Предметы» перемешиваются и раздаются заново.' },
@@ -4130,6 +4555,7 @@ const BUNKER_ACTION_CARDS = [
     { type: 'shuffleAll', cardKey: 'hiddenDefect',  name: 'Массовый брак',                      emoji: '💀', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Скрытые дефекты» перемешиваются и раздаются заново.' },
     { type: 'shuffleAll', cardKey: 'packaging',     name: 'Путаница на складе',                 emoji: '🗃️', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Упаковки» перемешиваются и раздаются заново.' },
     { type: 'shuffleAll', cardKey: 'review',        name: 'Атака ботов-парсеров',               emoji: '🤖', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Первые отзывы» перемешиваются и раздаются заново.' },
+    { type: 'shuffleAll', cardKey: 'historicalFact', name: 'Переписывание истории',             emoji: '🔥', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Все «Исторические факты» перемешиваются и раздаются заново.' },
     // C: Обмен с выбранным игроком
     { type: 'swapWithPlayer', cardKey: 'adjective',      name: 'Кража айдентики',               emoji: '🎭', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Прилагательным» с выбранным игроком.' },
     { type: 'swapWithPlayer', cardKey: 'item',           name: 'Рейдерский захват',             emoji: '🏢', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Предметом» с выбранным игроком.' },
@@ -4139,6 +4565,7 @@ const BUNKER_ACTION_CARDS = [
     { type: 'swapWithPlayer', cardKey: 'hiddenDefect',   name: 'Перекладывание ответственности',emoji: '🙈', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Скрытым дефектом» с выбранным игроком.' },
     { type: 'swapWithPlayer', cardKey: 'packaging',      name: 'Подмена на таможне',            emoji: '📮', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Упаковкой» с выбранным игроком.' },
     { type: 'swapWithPlayer', cardKey: 'review',         name: 'Кража репутации',               emoji: '💬', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Первым отзывом» с выбранным игроком.' },
+    { type: 'swapWithPlayer', cardKey: 'historicalFact', name: 'Подмена архивов',               emoji: '🗄️', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Поменяйся «Историческим фактом» с выбранным игроком.' },
     // D: Специальные
     { type: 'shareFeature',  name: 'Общие ресурсы',      emoji: '🔗', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Скопируй «Особенность» выбранного игрока — она работает и на твой товар.' },
     { type: 'forceReveal',   name: 'Анонс продукта',     emoji: '📢', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Заставь игрока немедленно вскрыть свою «Особенность».' },
@@ -4179,6 +4606,9 @@ function drawBunkerCard(room, cardKey, itemGender) {
         case 'review':
             if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
             return { value: REVIEWS[room.decks.reviews.pop()] };
+        case 'historicalFact':
+            if (!room.decks.historicalFacts || room.decks.historicalFacts.length === 0) room.decks.historicalFacts = shuffle([...Array(HISTORICAL_FACTS.length).keys()]);
+            return { value: HISTORICAL_FACTS[room.decks.historicalFacts.pop()] };
         default: return null;
     }
 }
@@ -4431,6 +4861,9 @@ function startBunkerGame(room) {
         if (room.decks.packaging.length === 0) room.decks.packaging = shuffle([...Array(PACKAGING.length).keys()]);
         var pkgIdx = room.decks.packaging.pop();
 
+        if (!room.decks.historicalFacts || room.decks.historicalFacts.length === 0) room.decks.historicalFacts = shuffle([...Array(HISTORICAL_FACTS.length).keys()]);
+        var histIdx = room.decks.historicalFacts.pop();
+
         p.cards = {
             adjective: adjWord,
             item: itemObj.word,
@@ -4440,6 +4873,7 @@ function startBunkerGame(room) {
             hiddenDefect: HIDDEN_DEFECTS[hdIdx],
             packaging: PACKAGING[pkgIdx],
             review: REVIEWS[revIdx],
+            historicalFact: HISTORICAL_FACTS[histIdx],
         };
 
         p.capital = 0;

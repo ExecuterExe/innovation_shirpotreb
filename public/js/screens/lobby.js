@@ -395,7 +395,7 @@ function buildRadioCard(value, cls, checked, emoji, title, sub, accent) {
         + '<input type="radio" name="' + cls.replace('-radio','') + '" value="' + value + '" class="' + cls + ' sr-only"' + (checked ? ' checked' : '') + '>'
         + '<div class="text-xl">' + emoji + '</div>'
         + '<div class="text-[0.65rem] font-black uppercase tracking-wider" style="color:' + textColor + '">' + title + '</div>'
-        + '<div class="text-[0.55rem] text-corp-dim leading-tight">' + sub + '</div>'
+        + '<div class="text-[0.7rem] text-corp-dim leading-tight">' + sub + '</div>'
         + '</label>';
 }
 
@@ -403,7 +403,7 @@ function buildInfoTile(emoji, title, sub) {
     return '<div class="flex flex-col items-center gap-1 p-3 rounded-xl text-center" style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06)">'
         + '<div class="text-lg">' + emoji + '</div>'
         + '<div class="text-xs font-black text-corp-light">' + title + '</div>'
-        + '<div class="text-[0.55rem] text-corp-dim">' + sub + '</div>'
+        + '<div class="text-[0.7rem] text-corp-dim">' + sub + '</div>'
         + '</div>';
 }
 
@@ -413,7 +413,7 @@ function buildFutureSetting(label, sub) {
         + '<div class="text-xs font-bold text-corp-light">' + label + '</div>'
         + '<div class="text-[0.6rem] text-corp-dim">' + sub + '</div>'
         + '</div>'
-        + '<div class="text-[0.55rem] font-bold uppercase tracking-wider text-corp-muted">скоро</div>'
+        + '<div class="text-[0.65rem] font-bold uppercase tracking-wider text-corp-muted">скоро</div>'
         + '</div>';
 }
 

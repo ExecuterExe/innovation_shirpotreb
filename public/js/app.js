@@ -23,6 +23,7 @@ export var state = {
     playerId: null,
     roomCode: null,
     isHost: false,
+    isSpectator: false,
     phase: 'welcome',
     players: [],
     settings: {

@@ -132,7 +132,7 @@ export function renderBunkerVote(container) {
             html += '  <div class="flex gap-3 flex-wrap">';
             for (var vac = 0; vac < voteActionCards.length; vac++) {
                 var vc = voteActionCards[vac];
-                html += '<div class="bunker-action-card bunker-vote-action-btn flex-1 min-w-[140px] max-w-[200px] p-3.5"';
+                html += '<div class="bunker-action-card bunker-vote-action-btn flex-1 min-w-[160px] max-w-[240px] p-4"';
                 html += '  data-action-id="' + escapeHtml(vc.id) + '"';
                 html += '  data-action-type="' + escapeHtml(vc.type) + '"';
                 html += '  data-needs-target="' + (vc.needsTarget ? 'true' : 'false') + '"';
@@ -141,9 +141,9 @@ export function renderBunkerVote(container) {
                 html += '  data-action-desc="' + escapeHtml(vc.desc) + '"';
                 html += '>';
                 html += '  <div class="bunker-action-card-corner">⚡</div>';
-                html += '  <div class="text-2xl mb-2 relative z-10">' + escapeHtml(vc.emoji) + '</div>';
-                html += '  <div class="text-[0.62rem] font-black uppercase tracking-wider mb-1.5 relative z-10" style="color:#f5b731">' + escapeHtml(vc.name) + '</div>';
-                html += '  <div class="text-[0.55rem] leading-snug relative z-10" style="color:rgba(200,180,120,0.7)">' + escapeHtml(vc.desc) + '</div>';
+                html += '  <div class="text-3xl mb-2.5 relative z-10">' + escapeHtml(vc.emoji) + '</div>';
+                html += '  <div class="text-xs font-black uppercase tracking-wider mb-2 relative z-10" style="color:#f5d060">' + escapeHtml(vc.name) + '</div>';
+                html += '  <div class="text-[0.7rem] leading-relaxed relative z-10" style="color:rgba(230,210,150,0.9)">' + escapeHtml(vc.desc) + '</div>';
                 html += '</div>';
             }
             html += '  </div>';
@@ -488,7 +488,7 @@ export function renderBunkerGameOver(container) {
 
     // Глобальная проблема
     html += '<div class="corp-card border-accent-red/20 bg-accent-red-dim px-5 py-3 mb-6 text-left">';
-    html += '  <div class="text-[0.55rem] font-black text-accent-red uppercase tracking-widest mb-1">🌍 Глобальная проблема</div>';
+    html += '  <div class="text-xs font-black text-accent-red uppercase tracking-widest mb-1">🌍 Глобальная проблема</div>';
     html += '  <div class="text-xs text-corp-light leading-relaxed">' + escapeHtml(bunker.globalProblem || '') + '</div>';
     html += '</div>';
 
@@ -688,7 +688,8 @@ function generateBunkerAIPrompt(bunker, survivors, eliminated) {
     lines.push('1. 🏅 ОЦЕНКА ПОЛЕЗНОСТИ (для каждого выжившего):');
     lines.push('   — Оцени продукт по шкале 1-10: насколько он полезен при данной катастрофе?');
     lines.push('   — Учитывай ВСЕ карточки: прилагательное, предмет, особенность,');
-    lines.push('     бонус к продукту, скрытый дефект, упаковку и первый отзыв.');
+    lines.push('     бонус к продукту, скрытый дефект, упаковку, первый отзыв и исторический факт.');
+    lines.push('   — Исторический факт — это реальная история продукта или биография события с ним связанного.');
     lines.push('   — Объясни, как конкретно этот продукт помогает (или мешает) выживанию.');
     lines.push('');
     lines.push('2. 📖 ИСТОРИЯ ПЕРВОЙ НЕДЕЛИ В БУНКЕРЕ:');
@@ -754,6 +755,7 @@ function formatPlayerForPrompt(player, index) {
         { key: 'hiddenDefect', label: '⚠️ Скрытый дефект' },
         { key: 'packaging', label: '📦 Упаковка' },
         { key: 'review', label: '💬 Первый отзыв клиента' },
+        { key: 'historicalFact', label: '📜 Исторический факт' },
     ];
 
     for (var i = 0; i < cardMap.length; i++) {
@@ -779,15 +781,23 @@ function renderBunkerPlayerFull(player, survived) {
     html += '  <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">';
     for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
         var ct = BUNKER_CARD_TYPES[ci];
+        if (ct.key === 'historicalFact') continue;
         var val = player.cards ? player.cards[ct.key] : null;
         if (val) {
             html += '<div class="rounded-lg p-2 ' + ct.bg + ' ' + ct.border + ' border text-center">';
-            html += '  <div class="text-[0.5rem] font-bold text-corp-muted uppercase">' + ct.emoji + ' ' + ct.label + '</div>';
+            html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase">' + ct.emoji + ' ' + ct.label + '</div>';
             html += '  <div class="text-[0.6rem] font-bold ' + ct.color + '">' + escapeHtml(val) + '</div>';
             html += '</div>';
         }
     }
     html += '  </div>';
+    var hfVal2 = player.cards ? player.cards['historicalFact'] : null;
+    if (hfVal2) {
+        html += '<div class="mt-1.5 rounded-lg p-2 bg-yellow-900/20 border border-yellow-700/30">';
+        html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase">📜 Исторический факт</div>';
+        html += '  <div class="text-[0.6rem] font-bold text-yellow-300">' + escapeHtml(hfVal2) + '</div>';
+        html += '</div>';
+    }
 
     html += '</div>';
     return html;

@@ -78,6 +78,7 @@ body {
 .card-defect-gradient      { background: linear-gradient(145deg, #ea580c 0%, #c2410c 50%, #7c2d12 100%); }
 .card-packaging-gradient   { background: linear-gradient(145deg, #0d9488 0%, #0f766e 50%, #134e4a 100%); }
 .card-review-gradient      { background: linear-gradient(145deg, #b45309 0%, #92400e 50%, #451a03 100%); }
+.card-history-gradient     { background: linear-gradient(145deg, #a16207 0%, #854d0e 50%, #713f12 100%); }
 
 /* Шиммер внутри карты */
 .card-shimmer {

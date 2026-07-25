@@ -30,6 +30,25 @@ export function connectWS() {
         reconnectAttempts = 0;
         setState({ connected: true });
         updateConnectionUI('connected');
+
+        // Пробуем автоматически переподключиться к игре
+        if (state.playerId && state.roomCode) {
+            console.log('[WS] Auto-reconnecting to', state.roomCode);
+            ws.send(JSON.stringify({ type: 'reconnect', playerId: state.playerId, roomCode: state.roomCode }));
+        } else {
+            // Фолбек: проверяем sessionStorage (если страница была перезагружена)
+            try {
+                var saved = sessionStorage.getItem('gameSession');
+                if (saved) {
+                    var sess = JSON.parse(saved);
+                    if (sess.playerId && sess.roomCode) {
+                        console.log('[WS] Session-storage reconnect to', sess.roomCode);
+                        setState({ playerId: sess.playerId, roomCode: sess.roomCode });
+                        ws.send(JSON.stringify({ type: 'reconnect', playerId: sess.playerId, roomCode: sess.roomCode }));
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
     };
 
     ws.onmessage = function (event) {
@@ -94,6 +113,7 @@ function handleMessage(msg) {
 
         case 'roomCreated':
             setState({ playerId: msg.playerId, roomCode: msg.roomCode, isHost: true });
+            try { sessionStorage.setItem('gameSession', JSON.stringify({ playerId: msg.playerId, roomCode: msg.roomCode })); } catch (e) {}
             navigate('lobby');
             showNotification('Комната создана: ' + msg.roomCode, 'success');
             playSound('success');
@@ -109,9 +129,13 @@ function handleMessage(msg) {
 
         case 'roomJoined':
             setState({ playerId: msg.playerId, roomCode: msg.roomCode });
-            navigate('lobby');
-            showNotification('Вы вошли в комнату!', 'success');
-            playSound('join');
+            try { sessionStorage.setItem('gameSession', JSON.stringify({ playerId: msg.playerId, roomCode: msg.roomCode })); } catch (e) {}
+            if (!msg.rejoining) {
+                navigate('lobby');
+                showNotification('Вы вошли в комнату!', 'success');
+                playSound('join');
+            }
+            // Если rejoining=true — ждём gameStateSync, не навигируем
             break;
 
         case 'lobbyUpdate':
@@ -210,6 +234,29 @@ function handleMessage(msg) {
             setTimeout(function () {
                 startTimer(msg.duration);
             }, 50);
+            break;
+
+        case 'gameStateSync':
+            handleGameStateSync(msg);
+            break;
+
+        case 'reconnectSuccess':
+            showNotification('Вы переподключились к игре', 'success');
+            playSound('join');
+            break;
+
+        case 'reconnectFailed':
+            // Сессия устарела — очищаем и возвращаем на главную
+            try { sessionStorage.removeItem('gameSession'); } catch (e) {}
+            setState({ playerId: null, roomCode: null });
+            navigate('welcome');
+            break;
+
+        case 'joinedAsSpectator':
+            setState({ playerId: msg.playerId, roomCode: msg.roomCode, isSpectator: true });
+            try { sessionStorage.removeItem('gameSession'); } catch (e) {} // зрители не восстанавливают сессию
+            showNotification('👀 ' + (msg.message || 'Вы смотрите как зритель'), 'info');
+            // gameStateSync придёт следующим и переведёт на нужный экран
             break;
 
         case 'playerDisconnected':
@@ -736,6 +783,79 @@ function handleBunkerActionCardPlayed(msg) {
     var handEl = document.getElementById('bunker-action-hand');
     if (handEl && typeof window.renderBunkerActionHand === 'function') {
         window.renderBunkerActionHand();
+    }
+}
+
+function handleGameStateSync(msg) {
+    var rs = msg.roomState;
+    var isSpectator = state.isSpectator || false;
+
+    if (rs === 'bunkerReveal' || rs === 'bunkerVote' || rs === 'bunkerTieVote') {
+        setState({
+            myCards: isSpectator ? {} : (msg.yourCards || {}),
+            myActionCards: isSpectator ? [] : (msg.yourActionCards || []),
+            myExtraCards: isSpectator ? {} : (msg.extraCards || {}),
+            players: msg.players,
+            bunker: {
+                globalProblem: msg.globalProblem,
+                revealOrder: msg.revealOrder || [],
+                currentPlayerId: msg.currentPlayerId,
+                currentTurnIndex: msg.currentTurnIndex || 0,
+                totalTurns: msg.totalTurns || 0,
+                currentRound: msg.currentRound || 0,
+                revealedCards: msg.revealedCards || {},
+                revealedCardValues: msg.revealedCardValues || {},
+                eliminatedPlayers: msg.eliminatedPlayers || [],
+                survivorsCount: msg.survivorsCount,
+                totalPlayers: msg.totalPlayers,
+                activePlayers: msg.activePlayers || [],
+                tiedPlayers: msg.tiedPlayers || [],
+                remainingKicks: msg.remainingKicks || 0,
+                voteResult: null,
+                survivors: [],
+                eliminated: [],
+                paused: !!msg.paused,
+                playedActionCards: (state.bunker && state.bunker.playedActionCards) || {},
+                hostMode: !!msg.hostMode,
+                hasRevealedThisTurn: false,
+            },
+        });
+        if (rs === 'bunkerReveal') navigate('bunkerReveal');
+        else if (rs === 'bunkerVote') navigate('bunkerVote');
+        else if (rs === 'bunkerTieVote') navigate('bunkerTieVote');
+        showNotification('Вы переподключились к игре', 'success');
+        playSound('join');
+    } else if (rs === 'preparation') {
+        setState({
+            currentRound: msg.round,
+            totalRounds: msg.totalRounds,
+            myCards: msg.yourCards,
+            currentEvent: msg.event,
+            players: msg.players || state.players,
+            presentationOrder: msg.presentationOrder || [],
+            pitchText: '',
+        });
+        navigate('preparation');
+        showNotification('Вы переподключились к игре', 'success');
+        playSound('join');
+    } else if (rs === 'presentation') {
+        if (msg.currentPresenter) {
+            setState({
+                currentPresenter: msg.currentPresenter,
+                presenterIndex: msg.presenterIndex || 0,
+                totalPresenters: msg.totalPresenters || 0,
+                previousPresentations: msg.previousPresentations || [],
+                currentEvent: msg.event || state.currentEvent,
+                currentRound: msg.round || state.currentRound,
+                totalRounds: msg.totalRounds || state.totalRounds,
+            });
+            navigate('presentation');
+        }
+        showNotification('Вы переподключились к игре', 'success');
+        playSound('join');
+    } else {
+        showNotification('Вы переподключились к игре', 'success');
+        playSound('join');
     }
 }
 
