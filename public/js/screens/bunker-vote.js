@@ -845,47 +845,50 @@ function formatPlayerForPrompt(player, index) {
 function generateBunkerAIPromptMini(bunker, survivors, eliminated) {
     var lines = [];
 
-    lines.push('🏠 БУНКЕР: реши судьбу выживших коротко и с юмором.');
+    lines.push('🏠 БУНКЕР: реши судьбу выживших — коротко и с юмором.');
     lines.push('Катастрофа: ' + (bunker.globalProblem || 'неизвестная угроза'));
     lines.push('');
-    lines.push('✅ В бункере (' + survivors.length + '):');
+    lines.push('══════════════════════════════════════');
+    lines.push('✅ ВЫЖИВШИЕ — ПОПАЛИ В БУНКЕР (' + survivors.length + ' чел.):');
+    lines.push('══════════════════════════════════════');
+    lines.push('');
     for (var si = 0; si < survivors.length; si++) {
-        lines.push('  ' + formatPlayerOneLine(survivors[si]));
+        lines.push(formatPlayerForPrompt(survivors[si], si + 1));
     }
+
     if (eliminated.length > 0) {
+        lines.push('══════════════════════════════════════');
+        lines.push('❌ ВЫБЫВШИЕ — НЕ ПОПАЛИ В БУНКЕР (' + eliminated.length + ' чел.):');
+        lines.push('══════════════════════════════════════');
         lines.push('');
-        lines.push('❌ За бортом (' + eliminated.length + '):');
         for (var ei = 0; ei < eliminated.length; ei++) {
-            lines.push('  ' + formatPlayerOneLine(eliminated[ei]));
+            lines.push(formatPlayerForPrompt(eliminated[ei], ei + 1));
         }
     }
+
+    lines.push('══════════════════════════════════════');
+    lines.push('📋 ЗАДАНИЕ (коротко, до 350 слов):');
+    lines.push('══════════════════════════════════════');
     lines.push('');
-    lines.push('Задание (коротко, до 300 слов):');
-    lines.push('1. Выжило ли человечество — ДА/НЕТ/ЧАСТИЧНО, и почему.');
-    lines.push('2. Кто из выживших оказался самым полезным, а чей скрытый дефект всех подвёл.');
-    lines.push('3. Один абзац с самым смешным моментом первой недели в бункере.');
-    lines.push('Стиль: коротко, дерзко, с чёрным юмором, без воды.');
+    lines.push('1. Вердикт: ДА/НЕТ/ЧАСТИЧНО + одна конкретная цифра');
+    lines.push('   (сколько % выжило или сколько дней продержались).');
+    lines.push('');
+    lines.push('2. MVP и FAIL:');
+    lines.push('   — Чей продукт спас (используй название + одну деталь из бонуса/упаковки)');
+    lines.push('   — Чей дефект всех подставил (обыграй буквально)');
+    lines.push('');
+    lines.push('3. Самый абсурдный момент первой недели:');
+    lines.push('   — Один абзац');
+    lines.push('   — Обязательно упомяни ОТЗЫВ одного из игроков как пророчество');
+    lines.push('');
+    lines.push('4. Мог ли выбывший изменить всё? (1 предложение)');
+    lines.push('');
+    lines.push('Стиль:');
+    lines.push('— Как стендап-комик пересказывает новости');
+    lines.push('— Чёрный юмор + конкретика');
+    lines.push('— Без «возможно», «вероятно» — только факты из параллельной реальности');
 
     return lines.join('\n');
-}
-
-function formatPlayerOneLine(player) {
-    var cards = player.cards || {};
-    var productName = '';
-    if (cards.adjective) productName += cards.adjective + ' ';
-    if (cards.item) productName += cards.item;
-    if (cards.modifier) productName += ' ' + cards.modifier;
-    productName = productName.trim() || 'продукт неизвестен';
-
-    var extras = [];
-    if (cards.hiddenDefect) extras.push('дефект: ' + cards.hiddenDefect);
-    if (cards.review) extras.push('отзыв: «' + cards.review + '»');
-
-    var line = (player.nickname || 'Игрок') + ' — «' + productName + '»';
-    if (extras.length > 0) {
-        line += ' (' + extras.join('; ') + ')';
-    }
-    return line;
 }
 
 function renderBunkerPlayerFull(player, survived) {
