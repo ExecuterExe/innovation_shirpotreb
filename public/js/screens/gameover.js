@@ -1,5 +1,5 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 
 export function renderGameOver(container) {
     var players = state.players || [];
@@ -80,6 +80,7 @@ export function renderGameOver(container) {
     html += '</div>'; // end scoreboard
 
     // Controls
+    html += '<div class="flex flex-col items-center gap-4">';
     if (isHost) {
         html += '<button id="btn-play-again" class="btn-neon-solid px-12 py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">';
         html += '🔄 ИГРАТЬ ЕЩЁ';
@@ -90,6 +91,8 @@ export function renderGameOver(container) {
         html += 'Ожидание решения хоста...';
         html += '</div>';
     }
+    html += '<button id="btn-exit-gameover" class="text-xs font-bold text-corp-muted hover:text-accent-red transition-colors cursor-pointer">✕ Выйти в главное меню</button>';
+    html += '</div>';
 
     html += '</div>';
 
@@ -104,6 +107,13 @@ export function renderGameOver(container) {
         btnPlayAgain.addEventListener('click', function () {
             console.log('[gameover] Play again clicked');
             sendMsg({ type: 'playAgain' });
+        });
+    }
+
+    var btnExit = container.querySelector('#btn-exit-gameover');
+    if (btnExit) {
+        btnExit.addEventListener('click', function () {
+            leaveRoom();
         });
     }
 }

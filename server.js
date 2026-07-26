@@ -2405,6 +2405,7 @@ function createRoom(hostId, settings) {
             useHiddenDefects: !!settings.useHiddenDefects,
             usePackaging: !!settings.usePackaging,
             bunkerMode: !!settings.bunkerMode,
+            bunkerActionCards: settings.bunkerActionCards !== false,
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
             // Комната создаётся закрытой — хост сам решает, когда сделать её видимой в общем списке
@@ -4206,6 +4207,7 @@ wss.on('connection', (ws) => {
                 if (s.useHiddenDefects !== undefined) room.settings.useHiddenDefects = !!s.useHiddenDefects;
                 if (s.usePackaging !== undefined) room.settings.usePackaging = !!s.usePackaging;
                 if (s.bunkerMode !== undefined) room.settings.bunkerMode = !!s.bunkerMode;
+                if (s.bunkerActionCards !== undefined) room.settings.bunkerActionCards = !!s.bunkerActionCards;
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
                 if (s.chatTTS !== undefined) room.settings.chatTTS = !!s.chatTTS;
@@ -5224,7 +5226,7 @@ function startBunkerGame(room) {
     var totalPlayers = playerIds.length;
     var survivorsCount = getSurvivorsCount(totalPlayers);
 
-    // Раздаём ВСЕ 8 карт каждому
+    // Раздаём ВСЕ 9 карт каждому
     room.players.forEach(p => {
         if (room.decks.items.length === 0) room.decks.items = shuffle([...Array(ITEMS.length).keys()]);
         if (room.decks.adjectives.length === 0) room.decks.adjectives = shuffle([...Array(ADJECTIVES.length).keys()]);
@@ -5276,16 +5278,18 @@ function startBunkerGame(room) {
         p.actionCards = [];
     });
 
-    // Раздаём карты действия — 2 каждому игроку, без повторов в пуле
-    var actionPool = shuffle(BUNKER_ACTION_CARDS.map((c, i) => i));
-    var actionPoolIdx = 0;
-    room.players.forEach(p => {
-        for (var ai = 0; ai < 2; ai++) {
-            var template = BUNKER_ACTION_CARDS[actionPool[actionPoolIdx % actionPool.length]];
-            actionPoolIdx++;
-            p.actionCards.push(Object.assign({ id: uuidv4() }, template));
-        }
-    });
+    // Раздаём карты действия — 2 каждому игроку, без повторов в пуле (если включено в настройках)
+    if (room.settings.bunkerActionCards !== false) {
+        var actionPool = shuffle(BUNKER_ACTION_CARDS.map((c, i) => i));
+        var actionPoolIdx = 0;
+        room.players.forEach(p => {
+            for (var ai = 0; ai < 2; ai++) {
+                var template = BUNKER_ACTION_CARDS[actionPool[actionPoolIdx % actionPool.length]];
+                actionPoolIdx++;
+                p.actionCards.push(Object.assign({ id: uuidv4() }, template));
+            }
+        });
+    }
 
     // Глобальная проблема
     var problem = GLOBAL_PROBLEMS[Math.floor(Math.random() * GLOBAL_PROBLEMS.length)];

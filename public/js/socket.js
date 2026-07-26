@@ -631,6 +631,7 @@ function handleMessage(msg) {
 }
 
 function handleLobbyUpdate(msg) {
+    var wasHost = state.isHost;
     var amIHost = false;
     for (var i = 0; i < msg.players.length; i++) {
         if (msg.players[i].id === state.playerId && msg.players[i].isHost) {
@@ -641,7 +642,14 @@ function handleLobbyUpdate(msg) {
 
     setState({ players: msg.players, spectators: msg.spectators || [], settings: msg.settings, isHost: amIHost });
 
-    if (state.phase === 'lobby') {
+    // Если статус хоста только что изменился (например, старый хост вышел и права
+    // перешли к другому игроку) — нужен полный рендер: у "нового" хоста в DOM ещё
+    // нет #settings-panel вообще (она не рендерилась, пока он не был хостом), поэтому
+    // частичное обновление (updateSettingsPanel ищет уже существующий элемент) молча
+    // ничего не делает, и панель настроек просто не появляется.
+    var hostStatusChanged = amIHost !== wasHost;
+
+    if (state.phase === 'lobby' && !hostStatusChanged) {
         // Частичное обновление без полной перерисовки
         var currentScreen = document.querySelector('#app > div');
         if (currentScreen) {
@@ -844,7 +852,7 @@ function handleBunkerStart(msg) {
 
     navigate('bunkerReveal');
     playSound('start');
-    showNotification('Бункер начинается! У каждого 8 карт.', 'success');
+    showNotification('Бункер начинается! У каждого 9 карт.', 'success');
 }
 
 function handleBunkerTurn(msg) {
@@ -1016,7 +1024,6 @@ function handleBunkerGameOver(msg) {
 function handleBunkerActionCardPlayed(msg) {
     showNotification(msg.emoji + ' ' + msg.effect, 'info');
     playSound('start');
-    playActionCardFX(msg.emoji, msg.cardName, msg.nickname);
 
     // Сохраняем сыгранную карту в историю этого игрока
     var pid = msg.playerId;
@@ -1033,6 +1040,15 @@ function handleBunkerActionCardPlayed(msg) {
     if (handEl && typeof window.renderBunkerActionHand === 'function') {
         window.renderBunkerActionHand();
     }
+
+    // Сам эффект запускаем на следующем чистом кадре: если параллельно прилетел
+    // bunkerActionCardUpdate с полной перерисовкой всего экрана, анимация не должна
+    // стартовать в тот же такт вёрстки — иначе первые кадры проседают и она смотрится рвано.
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            playActionCardFX(msg.emoji, msg.cardName, msg.nickname);
+        });
+    });
 }
 
 function handleGameStateSync(msg) {

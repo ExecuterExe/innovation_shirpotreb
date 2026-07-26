@@ -147,6 +147,14 @@ export function updateSettingsPanel(container) {
 
     var html = '';
 
+    // ─── БЕЙДЖ АКТИВНОГО РЕЖИМА ───
+    if (s.bunkerMode) {
+        html += '<div class="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl" style="background:rgba(255,59,59,0.1);border:1px solid rgba(255,59,59,0.3)">';
+        html += '  <span style="width:8px;height:8px;border-radius:50%;background:#ff3b3b;display:inline-block;box-shadow:0 0 8px #ff3b3b;flex-shrink:0" class="bunker-mode-pulse-dot"></span>';
+        html += '  <span class="text-[0.65rem] font-black uppercase tracking-wider text-accent-red">🏠 Активен режим: Бункер</span>';
+        html += '</div>';
+    }
+
     // ─── ВКЛАДКИ ───
     html += '<div class="flex gap-1 p-1 rounded-2xl mb-5" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.07)">';
 
@@ -261,7 +269,7 @@ export function updateSettingsPanel(container) {
     html += '  <div class="flex items-start justify-between gap-4">';
     html += '    <div class="flex-1">';
     html += '      <div class="text-base font-black ' + (bunkerOn ? 'text-accent-red' : 'text-corp-light') + ' mb-1">🏠 Режим «Бункер»</div>';
-    html += '      <div class="text-xs text-corp-muted leading-relaxed">Выживание стартапов: каждый получает 8 карт, раскрывает по одной за ход. Остальные голосуют кого кикнуть. Последние выжившие — спасители человечества.</div>';
+    html += '      <div class="text-xs text-corp-muted leading-relaxed">Выживание стартапов: каждый получает 9 карт, раскрывает по одной за ход. Остальные голосуют кого кикнуть. Последние выжившие — спасители человечества.</div>';
     html += '    </div>';
     html += '    <input type="checkbox" id="set-bunker" class="toggle-corp mt-0.5 flex-shrink-0"' + (bunkerOn ? ' checked' : '') + '>';
     html += '  </div>';
@@ -285,7 +293,7 @@ export function updateSettingsPanel(container) {
     // Статистика режима
     html += buildSectionDivider('Как это работает');
     html += '<div class="grid grid-cols-2 gap-2 mb-4">';
-    html += buildInfoTile('🃏', '8 карт', 'у каждого игрока');
+    html += buildInfoTile('🃏', '9 карт', 'у каждого игрока');
     html += buildInfoTile('👁', 'По одной', 'раскрытие за ход');
     html += buildInfoTile('🗳', 'Голосование', 'после каждого раунда');
     html += buildInfoTile('🏆', '~50%', 'игроков выживает');
@@ -313,6 +321,15 @@ export function updateSettingsPanel(container) {
     html += '  <input type="checkbox" id="set-chat-tts" class="toggle-corp flex-shrink-0"' + (ttsOn ? ' checked' : '') + '>';
     html += '</label>';
 
+    var actionCardsOn = s.bunkerActionCards !== false; // default on
+    html += '<label for="set-bunker-actioncards" class="flex items-center justify-between py-3 px-4 rounded-xl cursor-pointer transition-all" style="background:' + (actionCardsOn ? 'rgba(245,183,49,0.08)' : 'rgba(0,0,0,0.15)') + ';border:1px solid ' + (actionCardsOn ? 'rgba(245,183,49,0.2)' : 'rgba(255,255,255,0.07)') + '">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-sm font-black ' + (actionCardsOn ? 'text-accent-gold' : 'text-corp-light') + '">⚡ Карты действия</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">Каждый получает 2 особые карты (заставить раскрыться, спасти от кика, ударить по игроку и т.д.). Выключите для более спокойной партии.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-bunker-actioncards" class="toggle-corp flex-shrink-0"' + (actionCardsOn ? ' checked' : '') + '>';
+    html += '</label>';
+
     html += buildFutureSetting('⏱ Время на ход', '180 сек — раскрытие карт');
     html += buildFutureSetting('🗳 Время голосования', '90 сек — основное голосование');
     html += buildFutureSetting('🎯 Кол-во выживших', 'Авто (~50% игроков)');
@@ -321,6 +338,7 @@ export function updateSettingsPanel(container) {
     html += '</div>';
 
     panel.innerHTML = html;
+    panel.classList.toggle('settings-panel-bunker-active', !!s.bunkerMode);
     attachSettingsListeners(container);
 }
 
@@ -594,7 +612,7 @@ function attachSettingsListeners(container) {
         blackSwanToggle.addEventListener('change', function () {
             if (blackSwanToggle.checked) {
                 // Выключаем "Генератор абсурда"
-                var dbRadio = container.querySelector('input[name="cardSource"][value="database"]');
+                var dbRadio = container.querySelector('input[name="card-source"][value="database"]');
                 if (dbRadio) {
                     dbRadio.checked = true;
                 }
@@ -637,7 +655,7 @@ function attachSettingsListeners(container) {
             radio.addEventListener('change', function () {
                 if (radio.value !== 'none' && radio.checked) {
                     // Модификаторы несовместимы с генератором абсурда
-                    var dbRadio = container.querySelector('input[name="cardSource"][value="database"]');
+                    var dbRadio = container.querySelector('input[name="card-source"][value="database"]');
                     if (dbRadio) dbRadio.checked = true;
                 }
                 pushSettings(container);
@@ -651,10 +669,10 @@ function attachSettingsListeners(container) {
         bunkerToggle.addEventListener('change', function () {
             if (bunkerToggle.checked) {
                 // Бункер включает ВСЕ карты принудительно, отключаем генератор абсурда
-                var dbRadio = container.querySelector('input[name="cardSource"][value="database"]');
+                var dbRadio = container.querySelector('input[name="card-source"][value="database"]');
                 if (dbRadio) dbRadio.checked = true;
 
-                // Отключаем псевдоинновации (нужны все 8 карт)
+                // Отключаем псевдоинновации (нужны все 9 карт)
                 var pseudoToggle = container.querySelector('#set-pseudo');
                 if (pseudoToggle) pseudoToggle.checked = false;
             }
@@ -698,7 +716,7 @@ function handleStep(field, dir, container) {
 }
 
 function pushSettings(container) {
-    var cardSourceEl = container.querySelector('input[name="cardSource"]:checked');
+    var cardSourceEl = container.querySelector('input[name="card-source"]:checked');
     var modifierEl = container.querySelector('input[name="modifier"]:checked');
 
     var rawMaxPlayers = parseInt(container.querySelector('#set-max-players')?.value);
@@ -729,6 +747,7 @@ function pushSettings(container) {
         bunkerMode: container.querySelector('#set-bunker')?.checked || false,
         bunkerHostMode: container.querySelector('#set-bunker-hostmode')?.checked || false,
         bunkerChat: container.querySelector('#set-bunker-chat') ? container.querySelector('#set-bunker-chat').checked : true,
+        bunkerActionCards: container.querySelector('#set-bunker-actioncards') ? container.querySelector('#set-bunker-actioncards').checked : true,
         chatTTS: container.querySelector('#set-chat-tts')?.checked || false,
         roomPrivate: container.querySelector('#set-room-open') ? !container.querySelector('#set-room-open').checked : false,
         roomPassword: container.querySelector('#set-room-password')?.value || '',

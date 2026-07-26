@@ -30,19 +30,28 @@ export function renderWelcome(container) {
     html += '</p>';
     html += '</div>';
 
-    // ═══════ RULES BUTTON ═══════
-    html += '<div class="w-full max-w-md mb-6">';
-    html += '<button id="btn-rules" class="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer ';
+    // ═══════ RULES BUTTONS ═══════
+    html += '<div class="w-full max-w-md mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">';
+    html += '<button id="btn-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
     html += 'bg-accent-gold-dim border border-accent-gold/25 text-accent-gold hover:bg-accent-gold/15 hover:border-accent-gold/45 transition-all">';
     html += '  <span>📖</span>';
-    html += '  <span>Обязательно прочитайте правила!</span>';
-    html += '  <span id="rules-arrow" class="text-xs text-accent-gold/60 transition-transform">▼</span>';
+    html += '  <span>Правила игры</span>';
+    html += '  <span id="rules-arrow" class="text-[0.6rem] text-accent-gold/60 transition-transform">▼</span>';
+    html += '</button>';
+    html += '<button id="btn-bunker-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
+    html += 'bg-accent-red-dim border border-accent-red/25 text-accent-red hover:bg-accent-red/15 hover:border-accent-red/45 transition-all">';
+    html += '  <span>🏠</span>';
+    html += '  <span>Правила бункера</span>';
+    html += '  <span id="bunker-rules-arrow" class="text-[0.6rem] text-accent-red/60 transition-transform">▼</span>';
     html += '</button>';
     html += '</div>';
 
-    // ═══════ RULES PANEL ═══════
+    // ═══════ RULES PANELS ═══════
     html += '<div id="rules-panel" class="hidden w-full max-w-2xl mb-8">';
     html += buildRulesContent();
+    html += '</div>';
+    html += '<div id="bunker-rules-panel" class="hidden w-full max-w-2xl mb-8">';
+    html += buildBunkerRulesContent();
     html += '</div>';
 
     // Main card
@@ -127,6 +136,7 @@ export function renderWelcome(container) {
     var nicknameInput = container.querySelector('#w-nickname');
     var codeInput = container.querySelector('#w-room-code');
     var btnRules = container.querySelector('#btn-rules');
+    var btnBunkerRules = container.querySelector('#btn-bunker-rules');
 
     if (btnCreate) {
         btnCreate.addEventListener('click', function () {
@@ -162,15 +172,47 @@ export function renderWelcome(container) {
         });
     }
 
-    // Rules toggle
+    // Rules toggle (закрываем правила бункера, если открывали их)
     if (btnRules) {
         btnRules.addEventListener('click', function () {
             var panel = container.querySelector('#rules-panel');
             var arrow = container.querySelector('#rules-arrow');
+            var otherPanel = container.querySelector('#bunker-rules-panel');
+            var otherArrow = container.querySelector('#bunker-rules-arrow');
+            if (otherPanel && !otherPanel.classList.contains('hidden')) {
+                otherPanel.classList.add('hidden');
+                if (otherArrow) otherArrow.style.transform = '';
+            }
             if (panel) {
                 panel.classList.toggle('hidden');
                 if (arrow) {
                     arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
+                }
+                if (!panel.classList.contains('hidden')) {
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
+    }
+
+    // Bunker rules toggle (закрываем основные правила, если открывали их)
+    if (btnBunkerRules) {
+        btnBunkerRules.addEventListener('click', function () {
+            var panel = container.querySelector('#bunker-rules-panel');
+            var arrow = container.querySelector('#bunker-rules-arrow');
+            var otherPanel = container.querySelector('#rules-panel');
+            var otherArrow = container.querySelector('#rules-arrow');
+            if (otherPanel && !otherPanel.classList.contains('hidden')) {
+                otherPanel.classList.add('hidden');
+                if (otherArrow) otherArrow.style.transform = '';
+            }
+            if (panel) {
+                panel.classList.toggle('hidden');
+                if (arrow) {
+                    arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
+                }
+                if (!panel.classList.contains('hidden')) {
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }
         });
@@ -479,44 +521,6 @@ function buildRulesContent() {
     html += '</div>';
     html += '</div>';
 
-    // Bunker mode
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🏠 Выживание стартапов (Бункер)</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Альтернативный режим игры! Каждый игрок получает <span class="text-accent-gold font-bold">8 карточек</span>: ';
-    html += 'прилагательное, предмет, модификатор, особенность, аудиторию, скрытый дефект, упаковку и отзыв. ';
-    html += 'На экране появляется <span class="text-accent-red font-bold">глобальная проблема</span> — ';
-    html += 'ваш продукт должен помочь человечеству справиться с ней!';
-    html += '</p>';
-    html += '<div class="mt-3 space-y-2">';
-
-    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
-    html += '<span class="text-lg flex-shrink-0">🃏</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-corp-light">Раскрытие карт</div>';
-    html += '<div class="text-xs text-corp-dim">Игроки ходят по очереди и открывают по одной карте за раунд. Остальные видят только уже раскрытые карты.</div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
-    html += '<span class="text-lg flex-shrink-0">🗳</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-corp-light">Голосование</div>';
-    html += '<div class="text-xs text-corp-dim">После каждого раунда раскрытий — голосование за кик. Можно пропустить голосование. При ничье — переголосование.</div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
-    html += '<span class="text-lg flex-shrink-0">💀</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-corp-light">Выбывание</div>';
-    html += '<div class="text-xs text-corp-dim">Кикнутый игрок выбывает, и все его карты раскрываются. Игра продолжается, пока не останется нужное количество выживших.</div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '</div>';
-    html += '</div>';
-
     // Streamer mode
     html += '<div>';
     html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎬 Стримерский режим</h3>';
@@ -538,6 +542,100 @@ function buildRulesContent() {
     html += '</div>';
 
     html += '</div>'; // end rules card
+    return html;
+}
+
+function buildBunkerRulesContent() {
+    var html = '';
+    html += '<div class="corp-card-elevated p-6 md:p-8 space-y-6 text-left" style="border-color:rgba(255,59,59,0.25)">';
+
+    // Intro / atmosphere
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-red mb-3">☢️ Конец света не повод закрывать раунд</h3>';
+    html += '<p class="text-sm text-corp-light leading-relaxed">';
+    html += 'На табло загорается <span class="text-accent-red font-bold">глобальная катастрофа</span> — от неё некуда бежать. ';
+    html += 'Есть только один бункер, и мест в нём меньше, чем желающих выжить. У каждого из вас — стартап, ';
+    html += 'который якобы способен спасти человечество. Проблема в том, что у продукта есть ';
+    html += '<span class="text-accent-gold font-bold">скрытый дефект</span>, а у вас — весомая причина не показывать его раньше времени.';
+    html += '</p>';
+    html += '<div class="mt-3 px-4 py-3 rounded-xl bg-corp-black/50 border-l-3 border-accent-red/40">';
+    html += '<span class="text-accent-red font-bold italic">«У меня приложение для медитации... и да, работает без интернета. Что значит, ПОЧЕМУ это важно?!»</span>';
+    html += '</div>';
+    html += '</div>';
+
+    // Why it's exciting
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-red mb-3">🔥 Почему тут жарко</h3>';
+    html += '<div class="grid md:grid-cols-2 gap-3">';
+
+    html += '<div class="corp-card p-4 border-accent-red/20">';
+    html += '<div class="text-2xl mb-2">🃏</div>';
+    html += '<div class="text-sm font-black text-accent-red mb-1">Информация — оружие</div>';
+    html += '<div class="text-xs text-corp-dim leading-relaxed">Все карты закрыты. Вы решаете, что раскрыть, а что придержать до последнего — и в этом всё веселье.</div>';
+    html += '</div>';
+
+    html += '<div class="corp-card p-4 border-accent-gold/20">';
+    html += '<div class="text-2xl mb-2">🗳</div>';
+    html += '<div class="text-sm font-black text-accent-gold mb-1">Никто никому не верит</div>';
+    html += '<div class="text-xs text-corp-dim leading-relaxed">Каждый раунд — голосование за кик. Союзы рушатся за секунды, обвинения летят во все стороны.</div>';
+    html += '</div>';
+
+    html += '<div class="corp-card p-4 border-accent-blue/20">';
+    html += '<div class="text-2xl mb-2">💣</div>';
+    html += '<div class="text-sm font-black text-accent-blue mb-1">Карты действий</div>';
+    html += '<div class="text-xs text-corp-dim leading-relaxed">Особые карты меняют расклад: заставляют раскрыться раньше времени, спасают от кика или бьют по конкретному игроку.</div>';
+    html += '</div>';
+
+    html += '<div class="corp-card p-4 border-accent-red/20">';
+    html += '<div class="text-2xl mb-2">💀</div>';
+    html += '<div class="text-sm font-black text-accent-red mb-1">Вылет — это навсегда</div>';
+    html += '<div class="text-xs text-corp-dim leading-relaxed">Никаких вторых шансов. Как только вас выкинули — все ваши карты раскрываются, и вы смотрите, чем всё закончится.</div>';
+    html += '</div>';
+
+    html += '<div class="corp-card p-4 border-accent-purple/20 sm:col-span-2">';
+    html += '<div class="text-2xl mb-2">🤖</div>';
+    html += '<div class="text-sm font-black text-purple-400 mb-1">Финал решает ИИ</div>';
+    html += '<div class="text-xs text-corp-dim leading-relaxed">После игры все карты — включая те, что никто так и не раскрыл — уходят в промпт для ИИ. Он честно расскажет, спас ли ваш стартап человечество на самом деле. Есть подробная версия и мини — для тех, кто спешит.</div>';
+    html += '</div>';
+
+    html += '</div>';
+    html += '</div>';
+
+    // How to play
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-red mb-3">📋 Как проходит партия</h3>';
+    html += '<div class="space-y-3">';
+
+    html += buildBunkerStep('1', 'Досье на продукт', 'Каждый получает 9 карт: прилагательное, предмет, модификатор, особенность, бонус, скрытый дефект, упаковку, отзыв клиента и исторический факт. Всё это — ваш стартап, который должен спасти мир.', '🎴');
+    html += buildBunkerStep('2', 'Раскрытие по очереди', 'В свой ход вы открываете ровно одну карту всем остальным. Решаете сами, с чего начать — с сильных сторон или с чего-то, что отвлечёт внимание от дефекта.', '🔓');
+    html += buildBunkerStep('3', 'Обсуждение и голосование', 'После раунда раскрытий — дебаты и тайное голосование за кандидата на вылет. Можно воздержаться. При ничьей — переголосование между лидерами.', '🗳');
+    html += buildBunkerStep('4', 'Бункер закрывается', 'Раунды повторяются, пока не останется столько выживших, сколько вмещает бункер. Они и делят вечную славу спасителей человечества.', '🏁');
+
+    html += '</div>';
+    html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-gold/40">';
+    html += '<span class="text-sm">💡</span>';
+    html += '<span class="text-xs text-corp-dim">Совет: раскрытый дефект ещё не значит вылет — иногда лучше признаться в слабости самому, чем ждать, пока это сделают за вас</span>';
+    html += '</div>';
+    html += '</div>';
+
+    html += '</div>'; // end rules card
+    return html;
+}
+
+function buildBunkerStep(num, title, desc, emoji) {
+    var html = '';
+    html += '<div class="flex items-start gap-4 p-4 rounded-xl bg-corp-black/30">';
+    html += '<div class="w-10 h-10 rounded-full bg-accent-red/15 border border-accent-red/25 flex items-center justify-center flex-shrink-0">';
+    html += '<span class="text-sm font-black text-accent-red">' + num + '</span>';
+    html += '</div>';
+    html += '<div>';
+    html += '<div class="flex items-center gap-2 mb-1">';
+    html += '<span class="text-base">' + emoji + '</span>';
+    html += '<span class="text-sm font-black text-corp-white">' + title + '</span>';
+    html += '</div>';
+    html += '<div class="text-xs text-corp-dim leading-relaxed">' + desc + '</div>';
+    html += '</div>';
+    html += '</div>';
     return html;
 }
 

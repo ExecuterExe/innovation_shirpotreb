@@ -65,6 +65,45 @@ body {
         0 28px 80px rgba(0,0,0,0.18);
 }
 
+/* ─── SETTINGS PANEL: BUNKER MODE HIGHLIGHT ─── */
+
+.settings-panel-bunker-active {
+    border-color: rgba(255,59,59,0.4) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.055),
+        0 0 0 1px rgba(255,59,59,0.15),
+        0 0 32px rgba(255,59,59,0.15),
+        0 12px 40px rgba(0,0,0,0.3);
+    animation: settingsBunkerGlow 2.6s ease-in-out infinite;
+}
+
+@keyframes settingsBunkerGlow {
+    0%, 100% {
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.055),
+            0 0 0 1px rgba(255,59,59,0.15),
+            0 0 24px rgba(255,59,59,0.12),
+            0 12px 40px rgba(0,0,0,0.3);
+    }
+    50% {
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.055),
+            0 0 0 1px rgba(255,59,59,0.3),
+            0 0 40px rgba(255,59,59,0.28),
+            0 12px 40px rgba(0,0,0,0.3);
+    }
+}
+
+.bunker-mode-pulse-dot {
+    animation: bunkerModePulseDot 1.6s ease-in-out infinite;
+    will-change: transform, opacity;
+}
+
+@keyframes bunkerModePulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.6; }
+}
+
 /* ─── GAME CARDS ─── */
 
 .game-card-container { perspective: 1200px; }
@@ -482,6 +521,7 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     animation: bunkerFlip 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     transform-style: preserve-3d;
     perspective: 800px;
+    will-change: transform, opacity;
 }
 @keyframes bunkerFlip {
     0%   { transform: rotateY(180deg) scale(0.6);  opacity: 0; }
@@ -508,6 +548,7 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     animation: bunkerRevealBurst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     pointer-events: none;
     z-index: 0;
+    will-change: transform, opacity;
 }
 @keyframes bunkerRevealBurst {
     0%   { transform: scale(0);   opacity: 1; }
@@ -530,13 +571,16 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     animation: bunkerRevealSpark 0.8s ease-out forwards;
     animation-delay: var(--delay, 0s);
+    will-change: transform, opacity;
 }
 @keyframes bunkerRevealSpark {
     0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
     100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
 }
 
-/* Луч света, пробегающий по карте после приземления */
+/* Луч света, пробегающий по карте после приземления.
+   Двигаем через transform, а не left — left пересчитывает layout на каждый кадр
+   и именно это давало ощущение «рваности» на слабых экранах. */
 .bunker-reveal-shine {
     position: absolute;
     top: 0;
@@ -544,15 +588,15 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     width: 40%;
     height: 100%;
     background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent);
-    transform: skewX(-20deg);
     animation: bunkerRevealShine 0.9s ease-out 0.4s forwards;
     pointer-events: none;
     z-index: 3;
+    will-change: transform, opacity;
 }
 @keyframes bunkerRevealShine {
-    0%   { left: -60%; opacity: 0; }
+    0%   { transform: translateX(0) skewX(-20deg); opacity: 0; }
     18%  { opacity: 1; }
-    100% { left: 130%; opacity: 0; }
+    100% { transform: translateX(475%) skewX(-20deg); opacity: 0; }
 }
 
 /* Импульс на самой мини-карточке в сетке «Ваш продукт» сразу после клика */
@@ -1416,10 +1460,13 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     border: 4px solid rgba(245,183,49,0.85);
     box-shadow: 0 0 50px rgba(245,183,49,0.65);
     animation: bunkerFxRing 1s cubic-bezier(0.16,1,0.3,1) forwards;
+    will-change: transform, opacity;
 }
+/* border-width НЕ анимируем — это layout-свойство (пересчёт на каждый кадр),
+   отсюда и «рваность». Расширение/исчезание кольца полностью решают transform+opacity. */
 @keyframes bunkerFxRing {
-    0%   { transform: scale(0);   opacity: 1; border-width: 8px; }
-    100% { transform: scale(7);   opacity: 0; border-width: 0px; }
+    0%   { transform: scale(0);   opacity: 1; }
+    100% { transform: scale(7);   opacity: 0; }
 }
 
 .bunker-fx-ring2 {
@@ -1429,6 +1476,7 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.7);
     animation: bunkerFxRing 1.15s cubic-bezier(0.16,1,0.3,1) 0.12s forwards;
+    will-change: transform, opacity;
 }
 
 .bunker-fx-spark {
@@ -1440,6 +1488,7 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     opacity: 0;
     animation: bunkerFxSpark 1s ease-out forwards;
     animation-delay: var(--delay, 0s);
+    will-change: transform, opacity;
 }
 @keyframes bunkerFxSpark {
     0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
@@ -1453,6 +1502,7 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     animation: bunkerFxEmoji 0.9s cubic-bezier(0.34,1.56,0.64,1) forwards;
     position: relative;
     z-index: 2;
+    will-change: transform, opacity;
 }
 @keyframes bunkerFxEmoji {
     0%   { transform: scale(0) rotate(-25deg); opacity: 0; }

@@ -6,7 +6,7 @@ import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 
 // ═══════════════════════════════════════════
-// Конфиг карт для бункера (все 8)
+// Конфиг карт для бункера (все 9)
 // ═══════════════════════════════════════════
 var BUNKER_CARD_TYPES = [
     { key: 'adjective', label: 'Прилагательное', emoji: '🎨', gradient: 'card-adjective-gradient', color: 'text-red-400', bg: 'bg-red-900/30', border: 'border-red-800/30' },
@@ -386,11 +386,18 @@ export function renderBunkerReveal(container) {
         })(bunkerKickBtns[bki]);
     }
 
-    // Если есть pending reveal — показываем модалку
+    // Если есть pending reveal — показываем модалку. Ждём макротаск + два кадра,
+    // чтобы тяжёлая перерисовка экрана (которая только что произошла) успела
+    // отрисоваться, и анимация карточки не «спотыкалась» на первых кадрах.
     if (pendingReveal) {
+        var revealToShow = pendingReveal;
+        pendingReveal = null;
         setTimeout(function () {
-            showRevealModal(container, pendingReveal);
-            pendingReveal = null;
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    showRevealModal(container, revealToShow);
+                });
+            });
         }, 100);
     }
 
@@ -789,8 +796,7 @@ function showRevealModal(container, data) {
     html += '      </span>';
     html += '    </div>';
 
-    // Shimmer + луч света
-    html += '    <div class="card-shimmer"></div>';
+    // Луч света, пробегающий по карте (не совмещаем с фоновым shimmer — вместе рябит)
     html += '    <div class="bunker-reveal-shine"></div>';
 
     html += '  </div>';

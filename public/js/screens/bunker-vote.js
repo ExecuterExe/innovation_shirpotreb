@@ -556,9 +556,15 @@ export function renderBunkerGameOver(container) {
     html += '    </div>';
     html += '  </div>';
 
-    html += '  <button id="btn-generate-prompt" class="btn-neon-solid w-full py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer mb-3">';
-    html += '    🧠 Сгенерировать запрос для ИИ';
-    html += '  </button>';
+    html += '  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">';
+    html += '    <button id="btn-generate-prompt" class="btn-neon-solid py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">';
+    html += '      🧠 Подробный запрос';
+    html += '    </button>';
+    html += '    <button id="btn-generate-prompt-mini" class="py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer bg-purple-900/20 border border-purple-700/30 text-purple-300 hover:bg-purple-800/30 transition-colors">';
+    html += '      ⚡ Быстрый мини-промпт';
+    html += '    </button>';
+    html += '  </div>';
+    html += '  <div class="text-[0.6rem] text-corp-dim text-center mb-3">Подробный — эпичная история на 1500+ слов. Мини — короткий вердикт за 30 секунд чтения.</div>';
 
     // Скрытый контейнер для промпта
     html += '  <div id="ai-prompt-container" class="hidden">';
@@ -582,12 +588,13 @@ export function renderBunkerGameOver(container) {
     html += '</div>'; // end AI section
 
     // Кнопки
-    html += '<div class="flex flex-wrap items-center justify-center gap-4">';
+    html += '<div class="flex flex-col items-center gap-4">';
     if (isHost) {
         html += '<button id="btn-bunker-play-again" class="btn-neon-solid px-12 py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">';
         html += '🔄 ИГРАТЬ ЕЩЁ';
         html += '</button>';
     }
+    html += '<button id="btn-exit-bunker-over" class="text-xs font-bold text-corp-muted hover:text-accent-red transition-colors cursor-pointer">✕ Выйти в главное меню</button>';
     html += '</div>';
 
     html += '</div>';
@@ -599,6 +606,13 @@ export function renderBunkerGameOver(container) {
     if (btn) {
         btn.addEventListener('click', function () {
             sendMsg({ type: 'playAgain' });
+        });
+    }
+
+    var btnExit = container.querySelector('#btn-exit-bunker-over');
+    if (btnExit) {
+        btnExit.addEventListener('click', function () {
+            leaveRoom();
         });
     }
 
@@ -615,6 +629,27 @@ export function renderBunkerGameOver(container) {
                 promptContainer.classList.remove('hidden');
                 btnGen.textContent = '✓ Промпт сгенерирован!';
                 btnGen.classList.add('opacity-50');
+
+                // Скроллим к промпту
+                promptContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            playSound('success');
+        });
+    }
+
+    // Генерация мини-промпта
+    var btnGenMini = container.querySelector('#btn-generate-prompt-mini');
+    if (btnGenMini) {
+        btnGenMini.addEventListener('click', function () {
+            var promptText = generateBunkerAIPromptMini(bunker, survivors, eliminated);
+            var promptContainer = container.querySelector('#ai-prompt-container');
+            var promptTextarea = container.querySelector('#ai-prompt-text');
+
+            if (promptContainer && promptTextarea) {
+                promptTextarea.value = promptText;
+                promptContainer.classList.remove('hidden');
+                btnGenMini.textContent = '✓ Мини-промпт готов!';
+                btnGenMini.classList.add('opacity-50');
 
                 // Скроллим к промпту
                 promptContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -801,6 +836,56 @@ function formatPlayerForPrompt(player, index) {
 
     lines.push('');
     return lines.join('\n');
+}
+
+// ═══════════════════════════════════════════
+// ГЕНЕРАТОР МИНИ-ПРОМПТА (короткая версия)
+// ═══════════════════════════════════════════
+
+function generateBunkerAIPromptMini(bunker, survivors, eliminated) {
+    var lines = [];
+
+    lines.push('🏠 БУНКЕР: реши судьбу выживших коротко и с юмором.');
+    lines.push('Катастрофа: ' + (bunker.globalProblem || 'неизвестная угроза'));
+    lines.push('');
+    lines.push('✅ В бункере (' + survivors.length + '):');
+    for (var si = 0; si < survivors.length; si++) {
+        lines.push('  ' + formatPlayerOneLine(survivors[si]));
+    }
+    if (eliminated.length > 0) {
+        lines.push('');
+        lines.push('❌ За бортом (' + eliminated.length + '):');
+        for (var ei = 0; ei < eliminated.length; ei++) {
+            lines.push('  ' + formatPlayerOneLine(eliminated[ei]));
+        }
+    }
+    lines.push('');
+    lines.push('Задание (коротко, до 300 слов):');
+    lines.push('1. Выжило ли человечество — ДА/НЕТ/ЧАСТИЧНО, и почему.');
+    lines.push('2. Кто из выживших оказался самым полезным, а чей скрытый дефект всех подвёл.');
+    lines.push('3. Один абзац с самым смешным моментом первой недели в бункере.');
+    lines.push('Стиль: коротко, дерзко, с чёрным юмором, без воды.');
+
+    return lines.join('\n');
+}
+
+function formatPlayerOneLine(player) {
+    var cards = player.cards || {};
+    var productName = '';
+    if (cards.adjective) productName += cards.adjective + ' ';
+    if (cards.item) productName += cards.item;
+    if (cards.modifier) productName += ' ' + cards.modifier;
+    productName = productName.trim() || 'продукт неизвестен';
+
+    var extras = [];
+    if (cards.hiddenDefect) extras.push('дефект: ' + cards.hiddenDefect);
+    if (cards.review) extras.push('отзыв: «' + cards.review + '»');
+
+    var line = (player.nickname || 'Игрок') + ' — «' + productName + '»';
+    if (extras.length > 0) {
+        line += ' (' + extras.join('; ') + ')';
+    }
+    return line;
 }
 
 function renderBunkerPlayerFull(player, survived) {
