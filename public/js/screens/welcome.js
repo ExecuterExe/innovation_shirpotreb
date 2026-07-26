@@ -81,7 +81,20 @@ export function renderWelcome(container) {
     html += '</button>';
     html += '</div>';
 
+    // Password field (for private rooms)
+    html += '<div id="w-password-wrap" class="hidden">';
+    html += '<input type="text" id="w-password" class="input-corp text-sm" placeholder="🔑 Пароль (для закрытой комнаты)" maxlength="30" autocomplete="off">';
+    html += '</div>';
+
     html += '</div>'; // end card
+
+    // Rooms browser
+    html += '<div class="w-full max-w-md mt-5">';
+    html += '<div class="text-[0.6rem] font-black text-corp-muted uppercase tracking-[0.18em] mb-3 text-center">🌐 Открытые комнаты</div>';
+    html += '<div id="rooms-list" class="space-y-2">';
+    html += '<div class="text-center text-xs text-corp-dim py-3">Загрузка...</div>';
+    html += '</div>';
+    html += '</div>';
 
     // Footer
     html += '<div class="flex flex-wrap items-center justify-center gap-5 mt-8">';
@@ -139,6 +152,13 @@ export function renderWelcome(container) {
     if (codeInput) {
         codeInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') doJoinRoom(container);
+        });
+        codeInput.addEventListener('input', function () {
+            var wrap = container.querySelector('#w-password-wrap');
+            if (wrap) {
+                if (codeInput.value.trim().length >= 3) wrap.classList.remove('hidden');
+                else wrap.classList.add('hidden');
+            }
         });
     }
 
@@ -567,10 +587,12 @@ function doCreateRoom(container) {
 function doJoinRoom(container) {
     var nicknameInput = container.querySelector('#w-nickname');
     var codeInput = container.querySelector('#w-room-code');
+    var passwordInput = container.querySelector('#w-password');
     if (!nicknameInput || !codeInput) return;
 
     var nickname = nicknameInput.value.trim();
     var code = codeInput.value.trim().toUpperCase();
+    var password = passwordInput ? passwordInput.value.trim() : '';
 
     if (!nickname) {
         showNotification('Введите позывной!', 'error');
@@ -582,5 +604,14 @@ function doJoinRoom(container) {
         codeInput.focus();
         return;
     }
-    sendMsg({ type: 'joinRoom', nickname: nickname, roomCode: code });
+    sendMsg({ type: 'joinRoom', nickname: nickname, roomCode: code, password: password });
+}
+
+export function showPasswordField(container) {
+    var wrap = (container || document).querySelector('#w-password-wrap');
+    if (wrap) {
+        wrap.classList.remove('hidden');
+        var pw = wrap.querySelector('#w-password');
+        if (pw) { pw.focus(); }
+    }
 }

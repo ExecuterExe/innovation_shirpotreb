@@ -1,6 +1,7 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
+import { renderBunkerChat } from '../components/bunker-chat.js';
 
 var MAX_PLAYERS_MIN = 3;
 var MAX_PLAYERS_MAX = 18;
@@ -13,6 +14,17 @@ var IS_CODE_HIDDEN = false;
 // Экспортируемые функции для частичного обновления
 // (вызываются из socket.js при lobbyUpdate)
 // ═══════════════════════════════════════════
+
+function buildRoomNameHtml() {
+    var roomName = (state.settings && state.settings.roomName) || '';
+    if (!roomName) return '';
+    return '<div class="text-lg font-black text-corp-white mb-1 truncate">' + escapeHtml(roomName) + '</div>';
+}
+
+export function updateRoomHeader(container) {
+    var el = container.querySelector('#room-name-display');
+    if (el) el.innerHTML = buildRoomNameHtml();
+}
 
 export function updatePlayersList(container) {
     var list = container.querySelector('#players-list');
@@ -31,9 +43,9 @@ export function updatePlayersList(container) {
         var hue2 = i * 45 + 160;
         var hue3 = i * 45 + 140;
 
-        html += '<div class="corp-card px-5 py-4 flex items-center gap-4';
+        html += '<div class="corp-card px-5 py-4 flex items-center gap-4 emotion-anchor';
         if (isMe) html += ' border-accent-blue/20';
-        html += '">';
+        html += '" data-player-id="' + p.id + '"' + (isMe ? ' data-emotion-self="1"' : '') + '>';
         html += '<div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black" style="background: linear-gradient(135deg, hsl(' + hue1 + ',40%,20%), hsl(' + hue2 + ',40%,15%)); color: hsl(' + hue3 + ',60%,65%);">';
         html += (i + 1);
         html += '</div>';
@@ -63,6 +75,19 @@ export function updatePlayersList(container) {
         html += '</div>';
         html += '</div>';
     }
+    // Зрители
+    var spectators = state.spectators || [];
+    if (spectators.length > 0) {
+        html += '<div class="mt-3 pt-3 border-t border-corp-border/30">';
+        html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">👀 Зрители</div>';
+        html += '<div class="flex flex-wrap gap-2">';
+        for (var si = 0; si < spectators.length; si++) {
+            html += '<span class="text-xs px-2 py-1 rounded-lg bg-corp-graphite border border-corp-border text-corp-dim">' + escapeHtml(spectators[si].nickname) + '</span>';
+        }
+        html += '</div>';
+        html += '</div>';
+    }
+
     list.innerHTML = html;
 
     var kickBtns = container.querySelectorAll('.kick-player-btn');
@@ -158,6 +183,28 @@ export function updateSettingsPanel(container) {
     html += buildSetting('🎤 Питч',            'present', 'set-present',  60, 300, s.presentTime || 120, 15);
     html += buildSetting('📈 Инвестирование',  'invest',  'set-invest',   30, 120, s.investTime || 60,   10);
     html += '</div>';
+    html += buildSectionDivider('Видимость комнаты');
+    var isPrivate = !!s.roomPrivate;
+    html += '<div class="space-y-2">';
+    html += '<div>';
+    html += '<div class="flex gap-2 items-stretch">';
+    html += '<input type="text" id="set-room-name" class="input-corp text-sm flex-1" placeholder="✏️ Название комнаты (необязательно)..." maxlength="40" autocomplete="off" value="' + escapeHtml(s.roomName || '') + '">';
+    html += '<button id="btn-apply-room-name" class="btn-apply-inline">Применить</button>';
+    html += '</div>';
+    html += '<div class="text-[0.55rem] text-corp-dim mt-1">Показывается вместо/рядом с кодом — своим и в списке открытых комнат.</div>';
+    html += '</div>';
+    html += buildToggle('🔓 Открытая комната', 'Отображается в списке комнат с кодом. По умолчанию комната закрыта — виден только код для входа.', 'set-room-open', !isPrivate, false);
+    if (isPrivate) {
+        html += '<div class="px-3 py-2 rounded-xl" style="background:rgba(255,180,0,0.06);border:1px solid rgba(255,180,0,0.15)">';
+        html += '<div class="text-[0.6rem] font-black text-accent-gold uppercase tracking-wider mb-1.5">🔑 Пароль для входа (необязательно)</div>';
+        html += '<div class="flex gap-2 items-stretch">';
+        html += '<input type="text" id="set-room-password" class="input-corp text-sm flex-1" placeholder="Пусто — вход только по коду, без пароля" maxlength="30" autocomplete="off" value="' + escapeHtml(s.roomPassword || '') + '">';
+        html += '<button id="btn-apply-room-password" class="btn-apply-inline">Применить</button>';
+        html += '</div>';
+        html += '<div class="text-[0.55rem] text-corp-dim mt-1">Комната не отображается в публичном списке. Если пароль задан — игрок должен знать и код, и пароль.</div>';
+        html += '</div>';
+    }
+    html += '</div>';
     html += '</div>';
 
     // ─── ВКЛАДКА: МЕХАНИКИ ───
@@ -244,13 +291,31 @@ export function updateSettingsPanel(container) {
     html += buildInfoTile('🏆', '~50%', 'игроков выживает');
     html += '</div>';
 
-    // Будущие настройки
+    // Настройки бункера
     html += buildSectionDivider('Настройки бункера');
     html += '<div class="space-y-2">';
+
+    var chatOn = s.bunkerChat !== false; // default on
+    html += '<label for="set-bunker-chat" class="flex items-center justify-between py-3 px-4 rounded-xl cursor-pointer transition-all" style="background:' + (chatOn ? 'rgba(0,180,255,0.06)' : 'rgba(0,0,0,0.15)') + ';border:1px solid ' + (chatOn ? 'rgba(0,180,255,0.18)' : 'rgba(255,255,255,0.07)') + '">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-sm font-black ' + (chatOn ? 'text-accent-blue' : 'text-corp-light') + '">💬 Чат продолжится в игре</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">В лобби чат есть всегда. Эта настройка решает, останется ли он виден во время самой партии.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-bunker-chat" class="toggle-corp flex-shrink-0"' + (chatOn ? ' checked' : '') + '>';
+    html += '</label>';
+
+    var ttsOn = !!s.chatTTS;
+    html += '<label for="set-chat-tts" class="flex items-center justify-between py-3 px-4 rounded-xl cursor-pointer transition-all" style="background:' + (ttsOn ? 'rgba(0,180,255,0.06)' : 'rgba(0,0,0,0.15)') + ';border:1px solid ' + (ttsOn ? 'rgba(0,180,255,0.18)' : 'rgba(255,255,255,0.07)') + '">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-sm font-black ' + (ttsOn ? 'text-accent-blue' : 'text-corp-light') + '">🔉 Озвучка питчей</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">Питчи с командой <span class="font-mono text-corp-light">!питч текст</span> произносятся синтезатором речи для всей комнаты.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-chat-tts" class="toggle-corp flex-shrink-0"' + (ttsOn ? ' checked' : '') + '>';
+    html += '</label>';
+
     html += buildFutureSetting('⏱ Время на ход', '180 сек — раскрытие карт');
     html += buildFutureSetting('🗳 Время голосования', '90 сек — основное голосование');
     html += buildFutureSetting('🎯 Кол-во выживших', 'Авто (~50% игроков)');
-    html += buildFutureSetting('⚡ Карты действия', '2 карты на игрока — в разработке');
     html += '</div>';
 
     html += '</div>';
@@ -270,6 +335,8 @@ export function renderLobby(container) {
     var isHost = state.isHost;
 
     var html = '';
+    html += '<div class="bunker-layout">';
+    html += '<div id="bunker-main-content" class="bunker-main-col">';
     html += '<div class="max-w-6xl mx-auto px-4 py-8 min-h-screen">';
 
     // Back
@@ -285,6 +352,7 @@ export function renderLobby(container) {
 
     // Room code
     html += '<div class="corp-card p-6">';
+    html += '<div id="room-name-display">' + buildRoomNameHtml() + '</div>';
     html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">Код комнаты</div>';
     html += '<div class="flex items-center gap-4">';
     html += '<span class="font-mono text-4xl md:text-5xl font-black text-accent-blue tracking-[0.2em]" style="text-shadow: 0 0 20px rgba(0,180,255,0.3);">';
@@ -322,7 +390,9 @@ export function renderLobby(container) {
     }
 
     html += '</div>'; // end flex
-    html += '</div>'; // end main
+    html += '</div>'; // end max-w-6xl
+    html += '</div>'; // end bunker-main-col
+    html += '</div>'; // end bunker-layout
 
     container.innerHTML = html;
 
@@ -331,12 +401,15 @@ export function renderLobby(container) {
     updateStartButton(container);
     if (isHost) updateSettingsPanel(container);
 
+    // Чат доступен в лобби всегда, вне зависимости от настройки «Чат в бункере»
+    // (та настройка решает только, продолжит ли чат работать после старта игры)
+    renderBunkerChat(container, true);
+
     // Static listeners
     var btnBack = container.querySelector('#btn-back');
     if (btnBack) {
         btnBack.addEventListener('click', function () {
-            console.log('[lobby] Back clicked');
-            window.location.reload();
+            leaveRoom();
         });
     }
 
@@ -588,6 +661,28 @@ function attachSettingsListeners(container) {
             pushSettings(container);
         });
     }
+
+    // Название и пароль комнаты — только по кнопке «Применить» или Enter.
+    // Раньше отправлялось автоматически при вводе (с задержкой), но обновление настроек
+    // от сервера перерисовывает всю панель и сбрасывает фокус с поля — печатать было невозможно.
+    bindApplyField(container, 'set-room-name', 'btn-apply-room-name', 'Название комнаты сохранено');
+    bindApplyField(container, 'set-room-password', 'btn-apply-room-password', 'Пароль сохранён');
+}
+
+function bindApplyField(container, inputId, btnId, savedMessage) {
+    var input = container.querySelector('#' + inputId);
+    var btn = container.querySelector('#' + btnId);
+    if (!input || !btn) return;
+
+    function apply() {
+        pushSettings(container);
+        showNotification(savedMessage, 'success');
+    }
+
+    btn.addEventListener('click', apply);
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); apply(); }
+    });
 }
 
 function handleStep(field, dir, container) {
@@ -633,6 +728,11 @@ function pushSettings(container) {
         pseudoMode: container.querySelector('#set-pseudo')?.checked || false,
         bunkerMode: container.querySelector('#set-bunker')?.checked || false,
         bunkerHostMode: container.querySelector('#set-bunker-hostmode')?.checked || false,
+        bunkerChat: container.querySelector('#set-bunker-chat') ? container.querySelector('#set-bunker-chat').checked : true,
+        chatTTS: container.querySelector('#set-chat-tts')?.checked || false,
+        roomPrivate: container.querySelector('#set-room-open') ? !container.querySelector('#set-room-open').checked : false,
+        roomPassword: container.querySelector('#set-room-password')?.value || '',
+        roomName: container.querySelector('#set-room-name')?.value || '',
     };
     console.log('[lobby] Pushing settings:', settings);
     sendMsg({ type: 'updateSettings', settings: settings });

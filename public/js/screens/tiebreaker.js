@@ -1,8 +1,15 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { CARD_TYPES, renderCardGrid } from './presentation.js';
+
+function bindExitButton(container) {
+    var btn = container.querySelector('#btn-exit-game');
+    if (btn) btn.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
+}
 
 export function renderTied(container) {
     var tied = state.tiedPlayers || [];
@@ -15,7 +22,8 @@ export function renderTied(container) {
     }
 
     var html = '';
-    html += '<div class="max-w-4xl mx-auto px-4 py-8 min-h-screen">';
+    html += '<div class="max-w-4xl mx-auto px-4 py-8 min-h-screen relative">';
+    html += '<button id="btn-exit-game" class="fixed top-4 right-4 z-20 px-2.5 py-1.5 rounded-lg border border-corp-border bg-corp-black/60 text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
 
     // Header
     html += '<div class="text-center mb-6">';
@@ -130,6 +138,7 @@ export function renderTied(container) {
 
     html += '</div>';
     container.innerHTML = html;
+    bindExitButton(container);
 
     // ═══════ BUTTON LISTENER ═══════
     var btnReady = container.querySelector('#btn-tb-ready');
@@ -185,7 +194,8 @@ export function renderTiebreaker(container) {
     }
 
     var html = '';
-    html += '<div class="max-w-4xl mx-auto px-4 py-8 min-h-screen">';
+    html += '<div class="max-w-4xl mx-auto px-4 py-8 min-h-screen relative">';
+    html += '<button id="btn-exit-game" class="fixed top-4 right-4 z-20 px-2.5 py-1.5 rounded-lg border border-corp-border bg-corp-black/60 text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
 
     // Header
     html += '<div class="text-center mb-6">';
@@ -247,6 +257,7 @@ export function renderTiebreaker(container) {
 
     html += '</div>';
     container.innerHTML = html;
+    bindExitButton(container);
 
     container.querySelector('#btn-tb-next')?.addEventListener('click', function () {
         console.log('[tiebreaker] Next clicked');
@@ -260,7 +271,8 @@ export function renderTiebreakerVoting(container) {
     var tied = state.tiedPlayers || [];
 
     var html = '';
-    html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen">';
+    html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen relative">';
+    html += '<button id="btn-exit-game" class="fixed top-4 right-4 z-20 px-2.5 py-1.5 rounded-lg border border-corp-border bg-corp-black/60 text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
 
     html += '<div class="text-center mb-6">';
     html += '<h2 class="text-xl font-black text-corp-white mb-1">🗳 Переголосование</h2>';
@@ -333,6 +345,7 @@ export function renderTiebreakerVoting(container) {
 
     html += '</div>';
     container.innerHTML = html;
+    bindExitButton(container);
 
     // ═══════ VOTING LOGIC ═══════
     var selectedVote = null;

@@ -475,12 +475,94 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
 
 /* ─── BUNKER MODE ─── */
 
-/* Card flip */
-.bunker-card-flip { animation: bunkerFlip 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+/* Card flip — с лёгким «пружинным» перелётом в конце для более сочного приземления */
+.bunker-card-flip {
+    position: relative;
+    z-index: 2;
+    animation: bunkerFlip 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-style: preserve-3d;
+    perspective: 800px;
+}
 @keyframes bunkerFlip {
-    0%   { transform: rotateY(180deg) scale(0.85); opacity: 0; }
-    50%  { transform: rotateY(90deg)  scale(0.92); opacity: 0.5; }
-    100% { transform: rotateY(0deg)   scale(1);    opacity: 1; }
+    0%   { transform: rotateY(180deg) scale(0.6);  opacity: 0; }
+    55%  { transform: rotateY(0deg)   scale(1.08); opacity: 1; }
+    78%  { transform: rotateY(0deg)   scale(0.97); }
+    100% { transform: rotateY(0deg)   scale(1); }
+}
+
+/* Обёртка модалки раскрытия — держит вспышку/частицы позади карты */
+.bunker-reveal-fx {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Круговая вспышка позади карты в момент появления */
+.bunker-reveal-burst {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(245,183,49,0.45) 40%, transparent 72%);
+    animation: bunkerRevealBurst 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    pointer-events: none;
+    z-index: 0;
+}
+@keyframes bunkerRevealBurst {
+    0%   { transform: scale(0);   opacity: 1; }
+    100% { transform: scale(7);   opacity: 0; }
+}
+
+/* Искры, разлетающиеся из центра при раскрытии карты */
+.bunker-reveal-particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+.bunker-reveal-spark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #f5d060 55%, transparent 75%);
+    opacity: 0;
+    animation: bunkerRevealSpark 0.8s ease-out forwards;
+    animation-delay: var(--delay, 0s);
+}
+@keyframes bunkerRevealSpark {
+    0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
+}
+
+/* Луч света, пробегающий по карте после приземления */
+.bunker-reveal-shine {
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent);
+    transform: skewX(-20deg);
+    animation: bunkerRevealShine 0.9s ease-out 0.4s forwards;
+    pointer-events: none;
+    z-index: 3;
+}
+@keyframes bunkerRevealShine {
+    0%   { left: -60%; opacity: 0; }
+    18%  { opacity: 1; }
+    100% { left: 130%; opacity: 0; }
+}
+
+/* Импульс на самой мини-карточке в сетке «Ваш продукт» сразу после клика */
+.bunker-reveal-btn-pressed {
+    animation: bunkerRevealPress 0.4s ease-out;
+}
+@keyframes bunkerRevealPress {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(0.93); }
+    100% { transform: scale(1); }
 }
 
 /* Card back */
@@ -577,6 +659,693 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     transition-duration: 0.1s;
 }
 
+/* ─── BUNKER LAYOUT WITH CHAT ─── */
+
+.bunker-layout {
+    display: flex;
+    gap: 10px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 10px 12px;
+    min-height: 100vh;
+    align-items: flex-start;
+}
+
+.bunker-main-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ─── CHAT PANEL ─── */
+
+.bunker-chat-panel {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #161616 0%, #121212 100%);
+    border: 1px solid #2e2e2e;
+    border-radius: 16px;
+    overflow: hidden;
+    position: sticky;
+    top: 10px;
+    max-height: calc(100vh - 20px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+}
+
+.bunker-chat-collapsed {
+    width: auto;
+}
+
+/* В лобби чат стоит слева от основной колонки (код комнаты/участники).
+   margin-top выравнивает верх чата с карточкой «Код комнаты» — у контента
+   слева есть свой отступ (py-8 + кнопка «Выйти» + отступ под ней), которого
+   у чата по умолчанию нет, поэтому без этого чат «висит» выше остального. */
+.bunker-chat-left {
+    order: -1;
+    margin-top: 76px;
+}
+
+.bunker-chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #2e2e2e;
+    background: #1e1e1e;
+    flex-shrink: 0;
+}
+
+.chat-icon-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    background: none;
+    border: none;
+    transition: background 0.15s, color 0.15s;
+}
+.chat-icon-btn:hover { background: rgba(255,255,255,0.06); }
+
+.bunker-chat-messages-wrap {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.bunker-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    min-height: 0;
+    scroll-behavior: smooth;
+}
+
+.bunker-chat-new-msg-btn {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    transform: translateX(-50%);
+    background: rgba(0, 180, 255, 0.85);
+    color: #fff;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,180,255,0.35);
+    animation: newMsgPulse 1.8s ease-in-out infinite;
+    z-index: 3;
+}
+.bunker-chat-new-msg-btn.hidden { display: none; }
+.bunker-chat-new-msg-btn:hover { background: rgba(0, 180, 255, 1); }
+@keyframes newMsgPulse {
+    0%, 100% { box-shadow: 0 4px 12px rgba(0,180,255,0.35); }
+    50%      { box-shadow: 0 4px 20px rgba(0,180,255,0.65); }
+}
+
+.bunker-chat-hint {
+    padding: 4px 10px 6px;
+    font-size: 0.55rem;
+    color: #5a5a6a;
+    line-height: 1.3;
+    background: #1a1a1a;
+    border-top: 1px solid rgba(255,255,255,0.03);
+    text-align: center;
+}
+
+.bunker-chat-messages::-webkit-scrollbar { width: 3px; }
+.bunker-chat-messages::-webkit-scrollbar-track { background: transparent; }
+.bunker-chat-messages::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 2px; }
+
+.bunker-chat-input-area {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-top: 1px solid #2e2e2e;
+    background: #1a1a1a;
+    flex-shrink: 0;
+}
+
+.bunker-chat-input {
+    flex: 1;
+    min-width: 0;
+    background: #252525;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    color: #d4d4e0;
+    font-size: 0.7rem;
+    padding: 6px 10px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.15s;
+}
+.bunker-chat-input:focus { border-color: rgba(0,180,255,0.4); }
+.bunker-chat-input::placeholder { color: #5a5a6a; }
+
+.bunker-chat-send-btn {
+    width: 30px;
+    height: 30px;
+    background: rgba(0,180,255,0.15);
+    border: 1px solid rgba(0,180,255,0.3);
+    border-radius: 8px;
+    color: #00b4ff;
+    font-size: 0.65rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+.bunker-chat-send-btn:hover { background: rgba(0,180,255,0.25); }
+
+/* ─── CHAT MESSAGES ─── */
+
+.chat-msg {
+    padding: 6px 12px;
+    font-size: 0.74rem;
+    line-height: 1.5;
+    border-left: 2px solid transparent;
+    letter-spacing: 0.005em;
+}
+.chat-msg:hover { background: rgba(255,255,255,0.03); }
+
+.chat-msg-system  { border-left-color: #454555; background: rgba(255,255,255,0.015); }
+.chat-msg-event   { border-left-color: rgba(34,211,238,0.55); background: rgba(34,211,238,0.045); }
+.chat-msg-alert   { border-left-color: rgba(255,59,59,0.55); background: rgba(255,59,59,0.05); }
+.chat-msg-pitch   { border-left-color: rgba(255,215,0,0.5); background: rgba(255,215,0,0.04); }
+.chat-msg-general { border-left-color: transparent; }
+
+.chat-msg-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 2px;
+    flex-wrap: wrap;
+}
+.chat-msg-time {
+    font-size: 0.58rem;
+    color: #74748a;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+.chat-msg-icon   { font-size: 0.7rem; }
+.chat-msg-name   { font-weight: 700; font-size: 0.7rem; }
+.chat-msg-text   { word-break: break-word; }
+
+/* Крестик удаления сообщения — виден только ведущему, по умолчанию едва заметен */
+.chat-msg-delete {
+    margin-left: auto;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: none;
+    background: none;
+    color: rgba(255,255,255,0.15);
+    font-size: 0.6rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+.chat-msg:hover .chat-msg-delete {
+    color: rgba(255,59,59,0.6);
+}
+.chat-msg-delete:hover {
+    color: #ff3b3b !important;
+    background: rgba(255,59,59,0.12);
+}
+.chat-msg-removing {
+    opacity: 0;
+    transform: translateX(6px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+/* ─── ПАМЯТКА ПО КАРТАМ (бункер) ─── */
+
+.bunker-legend-panel {
+    order: -1;
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, #161616 0%, #121212 100%);
+    border: 1px solid #2e2e2e;
+    border-radius: 16px;
+    overflow: hidden;
+    position: sticky;
+    top: 10px;
+    max-height: calc(100vh - 20px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+}
+
+.bunker-legend-collapsed {
+    width: auto;
+}
+
+.bunker-legend-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #2e2e2e;
+    background: #1e1e1e;
+    flex-shrink: 0;
+}
+
+.bunker-legend-body {
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.bunker-legend-body::-webkit-scrollbar { width: 3px; }
+.bunker-legend-body::-webkit-scrollbar-track { background: transparent; }
+.bunker-legend-body::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 2px; }
+
+.bunker-legend-item {
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.bunker-legend-item-highlight {
+    background: rgba(245,183,49,0.06);
+    border: 1px solid rgba(245,183,49,0.22);
+}
+
+.bunker-legend-item-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.bunker-legend-emoji {
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.bunker-legend-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #ededf5;
+}
+
+.bunker-legend-star {
+    font-size: 0.6rem;
+    color: #f5b731;
+    margin-left: auto;
+}
+
+.bunker-legend-desc {
+    font-size: 0.68rem;
+    line-height: 1.4;
+    color: #a8a8ba;
+}
+
+.bunker-legend-example {
+    margin-top: 5px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    background: rgba(0,0,0,0.25);
+    font-size: 0.62rem;
+    line-height: 1.4;
+    color: #d8b96a;
+    font-style: italic;
+}
+
+@media (max-width: 1100px) {
+    .bunker-chat-panel { width: 260px; }
+    .bunker-legend-panel { width: 240px; }
+}
+@media (max-width: 900px) {
+    .bunker-layout { flex-direction: column; }
+    .bunker-chat-panel { width: 100%; position: static; max-height: 260px; }
+    .bunker-chat-left { order: 0; margin-top: 0; }
+    /* Памятка — сразу первой на мобильном, чтобы её увидели до начала игры; после сворачивания
+       остаётся тонкой полоской и не мешает */
+    .bunker-legend-panel { width: 100%; position: static; max-height: 320px; order: -1; }
+    .action-result-toast { max-width: 96vw; padding: 12px 14px; }
+
+    /* Увеличенные зоны нажатия для тач-экранов */
+    .chat-icon-btn { width: 40px; height: 40px; font-size: 0.95rem; }
+    .bunker-chat-send-btn { width: 40px; height: 40px; }
+}
+
+/* ─── ROOMS BROWSER ─── */
+
+.room-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: background 0.15s, border-color 0.15s;
+    cursor: default;
+}
+.room-card:hover {
+    background: rgba(0,180,255,0.04);
+    border-color: rgba(0,180,255,0.18);
+}
+.room-card-code {
+    flex-shrink: 0;
+    min-width: 58px;
+    max-width: 130px;
+}
+.room-card-name {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #ededf5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+.room-card-tags {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+.room-card-right {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+.room-join-btn {
+    font-size: 0.6rem;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    background: rgba(0,180,255,0.12);
+    border: 1px solid rgba(0,180,255,0.25);
+    color: #60c8ff;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.room-join-btn:hover {
+    background: rgba(0,180,255,0.22);
+    border-color: rgba(0,180,255,0.45);
+}
+
+/* Кнопка «Применить» рядом с полем ввода (название/пароль комнаты) —
+   сохраняет по явному клику/Enter, а не при каждом нажатии клавиши,
+   иначе перерисовка настроек от сервера сбрасывает фокус с поля. */
+.btn-apply-inline {
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 0 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    background: rgba(0,180,255,0.12);
+    border: 1px solid rgba(0,180,255,0.3);
+    color: #60c8ff;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.btn-apply-inline:hover {
+    background: rgba(0,180,255,0.22);
+    border-color: rgba(0,180,255,0.5);
+}
+.btn-apply-inline:active {
+    transform: scale(0.96);
+}
+
+/* Кнопка ведущего «исключить игрока из бункера» — на карточке игрока и в списке голосования */
+.bunker-kick-btn {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    background: rgba(255,59,59,0.1);
+    border: 1px solid rgba(255,59,59,0.25);
+    color: #ff3b3b;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.bunker-kick-btn:hover {
+    background: rgba(255,59,59,0.22);
+    border-color: rgba(255,59,59,0.5);
+}
+.bunker-kick-btn:active {
+    transform: scale(0.92);
+}
+
+/* ═══════════════════════════════════════════
+   ACTION RESULT TOAST (владелец видит что сделала карта)
+══════════════════════════════════════════ */
+
+.action-result-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-30px);
+    z-index: 10000;
+    max-width: 480px;
+    width: calc(100% - 24px);
+    background: linear-gradient(160deg, rgba(30,22,10,0.98) 0%, rgba(20,15,8,0.98) 100%);
+    border: 1px solid rgba(245, 183, 49, 0.35);
+    border-radius: 18px;
+    padding: 14px 18px 16px;
+    box-shadow:
+        0 12px 40px rgba(0,0,0,0.6),
+        0 0 0 1px rgba(245,183,49,0.1),
+        inset 0 1px 0 rgba(245,183,49,0.15);
+    opacity: 0;
+    transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.34,1.56,0.64,1);
+    overflow: hidden;
+}
+.action-result-toast-in {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.action-result-toast-out {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.action-result-glow {
+    position: absolute;
+    inset: -1px;
+    background: radial-gradient(ellipse at top left, rgba(245,183,49,0.18), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+.action-result-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 6px;
+}
+.action-result-emoji {
+    font-size: 1.8rem;
+    line-height: 1;
+    filter: drop-shadow(0 2px 6px rgba(245,183,49,0.35));
+}
+.action-result-name {
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: #f5d060;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex: 1;
+    min-width: 0;
+}
+.action-result-from {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+}
+.action-result-close {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.5);
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+}
+.action-result-close:hover {
+    background: rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.9);
+}
+.action-result-body {
+    position: relative;
+    z-index: 1;
+    color: #e8dcc0;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    font-weight: 500;
+    word-wrap: break-word;
+}
+
+/* ═══════════════════════════════════════════
+   CARD FLASH — подсветка изменившейся карты
+══════════════════════════════════════════ */
+
+.card-flash {
+    animation: cardFlash 2.4s ease-out;
+    position: relative;
+    z-index: 1;
+}
+@keyframes cardFlash {
+    0% {
+        box-shadow:
+            0 0 0 0 rgba(245, 183, 49, 0.7),
+            0 0 40px 4px rgba(245, 183, 49, 0.5);
+        transform: scale(1);
+    }
+    18% {
+        box-shadow:
+            0 0 0 8px rgba(245, 183, 49, 0.2),
+            0 0 60px 12px rgba(245, 183, 49, 0.35);
+        transform: scale(1.05);
+    }
+    100% {
+        box-shadow:
+            0 0 0 0 rgba(245, 183, 49, 0),
+            0 0 0 0 rgba(245, 183, 49, 0);
+        transform: scale(1);
+    }
+}
+
+/* ═══════════════════════════════════════════
+   ЭМОЦИИ
+══════════════════════════════════════════ */
+
+.emotion-anchor { position: relative; }
+
+/* Пузырь над карточкой */
+.emotion-bubble {
+    position: absolute;
+    top: -8px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px 5px 7px;
+    border-radius: 20px;
+    background: rgba(15,17,24,0.92);
+    border: 1px solid rgba(255,255,255,0.13);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.55);
+    pointer-events: none;
+    z-index: 50;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateY(6px) scale(0.88);
+    transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+.emotion-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    right: 16px;
+    border: 4px solid transparent;
+    border-top-color: rgba(255,255,255,0.1);
+}
+.emotion-bubble-in {
+    opacity: 1;
+    transform: translateY(-8px) scale(1);
+}
+.emotion-bubble-out {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.9);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.emotion-bubble-emoji { font-size: 1.15rem; line-height: 1; }
+.emotion-bubble-label { font-size: 0.65rem; font-weight: 700; color: rgba(255,255,255,0.7); letter-spacing: 0.02em; }
+
+/* Контекстное меню */
+.emotion-menu {
+    position: fixed;
+    z-index: 9999;
+    background: rgba(18,20,28,0.97);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    min-width: 200px;
+    backdrop-filter: blur(8px);
+    animation: emotion-menu-in 0.15s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes emotion-menu-in {
+    from { opacity: 0; transform: scale(0.88) translateY(4px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.emotion-menu-title {
+    font-size: 0.55rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+.emotion-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+}
+.emotion-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 4px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.03);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.1s;
+}
+.emotion-btn:hover {
+    background: rgba(0,180,255,0.1);
+    border-color: rgba(0,180,255,0.25);
+    transform: scale(1.07);
+}
+.emotion-btn:active { transform: scale(0.97); }
+.emotion-btn-emoji { font-size: 1.5rem; line-height: 1; }
+.emotion-btn-label { font-size: 0.55rem; font-weight: 700; color: rgba(255,255,255,0.5); text-align: center; line-height: 1.2; }
+
 /* Имитация ребра карты */
 .bunker-action-card-corner {
     position: absolute;
@@ -608,6 +1377,124 @@ input[type="range"].invest-slider::-webkit-slider-thumb:hover {
     transition: opacity 0.2s;
 }
 .bunker-reveal-btn:hover::after { opacity: 1; }
+
+/* ─── ЭФФЕКТ РОЗЫГРЫША КАРТЫ ДЕЙСТВИЯ (бункер) ─── */
+/* Полноэкранная кратковременная «вспышка каста» — видна всем в комнате */
+
+.bunker-fx-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.bunker-fx-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(245,183,49,0.16) 0%, rgba(0,0,0,0.3) 65%, rgba(0,0,0,0) 100%);
+    animation: bunkerFxVignette 1.3s ease-out forwards;
+}
+@keyframes bunkerFxVignette {
+    0%   { opacity: 0; }
+    10%  { opacity: 1; }
+    100% { opacity: 0; }
+}
+.bunker-fx-overlay-out {
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.bunker-fx-ring {
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 4px solid rgba(245,183,49,0.85);
+    box-shadow: 0 0 50px rgba(245,183,49,0.65);
+    animation: bunkerFxRing 1s cubic-bezier(0.16,1,0.3,1) forwards;
+}
+@keyframes bunkerFxRing {
+    0%   { transform: scale(0);   opacity: 1; border-width: 8px; }
+    100% { transform: scale(7);   opacity: 0; border-width: 0px; }
+}
+
+.bunker-fx-ring2 {
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.7);
+    animation: bunkerFxRing 1.15s cubic-bezier(0.16,1,0.3,1) 0.12s forwards;
+}
+
+.bunker-fx-spark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff8dc 0%, #f5b731 55%, transparent 75%);
+    opacity: 0;
+    animation: bunkerFxSpark 1s ease-out forwards;
+    animation-delay: var(--delay, 0s);
+}
+@keyframes bunkerFxSpark {
+    0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
+}
+
+.bunker-fx-emoji {
+    font-size: 5rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 30px rgba(245,183,49,0.75));
+    animation: bunkerFxEmoji 0.9s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    position: relative;
+    z-index: 2;
+}
+@keyframes bunkerFxEmoji {
+    0%   { transform: scale(0) rotate(-25deg); opacity: 0; }
+    55%  { transform: scale(1.3) rotate(8deg); opacity: 1; }
+    75%  { transform: scale(0.95) rotate(-3deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.bunker-fx-name {
+    margin-top: 12px;
+    font-size: 1.15rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #f5d060;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.7);
+    opacity: 0;
+    animation: bunkerFxNameIn 0.5s ease-out 0.35s forwards;
+    position: relative;
+    z-index: 2;
+}
+.bunker-fx-player {
+    margin-top: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    opacity: 0;
+    animation: bunkerFxNameIn 0.5s ease-out 0.45s forwards;
+    position: relative;
+    z-index: 2;
+}
+@keyframes bunkerFxNameIn {
+    0%   { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bunker-fx-overlay, .bunker-fx-ring, .bunker-fx-ring2, .bunker-fx-spark, .bunker-fx-emoji, .bunker-fx-name, .bunker-fx-player,
+    .bunker-reveal-burst, .bunker-reveal-spark, .bunker-reveal-shine, .bunker-card-flip {
+        animation-duration: 0.01ms !important;
+    }
+}
 
 /* ─── ЧАТ ─── */
 

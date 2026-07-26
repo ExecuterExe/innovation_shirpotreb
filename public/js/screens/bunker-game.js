@@ -1,5 +1,7 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
+import { renderBunkerChat } from '../components/bunker-chat.js';
+import { renderBunkerLegend } from '../components/bunker-legend.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 
@@ -46,7 +48,8 @@ export function renderBunkerReveal(container) {
     var myRevealed = revealedCards[myId] || {};
 
     var html = '';
-    html += '<div class="max-w-6xl mx-auto px-3 py-3 min-h-screen flex flex-col">';
+    html += '<div class="bunker-layout">';
+    html += '<div id="bunker-main-content" class="bunker-main-col">';
 
     // Баннер зрителя
     if (isSpectator) {
@@ -78,6 +81,7 @@ export function renderBunkerReveal(container) {
     html += '    <div class="text-[0.65rem] font-bold text-corp-muted uppercase tracking-widest">Выживших</div>';
     html += '    <div class="text-lg font-black text-accent-green">' + (bunker.survivorsCount || '?') + '</div>';
     html += '  </div>';
+    html += '  <button id="btn-exit-bunker" class="p-2 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer" title="Выйти в меню">✕ Выйти</button>';
     html += '</div>';
 
     // ═══════ ГЛОБАЛЬНАЯ ПРОБЛЕМА (сворачиваемая) ═══════
@@ -168,7 +172,7 @@ export function renderBunkerReveal(container) {
 
         if (isRevealed) {
             // ═══ Уже раскрыта — полупрозрачная, с галочкой ═══
-            html += '<div class="rounded-xl p-3 ' + ct.bg + ' ' + ct.border + ' border opacity-50 text-center relative">';
+            html += '<div class="rounded-xl p-3 ' + ct.bg + ' ' + ct.border + ' border opacity-50 text-center relative" data-my-slot="' + ct.key + '">';
             html += '  <div class="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-accent-green/20 flex items-center justify-center"><span class="text-[0.5rem] text-accent-green">✓</span></div>';
             html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
             html += '  <div class="text-xs font-bold ' + ct.color + ' leading-snug">' + escapeHtml(cardValue) + '</div>';
@@ -180,14 +184,14 @@ export function renderBunkerReveal(container) {
             var canReveal = ct.key === 'item' || itemAlreadyRevealed;
 
             if (canReveal) {
-                html += '<div class="bunker-reveal-btn rounded-xl p-3 ' + ct.gradient + ' border-2 border-white/20 cursor-pointer hover:scale-[1.03] hover:border-white/40 hover:shadow-lg transition-all text-center" data-card-key="' + ct.key + '">';
+                html += '<div class="bunker-reveal-btn rounded-xl p-3 ' + ct.gradient + ' border-2 border-white/20 cursor-pointer hover:scale-[1.03] hover:border-white/40 hover:shadow-lg transition-all text-center" data-card-key="' + ct.key + '" data-my-slot="' + ct.key + '">';
                 html += '  <div class="text-[0.65rem] font-bold text-white/85 uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
                 html += '  <div class="text-xs font-bold text-white leading-snug">' + escapeHtml(cardValue) + '</div>';
                 html += '  <div class="text-[0.45rem] text-white/50 mt-1">▲ нажмите</div>';
                 html += '</div>';
             } else {
                 // Заблокировано — пока предмет не раскрыт
-                html += '<div class="rounded-xl p-3 bg-corp-graphite border border-corp-border text-center opacity-40 relative">';
+                html += '<div class="rounded-xl p-3 bg-corp-graphite border border-corp-border text-center opacity-40 relative" data-my-slot="' + ct.key + '">';
                 html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
                 html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(cardValue) + '</div>';
                 html += '  <div class="text-[0.4rem] text-accent-gold mt-1">🔒 сначала предмет</div>';
@@ -196,7 +200,7 @@ export function renderBunkerReveal(container) {
 
         } else {
             // ═══ Не мой ход ИЛИ уже раскрыл в этом ходу ═══
-            html += '<div class="rounded-xl p-3 bg-corp-graphite border border-corp-border text-center">';
+            html += '<div class="rounded-xl p-3 bg-corp-graphite border border-corp-border text-center" data-my-slot="' + ct.key + '">';
             html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
             html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(cardValue) + '</div>';
             html += '</div>';
@@ -251,7 +255,7 @@ export function renderBunkerReveal(container) {
                 if (BUNKER_CARD_TYPES[ecti].key === ek) { ect = BUNKER_CARD_TYPES[ecti]; break; }
             }
             if (!ect) continue;
-            html += '<div class="rounded-xl p-2.5 ' + ect.bg + ' ' + ect.border + ' border text-center min-w-[110px] ring-1 ring-accent-gold/30">';
+            html += '<div class="rounded-xl p-2.5 ' + ect.bg + ' ' + ect.border + ' border text-center min-w-[110px] ring-1 ring-accent-gold/30" data-my-extra="' + ek + '">';
             html += '  <div class="text-[0.45rem] font-bold text-accent-gold uppercase tracking-widest mb-1">+1 ' + ect.emoji + ' ' + ect.label + '</div>';
             html += '  <div class="text-[0.65rem] font-bold ' + ect.color + ' leading-snug">' + escapeHtml(myExtraCards[ek]) + '</div>';
             html += '</div>';
@@ -272,7 +276,8 @@ export function renderBunkerReveal(container) {
         html += renderActionHand(actionCards, 'reveal');
     }
 
-    html += '</div>'; // end main
+    html += '</div>'; // end bunker-main-col
+    html += '</div>'; // end bunker-layout
 
     // ═══════ МОДАЛЬНОЕ ОКНО для раскрытия (скрыто) ═══════
     html += renderRevealModal();
@@ -282,7 +287,19 @@ export function renderBunkerReveal(container) {
 
     container.innerHTML = html;
 
+    // Рендерим чат и памятку по картам после установки innerHTML
+    renderBunkerChat(container);
+    renderBunkerLegend(container);
+
     // ═══════ LISTENERS ═══════
+
+    // Кнопка выхода
+    var btnExitBunker = container.querySelector('#btn-exit-bunker');
+    if (btnExitBunker) {
+        btnExitBunker.addEventListener('click', function () {
+            if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+        });
+    }
 
     // Сворачивание проблемы
     var btnProblem = container.querySelector('#btn-toggle-problem');
@@ -304,6 +321,8 @@ export function renderBunkerReveal(container) {
             btn.addEventListener('click', function () {
                 var cardKey = btn.getAttribute('data-card-key');
                 sendMsg({ type: 'bunkerReveal', cardKey: cardKey });
+                // Небольшой «нажим» именно на ту карточку, которую выбрали
+                btn.classList.add('bunker-reveal-btn-pressed');
                 // Визуально блокируем все кнопки
                 var allBtns = container.querySelectorAll('.bunker-reveal-btn');
                 for (var ab = 0; ab < allBtns.length; ab++) {
@@ -352,6 +371,21 @@ export function renderBunkerReveal(container) {
         })(playerMiniCards[pmi]);
     }
 
+    // Ведущий: исключить игрока из бункера прямо во время игры
+    var bunkerKickBtns = container.querySelectorAll('.bunker-kick-btn');
+    for (var bki = 0; bki < bunkerKickBtns.length; bki++) {
+        (function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var targetId = btn.getAttribute('data-bunker-kick');
+                var targetName = btn.getAttribute('data-bunker-kick-name') || 'игрока';
+                if (!targetId) return;
+                if (!window.confirm('Исключить «' + targetName + '» из бункера? Это действие необратимо для текущей игры.')) return;
+                sendMsg({ type: 'bunkerHostKick', targetPlayerId: targetId });
+            });
+        })(bunkerKickBtns[bki]);
+    }
+
     // Если есть pending reveal — показываем модалку
     if (pendingReveal) {
         setTimeout(function () {
@@ -380,6 +414,34 @@ export function renderBunkerReveal(container) {
                 });
             });
         })(actionBtns[acbi]);
+    }
+
+    // ═══════ HIGHLIGHT — изменённые карты после разыгранной карты действия ═══════
+    if (window._bunkerHighlightSlots && window._bunkerHighlightSlots.length) {
+        var slots = window._bunkerHighlightSlots;
+        window._bunkerHighlightSlots = null;
+        setTimeout(function () {
+            for (var si = 0; si < slots.length; si++) {
+                var el = container.querySelector('[data-my-slot="' + slots[si] + '"]');
+                if (el) {
+                    el.classList.add('card-flash');
+                    (function (e) {
+                        setTimeout(function () { e.classList.remove('card-flash'); }, 2400);
+                    })(el);
+                }
+            }
+        }, 60);
+    }
+    if (window._bunkerHighlightExtra) {
+        var extraKey = window._bunkerHighlightExtra;
+        window._bunkerHighlightExtra = null;
+        setTimeout(function () {
+            var el = container.querySelector('[data-my-extra="' + extraKey + '"]');
+            if (el) {
+                el.classList.add('card-flash');
+                setTimeout(function () { el.classList.remove('card-flash'); }, 2400);
+            }
+        }, 60);
     }
 }
 
@@ -666,6 +728,20 @@ function renderRevealModal() {
     return html;
 }
 
+function buildFxParticlesHtml(className, count, spread) {
+    var html = '';
+    for (var i = 0; i < count; i++) {
+        var angle = (Math.PI * 2 * i) / count + (Math.random() * 0.35 - 0.175);
+        var dist = spread * (0.6 + Math.random() * 0.5);
+        var dx = Math.cos(angle) * dist;
+        var dy = Math.sin(angle) * dist;
+        var delay = Math.random() * 0.14;
+        var size = 4 + Math.random() * 6;
+        html += '<span class="' + className + '" style="--dx:' + dx.toFixed(1) + 'px;--dy:' + dy.toFixed(1) + 'px;--delay:' + delay.toFixed(2) + 's;width:' + size.toFixed(1) + 'px;height:' + size.toFixed(1) + 'px;"></span>';
+    }
+    return html;
+}
+
 function showRevealModal(container, data) {
     var modal = container.querySelector('#reveal-modal');
     var content = container.querySelector('#reveal-modal-content');
@@ -681,42 +757,51 @@ function showRevealModal(container, data) {
     }
     if (!cardType) return;
 
+    var isMe = data.playerId === state.playerId;
+
     var html = '';
-    html += '<div class="bunker-card-flip">';
+    html += '<div class="bunker-reveal-fx">';
+    html += '  <div class="bunker-reveal-burst"></div>';
+    html += '  <div class="bunker-reveal-particles">' + buildFxParticlesHtml('bunker-reveal-spark', 12, 110) + '</div>';
+    html += '  <div class="bunker-card-flip">';
 
     // Имя игрока
-    html += '<div class="text-center mb-4">';
-    html += '  <div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-1">';
-    html += (data.isAuto ? '⏰ Авто-раскрытие' : '🃏 Раскрывает карту');
+    html += '  <div class="text-center mb-4">';
+    html += '    <div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-1">';
+    html += (data.isAuto ? '⏰ Авто-раскрытие' : (isMe ? '🃏 Вы раскрываете' : '🃏 Раскрывает карту'));
+    html += '    </div>';
+    html += '    <div class="text-xl font-black ' + (isMe ? 'text-accent-blue' : 'text-accent-gold') + '">' + escapeHtml(data.nickname) + '</div>';
     html += '  </div>';
-    html += '  <div class="text-xl font-black text-accent-gold">' + escapeHtml(data.nickname) + '</div>';
-    html += '</div>';
 
     // Большая карточка
-    html += '<div class="relative rounded-3xl overflow-hidden ' + cardType.gradient + ' shadow-2xl p-8 text-center" style="min-height: 200px;">';
+    html += '  <div class="relative rounded-3xl overflow-hidden ' + cardType.gradient + ' shadow-2xl p-8 text-center" style="min-height: 200px;">';
 
     // Badge
-    html += '  <div class="absolute top-0 left-0 right-0 h-10 bg-black/25 flex items-center justify-center">';
-    html += '    <span class="text-xs font-black uppercase tracking-[0.12em] text-white/70">' + cardType.emoji + ' ' + cardType.label + '</span>';
-    html += '  </div>';
+    html += '    <div class="absolute top-0 left-0 right-0 h-10 bg-black/25 flex items-center justify-center">';
+    html += '      <span class="text-xs font-black uppercase tracking-[0.12em] text-white/70">' + cardType.emoji + ' ' + cardType.label + '</span>';
+    html += '    </div>';
 
     // Значение
-    html += '  <div class="flex items-center justify-center" style="min-height: 140px; padding-top: 20px;">';
+    html += '    <div class="flex items-center justify-center" style="min-height: 140px; padding-top: 20px;">';
     var textSize = data.cardValue && data.cardValue.length > 40 ? 'text-lg' : 'text-2xl';
-    html += '    <span class="' + textSize + ' font-black text-white leading-tight drop-shadow-lg">';
+    html += '      <span class="' + textSize + ' font-black text-white leading-tight drop-shadow-lg">';
     html += escapeHtml(data.cardValue);
-    html += '    </span>';
+    html += '      </span>';
+    html += '    </div>';
+
+    // Shimmer + луч света
+    html += '    <div class="card-shimmer"></div>';
+    html += '    <div class="bunker-reveal-shine"></div>';
+
     html += '  </div>';
 
-    // Shimmer
-    html += '  <div class="card-shimmer"></div>';
-
-    html += '</div>';
-
-    html += '</div>'; // end flip
+    html += '  </div>'; // end flip
+    html += '</div>'; // end reveal-fx
 
     content.innerHTML = html;
     modal.classList.remove('hidden');
+
+    playSound(isMe ? 'success' : 'join');
 
     // Закрыть через 4 секунды или по клику
     var closeTimeout = setTimeout(function () {
@@ -909,8 +994,9 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
 
         var clickable = !isMe ? ' cursor-pointer hover:border-corp-light/20 transition-colors' : '';
 
-        html += '<div class="corp-card p-3' + borderClass + clickable + '"';
+        html += '<div class="corp-card p-3 emotion-anchor' + borderClass + clickable + '" data-player-id="' + p.id + '"';
         if (!isMe) html += ' data-player-detail="' + p.id + '"';
+        else html += ' data-emotion-self="1"';
         html += '>';
 
         // Имя + статус + счётчик
@@ -926,6 +1012,9 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
         html += '  <div class="text-[0.6rem] font-mono font-bold ' + (revealedCount > 0 ? 'text-accent-blue' : 'text-corp-dim') + ' flex-shrink-0 ml-2">';
         html += revealedCount + '/9';
         html += '  </div>';
+        if (state.isHost && !isMe && !isEliminated) {
+            html += '<button class="bunker-kick-btn flex-shrink-0 ml-2" data-bunker-kick="' + p.id + '" data-bunker-kick-name="' + escapeHtml(p.nickname) + '" title="Исключить из бункера">🚫</button>';
+        }
         html += '</div>';
 
         // Раскрытые карты — ЧИТАЕМЫЕ строки

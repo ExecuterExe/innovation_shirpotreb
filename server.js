@@ -8,7 +8,17 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+    etag: false,
+    lastModified: false,
+    setHeaders: function (res, filePath) {
+        if (/\.(js|css|html)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 
 // REST-эндпоинт для случайных комбинаций на welcome-экране
 app.get('/api/random-combo', (req, res) => {
@@ -2334,6 +2344,7 @@ function declineFeature(feature, gender) {
 const rooms = new Map();
 const playerRooms = new Map(); // ws -> { roomCode, playerId }
 const disconnectTimers = new Map(); // playerId -> setTimeout id
+const browserClients = new Set(); // WS connections not yet in a room
 const RECONNECT_TIMEOUT = 300000; // 5 минут на возврат (мобильные могут долго переподключаться)
 const ANON_NAMES = [
     'Богатый Волк', 'Миллионер из трущоб', 'Тихий Единорог', 'Крипто-Барон', 'Смелый Кальмар',
@@ -2396,6 +2407,10 @@ function createRoom(hostId, settings) {
             bunkerMode: !!settings.bunkerMode,
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
+            // Комната создаётся закрытой — хост сам решает, когда сделать её видимой в общем списке
+            roomPrivate: true,
+            roomPassword: '',
+            roomName: String(settings.roomName || '').trim().substring(0, 40),
         },
         players: new Map(),
         spectators: new Map(), // наблюдатели (зашли пока шла игра)
@@ -2537,13 +2552,48 @@ function getPlayersPublicInfo(room) {
             attractedInvestments: p.attractedInvestments,
             isHost: p.isHost,
             connected: p.connected,
-            eliminated: !!p.eliminated,  // ← ДОБАВЬ ЭТО
+            eliminated: !!p.eliminated,
             investorCups: p.investorCups || 0,
             entrepreneurMoneybags: p.entrepreneurMoneybags || 0,
-
         });
     });
     return players;
+}
+
+function getSpectatorsPublicInfo(room) {
+    if (!room.spectators) return [];
+    const specs = [];
+    room.spectators.forEach(s => {
+        specs.push({ id: s.id, nickname: s.nickname });
+    });
+    return specs;
+}
+
+function formatRelativeTime(room) {
+    if (!room.bunkerGameStartTime) return '';
+    var elapsed = Math.floor((Date.now() - room.bunkerGameStartTime) / 1000);
+    var m = Math.floor(elapsed / 60);
+    var s = elapsed % 60;
+    return '+' + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function sendChatMsg(room, type, text, playerId, nickname) {
+    // Чат в лобби всегда доступен; во время игры — только если включена настройка «Чат в бункере»
+    var chatAllowed = room.state === 'lobby' || (room.settings && room.settings.bunkerChat);
+    if (!chatAllowed) return;
+    if (!room.bunkerChat) room.bunkerChat = [];
+    var msg = {
+        id: uuidv4(),
+        type: type,
+        text: text,
+        playerId: playerId || null,
+        nickname: nickname || null,
+        relativeTime: formatRelativeTime(room),
+        ts: Date.now(),
+    };
+    room.bunkerChat.push(msg);
+    if (room.bunkerChat.length > 300) room.bunkerChat.shift();
+    broadcastToRoom(room, { type: 'chatBroadcast', msg: msg });
 }
 
 function getLobbyState(room) {
@@ -2551,6 +2601,7 @@ function getLobbyState(room) {
         type: 'lobbyUpdate',
         roomCode: room.code,
         players: getPlayersPublicInfo(room),
+        spectators: getSpectatorsPublicInfo(room),
         settings: room.settings,
         canStart: room.players.size >= 3,
     };
@@ -2765,6 +2816,8 @@ function sendCurrentStateToPlayer(room, player, ws) {
             activePlayers: activePlayers,
             remainingKicks: remaining - room.bunker.survivorsCount,
             tiedPlayers: room.bunker.tiedPlayers || [],
+            chatHistory: room.bunkerChat || [],
+            chatEnabled: !!(room.settings && room.settings.bunkerChat),
         }));
     } else if (roomState === 'preparation') {
         ws.send(JSON.stringify({
@@ -3445,6 +3498,7 @@ function showFinalResults(room) {
     }
 
     room.state = 'gameOver';
+    broadcastRoomsList();
     const players = getPlayersPublicInfo(room);
 
     let bestInvestor = null, maxCapital = -1;
@@ -3475,6 +3529,84 @@ function showFinalResults(room) {
 }
 
 // =====================================================================
+// СПИСОК ОТКРЫТЫХ КОМНАТ
+// =====================================================================
+
+const TAG_PRIORITY = ['bunker', 'blackSwan', 'events', 'streamer', 'pseudo', 'absurdGen', 'modifier', 'review', 'audience', 'defects', 'packaging', 'chat'];
+
+function getPublicRoomInfo(room) {
+    var s = room.settings || {};
+    var tags = [];
+
+    // Режимы — крупные теги
+    if (s.bunkerMode)              tags.push({ key: 'bunker',    label: '🏠 Бункер',         tier: 'major' });
+    if (s.blackSwan)               tags.push({ key: 'blackSwan', label: '🦢 Чёрный лебедь',  tier: 'major' });
+    if (s.useEvents)               tags.push({ key: 'events',    label: '🎲 События',         tier: 'major' });
+    if (s.streamerMode)            tags.push({ key: 'streamer',  label: '🎬 Стримерский',     tier: 'major' });
+    if (s.pseudoMode)              tags.push({ key: 'pseudo',    label: '🎯 Псевдо',          tier: 'major' });
+    if (s.cardSource === 'players') tags.push({ key: 'absurdGen', label: '🧟 Генератор',      tier: 'major' });
+    if (s.modifier && s.modifier !== 'none') tags.push({ key: 'modifier', label: s.modifier === 'addition' ? '📜 Дополнение' : '📜 Метафора', tier: 'minor' });
+
+    // Дополнительные карты — мелкие теги
+    if (s.useReviews)              tags.push({ key: 'review',    label: '💬 Отзыв',           tier: 'minor' });
+    if (s.useTargetAudience)       tags.push({ key: 'audience',  label: '👥 Аудитория',       tier: 'minor' });
+    if (s.useHiddenDefects)        tags.push({ key: 'defects',   label: '⚠️ Дефект',          tier: 'minor' });
+    if (s.usePackaging)            tags.push({ key: 'packaging', label: '📦 Упаковка',        tier: 'minor' });
+    if (s.bunkerChat)              tags.push({ key: 'chat',      label: '💬 Чат в игре',      tier: 'minor' });
+
+    var stateLabel, stateType;
+    if (room.state === 'lobby') {
+        stateLabel = 'В лобби';
+        stateType = 'lobby';
+    } else if (['bunkerReveal', 'bunkerVote', 'bunkerTieVote'].includes(room.state)) {
+        stateLabel = '🏠 Бункер идёт';
+        stateType = 'active';
+    } else if (room.state === 'bunkerGameOver') {
+        stateLabel = 'Завершена';
+        stateType = 'over';
+    } else {
+        stateLabel = 'Игра идёт';
+        stateType = 'active';
+    }
+
+    var hostPlayer = room.players.get(room.hostId);
+    return {
+        code: room.code,
+        roomName: s.roomName || '',
+        stateType,
+        stateLabel,
+        playerCount: room.players.size,
+        maxPlayers: s.maxPlayers || 8,
+        spectatorCount: room.spectators ? room.spectators.size : 0,
+        hostName: hostPlayer ? hostPlayer.nickname : '???',
+        tags,
+        rounds: s.rounds || 3,
+    };
+}
+
+// Комнаты в этих состояниях не имеет смысла показывать в списке —
+// игра завершена, а зайти можно только зрителем в уже неактуальный итог.
+var ROOM_LIST_HIDDEN_STATES = ['gameOver', 'bunkerGameOver'];
+
+function getPublicRoomsList() {
+    var list = [];
+    rooms.forEach(function(room) {
+        if (room.settings.roomPrivate) return;
+        if (ROOM_LIST_HIDDEN_STATES.includes(room.state)) return;
+        list.push(getPublicRoomInfo(room));
+    });
+    return list;
+}
+
+function broadcastRoomsList() {
+    var list = getPublicRoomsList();
+    var msg = JSON.stringify({ type: 'roomsList', rooms: list });
+    browserClients.forEach(function(client) {
+        if (client.readyState === 1) client.send(msg);
+    });
+}
+
+// =====================================================================
 // WEBSOCKET ОБРАБОТЧИК
 // =====================================================================
 
@@ -3484,6 +3616,10 @@ wss.on('connection', (ws) => {
 
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
+
+    // Отслеживаем незарегистрированных клиентов и шлём им список комнат
+    browserClients.add(ws);
+    ws.send(JSON.stringify({ type: 'roomsList', rooms: getPublicRoomsList() }));
     // AFK таймер — 10 минут без активности
     var AFK_TIMEOUT = 10 * 60 * 1000; // 10 минут
     var afkTimer = null;
@@ -3527,9 +3663,11 @@ wss.on('connection', (ws) => {
                 const room = createRoom(playerId, msg.settings || {});
                 addPlayer(room, playerId, nickname, ws);
                 playerRooms.set(ws, { roomCode: room.code, playerId });
+                browserClients.delete(ws);
 
                 ws.send(JSON.stringify({ type: 'roomCreated', roomCode: room.code, playerId }));
                 broadcastToRoom(room, getLobbyState(room));
+                broadcastRoomsList();
                 console.log(`[ROOM] ${room.code} created by "${nickname}"`);
                 break;
             }
@@ -3663,6 +3801,21 @@ wss.on('connection', (ws) => {
                     clearTimer(room);
                     processBunkerTieVotes(room);
                 }
+                break;
+            }
+
+            // ==================== БУНКЕР: ВЕДУЩИЙ ИСКЛЮЧАЕТ ИГРОКА ====================
+            case 'bunkerHostKick': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.hostId !== info.playerId) return;
+                if (!BUNKER_ACTIVE_STATES.includes(room.state)) return;
+
+                const targetId = msg.targetPlayerId;
+                if (!targetId || targetId === room.hostId) return;
+
+                hostKickFromBunker(room, targetId);
                 break;
             }
 
@@ -3825,6 +3978,93 @@ wss.on('connection', (ws) => {
                 });
                 console.log(`[PLAY AGAIN] Room ${paRoom.code} reset to lobby`);
                 broadcastToRoom(paRoom, getLobbyState(paRoom));
+                broadcastRoomsList();
+                break;
+            }
+
+            // ==================== ВЫХОД ИЗ КОМНАТЫ ====================
+            case 'leaveRoom': {
+                var lvInfo = playerRooms.get(ws);
+                if (!lvInfo) break;
+                var lvRoom = rooms.get(lvInfo.roomCode);
+                if (!lvRoom) break;
+                if (lvInfo.isSpectator && lvRoom.spectators) {
+                    lvRoom.spectators.delete(lvInfo.playerId);
+                    playerRooms.delete(ws);
+                    broadcastToRoom(lvRoom, { type: 'spectatorsUpdate', spectators: getSpectatorsPublicInfo(lvRoom) });
+                    // Клиент вернулся на главную — снова считаем его "браузером" комнат
+                    browserClients.add(ws);
+                    ws.send(JSON.stringify({ type: 'roomsList', rooms: getPublicRoomsList() }));
+                    broadcastRoomsList();
+                    break;
+                }
+                var lvPlayer = lvRoom.players.get(lvInfo.playerId);
+                if (!lvPlayer) break;
+                lvRoom.players.delete(lvInfo.playerId);
+                playerRooms.delete(ws);
+                var lvTimer = disconnectTimers.get(lvInfo.playerId);
+                if (lvTimer) { clearTimeout(lvTimer); disconnectTimers.delete(lvInfo.playerId); }
+                console.log(`[LEAVE] "${lvPlayer.nickname}" left ${lvRoom.code}`);
+                if (lvRoom.players.size === 0 && (!lvRoom.spectators || lvRoom.spectators.size === 0)) {
+                    clearTimer(lvRoom);
+                    rooms.delete(lvRoom.code);
+                } else {
+                    if (lvRoom.hostId === lvInfo.playerId) {
+                        var lvFirst = lvRoom.players.values().next().value;
+                        if (lvFirst) { lvRoom.hostId = lvFirst.id; lvFirst.isHost = true; }
+                    }
+                    broadcastToRoom(lvRoom, { type: 'playerLeft', playerId: lvInfo.playerId, nickname: lvPlayer.nickname, players: getPlayersPublicInfo(lvRoom) });
+                    if (lvRoom.state === 'lobby') broadcastToRoom(lvRoom, getLobbyState(lvRoom));
+                    else maybeEndGameForLowPlayerCount(lvRoom, lvInfo.playerId);
+                }
+                // Клиент вернулся на главную — снова считаем его "браузером" комнат
+                browserClients.add(ws);
+                ws.send(JSON.stringify({ type: 'roomsList', rooms: getPublicRoomsList() }));
+                broadcastRoomsList();
+                break;
+            }
+
+            // ==================== ЧАТ БУНКЕРА ====================
+            case 'chatMessage': {
+                var cmInfo = playerRooms.get(ws);
+                if (!cmInfo) break;
+                var cmRoom = rooms.get(cmInfo.roomCode);
+                if (!cmRoom) break;
+                // Чат в лобби всегда доступен; во время игры — только если включена настройка «Чат в бункере»
+                if (cmRoom.state !== 'lobby' && (!cmRoom.settings || !cmRoom.settings.bunkerChat)) break;
+                var cmPlayer = cmInfo.isSpectator
+                    ? (cmRoom.spectators && cmRoom.spectators.get(cmInfo.playerId))
+                    : cmRoom.players.get(cmInfo.playerId);
+                if (!cmPlayer) break;
+                var cmText = (msg.text || '').trim().substring(0, 300);
+                if (!cmText) break;
+                // Определяем тип сообщения. Команда !питч имеет смысл только во время игры —
+                // в лобби ещё некому и нечего презентовать, поэтому там она не обрабатывается.
+                var cmType = 'general';
+                if (cmRoom.state !== 'lobby' && /^!питч\s+/i.test(cmText)) {
+                    cmType = 'pitch';
+                    cmText = cmText.replace(/^!питч\s+/i, '').trim();
+                }
+                sendChatMsg(cmRoom, cmType, cmText, cmPlayer.id, cmPlayer.nickname);
+                break;
+            }
+
+            // ==================== ЧАТ: ВЕДУЩИЙ УДАЛЯЕТ СООБЩЕНИЕ ====================
+            case 'deleteChatMessage': {
+                var dcInfo = playerRooms.get(ws);
+                if (!dcInfo) break;
+                var dcRoom = rooms.get(dcInfo.roomCode);
+                if (!dcRoom || dcRoom.hostId !== dcInfo.playerId) break;
+                if (!dcRoom.bunkerChat) break;
+
+                var dcMessageId = msg.messageId;
+                if (!dcMessageId) break;
+
+                var dcIdx = dcRoom.bunkerChat.findIndex(function (m) { return m.id === dcMessageId; });
+                if (dcIdx === -1) break;
+                dcRoom.bunkerChat.splice(dcIdx, 1);
+
+                broadcastToRoom(dcRoom, { type: 'chatMessageDeleted', messageId: dcMessageId });
                 break;
             }
 
@@ -3841,6 +4081,15 @@ wss.on('connection', (ws) => {
                     ws.send(JSON.stringify({ type: 'error', message: 'Комната «' + code + '» не найдена. Проверьте код.' }));
                     return;
                 }
+                // Проверка пароля для закрытых комнат
+                if (room.settings && room.settings.roomPrivate) {
+                    var enteredPw = (msg.password || '').trim();
+                    var correctPw = (room.settings.roomPassword || '').trim();
+                    if (enteredPw !== correctPw) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Неверный пароль. Комната закрытая.' }));
+                        return;
+                    }
+                }
                 if (room.state !== 'lobby') {
                     // Игра идёт — проверяем, может это реконнект по никнейму
                     let rejoinPlayer = null;
@@ -3856,6 +4105,7 @@ wss.on('connection', (ws) => {
                         rejoinPlayer.ws = ws;
                         rejoinPlayer.connected = true;
                         playerRooms.set(ws, { roomCode: room.code, playerId: rejoinPlayer.id });
+                        browserClients.delete(ws);
                         ws.send(JSON.stringify({ type: 'roomJoined', roomCode: room.code, playerId: rejoinPlayer.id, rejoining: true }));
                         broadcastToRoom(room, {
                             type: 'playerReconnected',
@@ -3866,18 +4116,35 @@ wss.on('connection', (ws) => {
                         sendCurrentStateToPlayer(room, rejoinPlayer, ws);
                         console.log(`[REJOIN] "${nickname}" rejoined ${code}`);
                     } else {
+                        // Проверяем что ник не занят активным игроком
+                        var nickConflict = false;
+                        room.players.forEach(function(p) {
+                            if (p.nickname.toLowerCase() === nickname.toLowerCase() && p.connected) {
+                                nickConflict = true;
+                            }
+                        });
+                        if (nickConflict) {
+                            ws.send(JSON.stringify({ type: 'error', message: 'Ник «' + nickname + '» уже занят игроком в этой комнате.' }));
+                            return;
+                        }
                         // Новый ник — добавляем зрителем
                         var specId = uuidv4();
                         var spectator = { id: specId, nickname: nickname, ws: ws };
                         if (!room.spectators) room.spectators = new Map();
                         room.spectators.set(specId, spectator);
                         playerRooms.set(ws, { roomCode: room.code, playerId: specId, isSpectator: true });
+                        browserClients.delete(ws);
                         ws.send(JSON.stringify({
                             type: 'joinedAsSpectator',
                             roomCode: room.code,
                             playerId: specId,
                             message: 'Игра уже идёт. Вы смотрите как зритель.',
                         }));
+                        // Уведомляем комнату о новом зрителе
+                        broadcastToRoom(room, {
+                            type: 'spectatorsUpdate',
+                            spectators: getSpectatorsPublicInfo(room),
+                        });
                         sendCurrentStateToPlayer(room, { id: specId, cards: {}, actionCards: [] }, ws);
                         console.log(`[SPECTATOR] "${nickname}" joined ${code} as spectator`);
                     }
@@ -3899,10 +4166,26 @@ wss.on('connection', (ws) => {
 
                 addPlayer(room, playerId, nickname, ws);
                 playerRooms.set(ws, { roomCode: room.code, playerId });
+                browserClients.delete(ws);
 
                 ws.send(JSON.stringify({ type: 'roomJoined', roomCode: room.code, playerId }));
                 broadcastToRoom(room, getLobbyState(room));
+                broadcastRoomsList();
                 console.log(`[JOIN] "${nickname}" joined ${code}`);
+                break;
+            }
+
+            // ==================== ЭМОЦИЯ ИГРОКА ====================
+            case 'playerEmotion': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                const player = room && room.players.get(info.playerId);
+                if (!room || !player) return;
+                const VALID_EMOTIONS = ['laugh','angry','scared','love','think','mindblown'];
+                const em = String(msg.emotion || '');
+                if (!VALID_EMOTIONS.includes(em)) return;
+                broadcastToRoom(room, { type: 'playerEmotion', playerId: info.playerId, nickname: player.nickname, emotion: em });
                 break;
             }
 
@@ -3924,6 +4207,11 @@ wss.on('connection', (ws) => {
                 if (s.usePackaging !== undefined) room.settings.usePackaging = !!s.usePackaging;
                 if (s.bunkerMode !== undefined) room.settings.bunkerMode = !!s.bunkerMode;
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
+                if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
+                if (s.chatTTS !== undefined) room.settings.chatTTS = !!s.chatTTS;
+                if (s.roomPrivate !== undefined) room.settings.roomPrivate = !!s.roomPrivate;
+                if (s.roomPassword !== undefined) room.settings.roomPassword = String(s.roomPassword || '').trim().substring(0, 30);
+                if (s.roomName !== undefined) room.settings.roomName = String(s.roomName || '').trim().substring(0, 40);
                 if (s.prepTime !== undefined) room.settings.prepTime = Math.min(600, Math.max(10, parseInt(s.prepTime) || 120));
                 if (s.maxPlayers !== undefined) room.settings.maxPlayers = Math.min(18, Math.max(3, parseInt(s.maxPlayers) || 8));
                 if (s.presentTime !== undefined) room.settings.presentTime = Math.min(600, Math.max(10, parseInt(s.presentTime) || 120));
@@ -3962,6 +4250,7 @@ wss.on('connection', (ws) => {
                 room.totalRounds = room.settings.rounds;
 
                 broadcastToRoom(room, getLobbyState(room));
+                broadcastRoomsList();
                 break;
             }
 
@@ -3982,6 +4271,7 @@ wss.on('connection', (ws) => {
                 } else {
                     startGame(room);
                 }
+                broadcastRoomsList();
                 break;
             }
             case 'playerReady': {
@@ -4163,6 +4453,7 @@ wss.on('connection', (ws) => {
                         processInvestments(room);
                     }
                 }
+                if (room.state !== 'lobby') maybeEndGameForLowPlayerCount(room, targetId);
                 break;
             }
 
@@ -4445,14 +4736,19 @@ wss.on('connection', (ws) => {
     // ==================== ОТКЛЮЧЕНИЕ ====================
     ws.on('close', () => {
         if (afkTimer) { clearTimeout(afkTimer); afkTimer = null; }
+        browserClients.delete(ws);
         const info = playerRooms.get(ws);
         if (info) {
             const room = rooms.get(info.roomCode);
             if (room) {
-                // Если это зритель — просто удаляем без лишних уведомлений
+                // Если это зритель — удаляем и уведомляем
                 if (info.isSpectator && room.spectators) {
                     room.spectators.delete(info.playerId);
                     playerRooms.delete(ws);
+                    broadcastToRoom(room, {
+                        type: 'spectatorsUpdate',
+                        spectators: getSpectatorsPublicInfo(room),
+                    });
                     return;
                 }
                 const player = room.players.get(info.playerId);
@@ -4478,6 +4774,7 @@ wss.on('connection', (ws) => {
                             }
                             broadcastToRoom(room, getLobbyState(room));
                         }
+                        broadcastRoomsList();
                     } else {
                         // Во время игры — даём 15 сек на возврат
                         broadcastToRoom(room, {
@@ -4638,9 +4935,16 @@ function handleBunkerActionCard(room, player, msg) {
         player.actionCards.splice(cardIdx, 1);
     }
     function sendMyUpdate(extra) {
-        sendToPlayer(room, player.id, Object.assign({ type: 'bunkerActionCardUpdate', updatedCards: player.cards, myActionCards: player.actionCards }, extra || {}));
+        sendToPlayer(room, player.id, Object.assign({
+            type: 'bunkerActionCardUpdate',
+            updatedCards: player.cards,
+            myActionCards: player.actionCards,
+            cardName: cardDef.name,
+            emoji: cardDef.emoji,
+        }, extra || {}));
     }
     function broadcastPlayed(effect, extra) {
+        sendChatMsg(room, 'event', effect);
         broadcastToRoom(room, Object.assign({
             type: 'bunkerActionCardPlayed',
             playerId: player.id,
@@ -4670,7 +4974,11 @@ function handleBunkerActionCard(room, player, msg) {
             if (!drawn) return { error: 'Не удалось вытянуть карту.' };
             player.cards[key] = drawn.value;
             if (key === 'item' && drawn.gender) redeclineForItem(player, drawn.gender);
-            markUsed(); sendMyUpdate();
+            markUsed();
+            sendMyUpdate({
+                ownerEffect: 'Ваш(а) «' + (CARD_KEY_LABELS[key] || key) + '» теперь: ' + drawn.value,
+                changedCards: [key],
+            });
             broadcastPlayed(player.nickname + ' сыграл «' + cardDef.name + '»');
             return { ok: true };
         }
@@ -4684,6 +4992,7 @@ function handleBunkerActionCard(room, player, msg) {
             });
             if (eligible.length < 2) return { error: 'Недостаточно игроков для перемешивания.' };
             var values = shuffle(eligible.map(id => room.players.get(id).cards[key]));
+            var keyLabel = CARD_KEY_LABELS[key] || key;
             eligible.forEach((id, i) => {
                 var p = room.players.get(id);
                 p.cards[key] = values[i];
@@ -4692,9 +5001,21 @@ function handleBunkerActionCard(room, player, msg) {
                     for (var ii = 0; ii < ITEMS.length; ii++) { if (ITEMS[ii].word === values[i]) { itemObj = ITEMS[ii]; break; } }
                     if (itemObj) redeclineForItem(p, itemObj.gender);
                 }
-                sendToPlayer(room, id, { type: 'bunkerActionCardUpdate', updatedCards: p.cards, myActionCards: p.actionCards || [] });
+                var isOwner = id === player.id;
+                sendToPlayer(room, id, {
+                    type: 'bunkerActionCardUpdate',
+                    updatedCards: p.cards,
+                    myActionCards: p.actionCards || [],
+                    cardName: cardDef.name,
+                    emoji: cardDef.emoji,
+                    ownerEffect: isOwner
+                        ? ('Все получили новую «' + keyLabel + '». Ваша: ' + values[i])
+                        : ('Ваш(а) «' + keyLabel + '» изменился(-ась) на: ' + values[i]),
+                    changedCards: [key],
+                    fromPlayer: isOwner ? null : player.nickname,
+                });
             });
-            markUsed(); sendMyUpdate();
+            markUsed();
             broadcastPlayed(player.nickname + ' сыграл «' + cardDef.name + '»: ' + eligible.length + ' игроков получили новые карты', { affectedCount: eligible.length });
             return { ok: true };
         }
@@ -4716,9 +5037,27 @@ function handleBunkerActionCard(room, player, msg) {
                 if (theirItem) redeclineForItem(target, theirItem.gender);
             }
             markUsed();
-            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, myActionCards: player.actionCards });
-            sendToPlayer(room, targetPlayerId, { type: 'bunkerActionCardUpdate', updatedCards: target.cards, myActionCards: target.actionCards || [] });
-            broadcastPlayed(player.nickname + ' поменялся «' + key + '» с ' + target.nickname, { targetNickname: target.nickname });
+            var swapLabel = CARD_KEY_LABELS[key] || key;
+            sendToPlayer(room, player.id, {
+                type: 'bunkerActionCardUpdate',
+                updatedCards: player.cards,
+                myActionCards: player.actionCards,
+                cardName: cardDef.name,
+                emoji: cardDef.emoji,
+                ownerEffect: 'Обмен с ' + target.nickname + '! Ваш(а) новый(-ая) «' + swapLabel + '»: ' + player.cards[key],
+                changedCards: [key],
+            });
+            sendToPlayer(room, targetPlayerId, {
+                type: 'bunkerActionCardUpdate',
+                updatedCards: target.cards,
+                myActionCards: target.actionCards || [],
+                cardName: cardDef.name,
+                emoji: cardDef.emoji,
+                ownerEffect: player.nickname + ' поменялся с вами! Ваш(а) новый(-ая) «' + swapLabel + '»: ' + target.cards[key],
+                changedCards: [key],
+                fromPlayer: player.nickname,
+            });
+            broadcastPlayed(player.nickname + ' поменялся «' + swapLabel + '» с ' + target.nickname, { targetNickname: target.nickname });
             return { ok: true };
         }
 
@@ -4729,7 +5068,16 @@ function handleBunkerActionCard(room, player, msg) {
             if (!room.bunker.extraCards[player.id]) room.bunker.extraCards[player.id] = {};
             room.bunker.extraCards[player.id].feature = target.cards.feature;
             markUsed();
-            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, extraCards: room.bunker.extraCards[player.id], myActionCards: player.actionCards });
+            sendToPlayer(room, player.id, {
+                type: 'bunkerActionCardUpdate',
+                updatedCards: player.cards,
+                extraCards: room.bunker.extraCards[player.id],
+                myActionCards: player.actionCards,
+                cardName: cardDef.name,
+                emoji: cardDef.emoji,
+                ownerEffect: 'Скопировано у ' + target.nickname + '. Их «Особенность»: ' + target.cards.feature,
+                extraSlot: 'feature',
+            });
             broadcastPlayed(player.nickname + ' скопировал «Особенность» у ' + target.nickname, { targetNickname: target.nickname });
             return { ok: true };
         }
@@ -4740,7 +5088,10 @@ function handleBunkerActionCard(room, player, msg) {
             if (!target || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
             if ((room.bunker.revealedCards[targetPlayerId] || {})['feature']) return { error: 'Особенность этого игрока уже раскрыта.' };
             bunkerRevealCard(room, targetPlayerId, 'feature', false);
-            markUsed(); sendMyUpdate();
+            markUsed();
+            sendMyUpdate({
+                ownerEffect: 'Вы вскрыли «Особенность» игрока ' + target.nickname + '. Смотрите её карточку!',
+            });
             broadcastPlayed(player.nickname + ' вынудил ' + target.nickname + ' вскрыть «Особенность»!', { targetNickname: target.nickname });
             return { ok: true };
         }
@@ -4752,14 +5103,27 @@ function handleBunkerActionCard(room, player, msg) {
             if (!room.bunker.extraCards[player.id]) room.bunker.extraCards[player.id] = {};
             room.bunker.extraCards[player.id][targetCardKey] = drawn.value;
             markUsed();
-            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, extraCards: room.bunker.extraCards[player.id], myActionCards: player.actionCards });
-            broadcastPlayed(player.nickname + ' вытянул вторую карту «' + targetCardKey + '»!');
+            var extraLabel = CARD_KEY_LABELS[targetCardKey] || targetCardKey;
+            sendToPlayer(room, player.id, {
+                type: 'bunkerActionCardUpdate',
+                updatedCards: player.cards,
+                extraCards: room.bunker.extraCards[player.id],
+                myActionCards: player.actionCards,
+                cardName: cardDef.name,
+                emoji: cardDef.emoji,
+                ownerEffect: 'Дополнительная карта «' + extraLabel + '»: ' + drawn.value,
+                extraSlot: targetCardKey,
+            });
+            broadcastPlayed(player.nickname + ' вытянул вторую карту «' + extraLabel + '»!');
             return { ok: true };
         }
 
         case 'voteDouble': {
             room.bunker.voteMultipliers[player.id] = 2;
-            markUsed(); sendMyUpdate();
+            markUsed();
+            sendMyUpdate({
+                ownerEffect: 'Ваш голос в этом голосовании удвоен (x2)!',
+            });
             broadcastPlayed(player.nickname + ' удвоил свой голос в этом голосовании!');
             return { ok: true };
         }
@@ -4769,7 +5133,10 @@ function handleBunkerActionCard(room, player, msg) {
             var target = room.players.get(targetPlayerId);
             if (!target || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
             room.bunker.voteTargetMultipliers[targetPlayerId] = 2;
-            markUsed(); sendMyUpdate();
+            markUsed();
+            sendMyUpdate({
+                ownerEffect: 'Голоса против ' + target.nickname + ' в этом голосовании удвоены (x2)!',
+            });
             broadcastPlayed(player.nickname + ' запустил «Чёрный пиар» против ' + target.nickname + '! Голоса против него удваиваются.', { targetNickname: target.nickname, targetPlayerId: targetPlayerId });
             return { ok: true };
         }
@@ -4784,8 +5151,13 @@ function handleBunkerActionCard(room, player, msg) {
             if (!sourceVal) return { error: 'Карта не найдена у выбывшего игрока.' };
             if ((room.bunker.revealedCards[player.id] || {})[targetCardKey]) return { error: 'Ваша карта уже раскрыта.' };
             player.cards[targetCardKey] = sourceVal;
-            markUsed(); sendMyUpdate();
-            broadcastPlayed(player.nickname + ' поглотил карту «' + targetCardKey + '» у ' + target.nickname, { targetNickname: target.nickname });
+            markUsed();
+            var absorbLabel = CARD_KEY_LABELS[targetCardKey] || targetCardKey;
+            sendMyUpdate({
+                ownerEffect: 'Поглощено у ' + target.nickname + '. Ваш(а) новый(-ая) «' + absorbLabel + '»: ' + sourceVal,
+                changedCards: [targetCardKey],
+            });
+            broadcastPlayed(player.nickname + ' поглотил карту «' + absorbLabel + '» у ' + target.nickname, { targetNickname: target.nickname });
             return { ok: true };
         }
 
@@ -4798,8 +5170,19 @@ function handleBunkerActionCard(room, player, msg) {
             if (!drawn) return { error: 'Не удалось вытянуть карту.' };
             player.cards[myCardKey] = drawn.value;
             markUsed();
-            sendToPlayer(room, player.id, { type: 'bunkerActionCardUpdate', updatedCards: player.cards, myActionCards: player.actionCards, wildcardNote: { slot: myCardKey, fromDeck: randomKey } });
-            broadcastPlayed(player.nickname + ' сыграл «Биткоин-прыжок»: случайная карта вместо «' + myCardKey + '»!');
+            var wcMyLabel = CARD_KEY_LABELS[myCardKey] || myCardKey;
+            var wcFromLabel = CARD_KEY_LABELS[randomKey] || randomKey;
+            sendToPlayer(room, player.id, {
+                type: 'bunkerActionCardUpdate',
+                updatedCards: player.cards,
+                myActionCards: player.actionCards,
+                cardName: cardDef.name,
+                emoji: cardDef.emoji,
+                wildcardNote: { slot: myCardKey, fromDeck: randomKey },
+                ownerEffect: 'Ваш(а) «' + wcMyLabel + '» заменён(-а) картой из колоды «' + wcFromLabel + '»: ' + drawn.value,
+                changedCards: [myCardKey],
+            });
+            broadcastPlayed(player.nickname + ' сыграл «Биткоин-прыжок»: случайная карта вместо «' + wcMyLabel + '»!');
             return { ok: true };
         }
 
@@ -4809,8 +5192,20 @@ function handleBunkerActionCard(room, player, msg) {
             if (!target || !target.cards || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
             if (!target.cards.hiddenDefect) return { error: 'У этого игрока нет скрытого дефекта.' };
             target.cards.hiddenDefect = null;
-            markUsed(); sendMyUpdate();
-            sendToPlayer(room, targetPlayerId, { type: 'bunkerActionCardUpdate', updatedCards: target.cards, myActionCards: target.actionCards || [] });
+            markUsed();
+            sendMyUpdate({
+                ownerEffect: 'Вы удалили «Скрытый дефект» у ' + target.nickname + '!',
+            });
+            sendToPlayer(room, targetPlayerId, {
+                type: 'bunkerActionCardUpdate',
+                updatedCards: target.cards,
+                myActionCards: target.actionCards || [],
+                cardName: cardDef.name,
+                emoji: cardDef.emoji,
+                ownerEffect: player.nickname + ' удалил ваш «Скрытый дефект»!',
+                changedCards: ['hiddenDefect'],
+                fromPlayer: player.nickname,
+            });
             broadcastPlayed(player.nickname + ' «Донатил» ' + target.nickname + ': скрытый дефект удалён!', { targetNickname: target.nickname });
             return { ok: true };
         }
@@ -4907,6 +5302,9 @@ function startBunkerGame(room) {
         });
     });
 
+    room.bunkerChat = [];
+    room.bunkerGameStartTime = Date.now();
+
     room.bunker = {
         enabled: true,
         globalProblem: problem,
@@ -4950,8 +5348,13 @@ function startBunkerGame(room) {
             eliminatedPlayers: [],
             players: getPlayersPublicInfo(room),
             hostMode: !!room.settings.bunkerHostMode,
+            chatHistory: room.bunkerChat || [],
+            chatEnabled: !!(room.settings && room.settings.bunkerChat),
         });
     });
+
+    // Системное сообщение старта
+    sendChatMsg(room, 'system', 'Игра в бункере началась! Глобальная катастрофа: ' + problem);
 
     // Запускаем таймер на первый ход (в режиме ведущего таймера нет)
     if (!room.settings.bunkerHostMode) {
@@ -4965,6 +5368,39 @@ function getBunkerActivePlayers(room) {
     return room.bunker.revealOrder.filter(id => {
         return !room.bunker.eliminatedPlayers.includes(id);
     });
+}
+
+// Состояния активной игры (не лобби и не уже завершённая игра) —
+// именно в них нужно следить, что игроков не осталось слишком мало.
+var BUNKER_ACTIVE_STATES = ['bunkerReveal', 'bunkerVote', 'bunkerTieVote'];
+var REGULAR_ACTIVE_STATES = ['cardInput', 'preparation', 'presentation', 'investing', 'roundResults', 'tiebreaker_prep', 'tiebreaker', 'tiebreaker_voting'];
+
+// Если во время игры (уход по кнопке «Выйти», кик хостом и т.п.) активных игроков
+// осталось 1 или меньше — продолжать нечего, завершаем партию и показываем итоги.
+function maybeEndGameForLowPlayerCount(room, leavingPlayerId) {
+    if (!room) return false;
+
+    if (BUNKER_ACTIVE_STATES.includes(room.state)) {
+        // Игрок, покинувший комнату посреди бункера, считается выбывшим —
+        // иначе getBunkerActivePlayers() будет и дальше считать его «живым».
+        if (leavingPlayerId && room.bunker && room.bunker.revealOrder &&
+            room.bunker.revealOrder.includes(leavingPlayerId) &&
+            !room.bunker.eliminatedPlayers.includes(leavingPlayerId)) {
+            room.bunker.eliminatedPlayers.push(leavingPlayerId);
+        }
+        if (getBunkerActivePlayers(room).length <= 1) {
+            clearTimer(room);
+            endBunkerGame(room);
+            return true;
+        }
+    } else if (REGULAR_ACTIVE_STATES.includes(room.state)) {
+        if (room.players.size <= 1) {
+            clearTimer(room);
+            showFinalResults(room);
+            return true;
+        }
+    }
+    return false;
 }
 
 function bunkerAutoAdvanceTurn(room) {
@@ -5004,6 +5440,12 @@ function getUnrevealedCards(room, playerId) {
     return unrevealed;
 }
 
+var CARD_KEY_LABELS = {
+    adjective: 'Прилагательное', item: 'Предмет', modifier: 'Модификатор',
+    feature: 'Особенность', gift: 'Бонус', hiddenDefect: 'Скрытый дефект',
+    packaging: 'Упаковка', review: 'Отзыв', historicalFact: 'Исторический факт',
+};
+
 function bunkerRevealCard(room, playerId, cardKey, isAuto) {
     if (!room.bunker.revealedCards[playerId]) return;
     if (room.bunker.revealedCards[playerId][cardKey]) return; // уже раскрыта
@@ -5012,16 +5454,20 @@ function bunkerRevealCard(room, playerId, cardKey, isAuto) {
 
     var player = room.players.get(playerId);
     var cardValue = player && player.cards ? player.cards[cardKey] : '???';
+    var cardLabel = CARD_KEY_LABELS[cardKey] || cardKey;
+    var nick = player ? player.nickname : '???';
 
     broadcastToRoom(room, {
         type: 'bunkerCardRevealed',
         playerId: playerId,
-        nickname: player ? player.nickname : '???',
+        nickname: nick,
         cardKey: cardKey,
         cardValue: cardValue,
         revealedCards: room.bunker.revealedCards,
         isAuto: !!isAuto,
     });
+
+    sendChatMsg(room, 'system', nick + ' открыл ' + cardLabel + ': ' + cardValue);
 }
 
 function showBunkerCurrentTurn(room) {
@@ -5035,6 +5481,8 @@ function showBunkerCurrentTurn(room) {
 
     var currentPlayerId = activePlayers[room.bunker.currentTurnIndex];
     room.bunker.hasRevealedThisTurn = false;
+    var currentNick = room.players.get(currentPlayerId) ? room.players.get(currentPlayerId).nickname : '???';
+    sendChatMsg(room, 'system', 'Раунд ' + (room.bunker.currentRound + 1) + ' — ход игрока ' + currentNick);
     broadcastToRoom(room, {
         type: 'bunkerTurn',
         currentPlayerId: currentPlayerId,
@@ -5056,6 +5504,7 @@ function showBunkerCurrentTurn(room) {
 }
 
 function startBunkerVoting(room) {
+    sendChatMsg(room, 'event', 'Начинается голосование! Выберите кого исключить из бункера.');
     // После раунда 1 голосование пропускаем — по одному предмету нечестно оценивать
     if (room.bunker.currentRound === 0) {
         broadcastToRoom(room, {
@@ -5340,6 +5789,7 @@ function eliminateFromBunker(room, eliminatedId, voteCounts) {
 
     var player = room.players.get(eliminatedId);
     if (player) player.eliminated = true;
+    sendChatMsg(room, 'alert', 'Игрок ' + (player ? player.nickname : '???') + ' выгнан из бункера!');
 
     // Раскрываем ВСЕ карты кикнутого
     var allCards = {};
@@ -5373,10 +5823,99 @@ function eliminateFromBunker(room, eliminatedId, voteCounts) {
     }
 }
 
+// Ведущий принудительно исключает игрока из бункера прямо во время игры
+// (в отличие от eliminateFromBunker — не завязано на итоги голосования,
+// поэтому аккуратно чинит currentTurnIndex/зависшие голоса самостоятельно).
+function hostKickFromBunker(room, targetId) {
+    var target = room.players.get(targetId);
+    if (!target) return false;
+    if (!room.bunker.revealOrder.includes(targetId)) return false;
+    if (room.bunker.eliminatedPlayers.includes(targetId)) return false;
+
+    var wasRevealing = room.state === 'bunkerReveal';
+    var activeBefore = wasRevealing ? getBunkerActivePlayers(room) : null;
+    var kickedIndex = wasRevealing ? activeBefore.indexOf(targetId) : -1;
+
+    room.bunker.eliminatedPlayers.push(targetId);
+    target.eliminated = true;
+
+    if (room.bunker.revealedCards[targetId]) {
+        getBunkerCardKeys().forEach(key => {
+            room.bunker.revealedCards[targetId][key] = true;
+        });
+    }
+
+    sendChatMsg(room, 'alert', 'Ведущий исключил ' + target.nickname + ' из бункера!');
+
+    var activeAfter = getBunkerActivePlayers(room);
+
+    broadcastToRoom(room, {
+        type: 'bunkerPlayerKicked',
+        playerId: targetId,
+        nickname: target.nickname,
+        revealedCards: room.bunker.revealedCards,
+        eliminatedPlayers: room.bunker.eliminatedPlayers,
+        remainingPlayers: activeAfter.length,
+        players: getPlayersPublicInfo(room),
+    });
+
+    // Игроков осталось мало — партия естественным образом закончена
+    if (activeAfter.length <= room.bunker.survivorsCount) {
+        clearTimer(room);
+        setTimeout(() => { endBunkerGame(room); }, 3000);
+        return true;
+    }
+
+    if (room.state === 'bunkerVote') {
+        // Иначе голосование зависнет — исключённый должен «проголосовать» автоматически
+        if (!room.bunker.votes.has(targetId)) room.bunker.votes.set(targetId, '__skip__');
+        var activeCountHK = 0, votedCountHK = 0;
+        room.players.forEach(p => {
+            if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
+                activeCountHK++;
+                if (room.bunker.votes.has(p.id)) votedCountHK++;
+            }
+        });
+        if (votedCountHK >= activeCountHK) {
+            clearTimer(room);
+            processBunkerVotes(room);
+        } else {
+            broadcastToRoom(room, { type: 'bunkerVoteProgress', voted: votedCountHK, total: activeCountHK });
+        }
+    } else if (room.state === 'bunkerTieVote') {
+        if (!room.bunker.tieVotes.has(targetId)) room.bunker.tieVotes.set(targetId, '__skip__');
+        var activeCountHK2 = 0, votedCountHK2 = 0;
+        room.players.forEach(p => {
+            if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
+                activeCountHK2++;
+                if (room.bunker.tieVotes.has(p.id)) votedCountHK2++;
+            }
+        });
+        if (votedCountHK2 >= activeCountHK2) {
+            clearTimer(room);
+            processBunkerTieVotes(room);
+        } else {
+            broadcastToRoom(room, { type: 'bunkerTieVoteProgress', voted: votedCountHK2, total: activeCountHK2 });
+        }
+    } else if (wasRevealing && kickedIndex !== -1) {
+        if (kickedIndex === room.bunker.currentTurnIndex) {
+            // Кикнули как раз того, чей был ход — переходим к следующему игроку
+            clearTimer(room);
+            showBunkerCurrentTurn(room);
+        } else if (kickedIndex < room.bunker.currentTurnIndex) {
+            // Индекс текущего игрока сместился из-за удаления элемента перед ним в списке активных
+            room.bunker.currentTurnIndex--;
+        }
+    }
+
+    return true;
+}
+
 function startNextBunkerRound(room) {
     room.bunker.currentRound++;
     room.bunker.currentTurnIndex = 0;
     room.state = 'bunkerReveal';
+    sendChatMsg(room, 'system', 'Раунд ' + (room.bunker.currentRound + 1) + ' начался! Каждый открывает по одной карте.');
 
     // Проверяем: если все карты раскрыты у всех — заканчиваем
     var activePlayers = getBunkerActivePlayers(room);
@@ -5397,6 +5936,8 @@ function startNextBunkerRound(room) {
 
 function endBunkerGame(room) {
     room.state = 'bunkerGameOver';
+    broadcastRoomsList();
+    sendChatMsg(room, 'event', '🏁 Игра завершена! Победители определены.');
     var activePlayers = getBunkerActivePlayers(room);
 
     // Раскрываем ВСЕ карты ВСЕХ игроков

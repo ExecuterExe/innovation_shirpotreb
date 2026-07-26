@@ -1,5 +1,5 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 import { renderCardGrid, CARD_TYPES } from './presentation.js';
 
 export function renderPreparation(container) {
@@ -39,6 +39,7 @@ export function renderPreparation(container) {
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Капитал</div>';
     html += '    <div class="text-3xl font-black text-accent-blue">' + state.myCapital + '</div>';
     html += '  </div>';
+    html += '  <button id="btn-exit-game" class="px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
 
     // Event
@@ -114,6 +115,11 @@ export function renderPreparation(container) {
     container.innerHTML = html;
 
     // ═══════ LISTENERS ═══════
+    var btnExitGame = container.querySelector('#btn-exit-game');
+    if (btnExitGame) btnExitGame.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
+
     var textarea = container.querySelector('#pitch-textarea');
     var btnReady = container.querySelector('#btn-ready');
     var readyConfirmed = container.querySelector('#ready-confirmed');

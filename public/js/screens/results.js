@@ -1,5 +1,5 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 import { CARD_TYPES } from './presentation.js';
 
 export function renderResults(container) {
@@ -17,7 +17,11 @@ export function renderResults(container) {
     var html = '';
     html += '<div class="max-w-5xl mx-auto px-4 py-8 min-h-screen">';
 
-    html += '<h2 class="text-2xl font-black text-corp-white text-center mb-8">Результаты раунда ' + state.currentRound + '</h2>';
+    html += '<div class="flex items-start justify-between mb-8 gap-3">';
+    html += '  <div class="w-0 flex-shrink-0 sm:w-[70px]"></div>';
+    html += '  <h2 class="text-2xl font-black text-corp-white text-center flex-1">Результаты раунда ' + state.currentRound + '</h2>';
+    html += '  <button id="btn-exit-game" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
+    html += '</div>';
 
     if (winners.length > 0) {
         var mvp = winners[0];
@@ -200,6 +204,11 @@ export function renderResults(container) {
     container.innerHTML = html;
 
     // ═══════ LISTENERS ═══════
+    var btnExitGame = container.querySelector('#btn-exit-game');
+    if (btnExitGame) btnExitGame.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
+
     var btnNext = container.querySelector('#btn-next-round');
     if (btnNext) {
         btnNext.addEventListener('click', function () {

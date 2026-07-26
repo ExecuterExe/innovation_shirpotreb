@@ -26,6 +26,7 @@ export var state = {
     isSpectator: false,
     phase: 'welcome',
     players: [],
+    spectators: [],
     settings: {
         rounds: 3,
         startCapital: 10,

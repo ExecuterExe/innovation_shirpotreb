@@ -1,8 +1,9 @@
 import { state, setState, navigate, startTimer } from './app.js';
 import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
-import { updatePlayersList, updateStartButton, updateSettingsPanel } from './screens/lobby.js';
+import { updatePlayersList, updateStartButton, updateSettingsPanel, updateRoomHeader } from './screens/lobby.js';
 import { speakSequence, stopSpeaking } from './components/speech.js';
+import { appendChatMsg, renderBunkerChat, removeChatMsgFromDom } from './components/bunker-chat.js';
 import { setPendingReveal } from './screens/bunker-game.js';
 
 var ws = null;
@@ -75,6 +76,13 @@ export function connectWS() {
     };
 }
 
+export function leaveRoom() {
+    sendMsg({ type: 'leaveRoom' });
+    try { sessionStorage.removeItem('gameSession'); } catch (e) {}
+    setState({ playerId: null, roomCode: null, isSpectator: false, spectators: [] });
+    navigate('welcome');
+}
+
 export function sendMsg(msg) {
     console.log('[WS] Sending:', msg.type);
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -106,10 +114,198 @@ function updateConnectionUI(status) {
     }
 }
 
+// ─── Рендер списка открытых комнат ───
+var TAG_COLORS = {
+    bunker: 'rgba(245,158,11,0.15)', blackSwan: 'rgba(139,92,246,0.15)',
+    events: 'rgba(0,180,255,0.12)', streamer: 'rgba(34,197,94,0.12)',
+    pseudo: 'rgba(255,255,255,0.08)', absurdGen: 'rgba(255,100,60,0.12)',
+    modifier: 'rgba(255,255,255,0.08)', review: 'rgba(255,255,255,0.06)',
+    audience: 'rgba(255,255,255,0.06)', defects: 'rgba(255,80,80,0.08)',
+    packaging: 'rgba(255,255,255,0.06)', chat: 'rgba(0,180,255,0.08)',
+};
+var TAG_TEXT = {
+    bunker: '#f59e0b', blackSwan: '#a78bfa', events: '#60c8ff', streamer: '#4ade80',
+    pseudo: 'rgba(255,255,255,0.5)', absurdGen: '#ff6464', modifier: 'rgba(255,255,255,0.5)',
+    review: 'rgba(255,255,255,0.4)', audience: 'rgba(255,255,255,0.4)',
+    defects: '#ff8080', packaging: 'rgba(255,255,255,0.4)', chat: '#60c8ff',
+};
+
+function buildRoomCard(room) {
+    var stateBg = room.stateType === 'lobby' ? 'rgba(34,197,94,0.1)' : room.stateType === 'active' ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.05)';
+    var stateColor = room.stateType === 'lobby' ? '#4ade80' : room.stateType === 'active' ? '#f59e0b' : 'rgba(255,255,255,0.3)';
+    var safeCode = escapeHtmlLocal(room.code);
+    var html = '<div class="room-card" data-room-code="' + safeCode + '">';
+    // Left: name/code + host
+    html += '<div class="room-card-code">';
+    if (room.roomName) {
+        html += '<div class="room-card-name" title="' + escapeHtmlLocal(room.roomName) + '">' + escapeHtmlLocal(room.roomName) + '</div>';
+        html += '<div class="font-mono font-black text-accent-blue" style="font-size:0.7rem;letter-spacing:0.05em">' + safeCode + '</div>';
+    } else {
+        html += '<div class="font-mono font-black text-accent-blue" style="font-size:1rem;letter-spacing:0.05em">' + safeCode + '</div>';
+    }
+    html += '<div style="font-size:0.55rem;color:rgba(255,255,255,0.35);margin-top:2px">хост: ' + escapeHtmlLocal(room.hostName) + '</div>';
+    html += '</div>';
+    // Middle: tags
+    html += '<div class="room-card-tags">';
+    if (room.tags && room.tags.length) {
+        room.tags.forEach(function(t) {
+            var bg = TAG_COLORS[t.key] || 'rgba(255,255,255,0.06)';
+            var color = TAG_TEXT[t.key] || 'rgba(255,255,255,0.4)';
+            html += '<span style="display:inline-flex;align-items:center;font-size:0.55rem;font-weight:700;padding:2px 7px;border-radius:5px;background:' + bg + ';color:' + color + ';white-space:nowrap">' + t.label + '</span>';
+        });
+    } else {
+        html += '<span style="font-size:0.6rem;color:rgba(255,255,255,0.25)">Стандартная игра</span>';
+    }
+    html += '</div>';
+    // Right: state + count + join
+    html += '<div class="room-card-right">';
+    html += '<div style="font-size:0.65rem;font-weight:700;padding:3px 8px;border-radius:6px;background:' + stateBg + ';color:' + stateColor + ';margin-bottom:4px;text-align:center">' + room.stateLabel + '</div>';
+    var countLabel = room.playerCount + '/' + room.maxPlayers + (room.spectatorCount ? ' · 👀' + room.spectatorCount : '');
+    html += '<div style="font-size:0.6rem;color:rgba(255,255,255,0.4);text-align:center;margin-bottom:6px">' + countLabel + '</div>';
+    html += '<button class="room-join-btn" data-code="' + safeCode + '">Войти</button>';
+    html += '</div>';
+    html += '</div>';
+    return html;
+}
+
+function renderRoomsBrowser(rooms) {
+    var el = document.querySelector('#rooms-list');
+    if (!el) return;
+    if (!rooms || rooms.length === 0) {
+        el.innerHTML = '<div style="text-align:center;font-size:0.7rem;color:rgba(255,255,255,0.25);padding:16px 0">Нет открытых комнат</div>';
+        return;
+    }
+    el.innerHTML = rooms.map(buildRoomCard).join('');
+    el.querySelectorAll('.room-join-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var code = btn.getAttribute('data-code');
+            var codeInput = document.querySelector('#w-room-code');
+            var pwWrap = document.querySelector('#w-password-wrap');
+            if (codeInput) {
+                codeInput.value = code;
+                if (pwWrap) pwWrap.classList.remove('hidden');
+            }
+            var nickInput = document.querySelector('#w-nickname');
+            if (nickInput && !nickInput.value.trim()) nickInput.focus();
+            else if (codeInput) codeInput.focus();
+        });
+    });
+}
+
+// ═══════════════════════════════════════════
+// ЭМОЦИИ
+// ═══════════════════════════════════════════
+
+var EMOTIONS = {
+    laugh:     { emoji: '😂', label: 'Смеётся' },
+    angry:     { emoji: '😡', label: 'Злится' },
+    scared:    { emoji: '😱', label: 'Пугается' },
+    love:      { emoji: '😍', label: 'Восхищается' },
+    think:     { emoji: '🤔', label: 'Думает' },
+    mindblown: { emoji: '🤯', label: 'Голова взрывается' },
+};
+
+function showEmotionBubble(playerId, emotion) {
+    var em = EMOTIONS[emotion];
+    if (!em) return;
+    var card = document.querySelector('[data-player-id="' + playerId + '"]');
+    if (!card) return;
+
+    var existing = card.querySelector('.emotion-bubble');
+    if (existing) existing.remove();
+
+    var bubble = document.createElement('div');
+    bubble.className = 'emotion-bubble';
+    bubble.innerHTML = '<span class="emotion-bubble-emoji">' + em.emoji + '</span><span class="emotion-bubble-label">' + em.label + '</span>';
+    card.style.position = 'relative';
+    card.appendChild(bubble);
+
+    requestAnimationFrame(function () {
+        bubble.classList.add('emotion-bubble-in');
+    });
+
+    var fadeTimer = setTimeout(function () {
+        bubble.classList.add('emotion-bubble-out');
+        setTimeout(function () { if (bubble.parentNode) bubble.remove(); }, 400);
+    }, 3000);
+    bubble._fadeTimer = fadeTimer;
+}
+
+var emotionMenuEl = null;
+
+function closeEmotionMenu() {
+    if (emotionMenuEl) {
+        emotionMenuEl.remove();
+        emotionMenuEl = null;
+    }
+}
+
+function openEmotionMenu(x, y) {
+    closeEmotionMenu();
+    var menu = document.createElement('div');
+    menu.id = 'emotion-menu';
+    menu.className = 'emotion-menu';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+
+    var title = document.createElement('div');
+    title.className = 'emotion-menu-title';
+    title.textContent = 'Эмоция';
+    menu.appendChild(title);
+
+    var grid = document.createElement('div');
+    grid.className = 'emotion-menu-grid';
+
+    Object.keys(EMOTIONS).forEach(function (key) {
+        var em = EMOTIONS[key];
+        var btn = document.createElement('button');
+        btn.className = 'emotion-btn';
+        btn.innerHTML = '<span class="emotion-btn-emoji">' + em.emoji + '</span><span class="emotion-btn-label">' + em.label + '</span>';
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            sendMsg({ type: 'playerEmotion', emotion: key });
+            closeEmotionMenu();
+        });
+        grid.appendChild(btn);
+    });
+
+    menu.appendChild(grid);
+    document.body.appendChild(menu);
+    emotionMenuEl = menu;
+
+    // position correction if out of viewport
+    var rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + 'px';
+    if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + 'px';
+}
+
+document.addEventListener('contextmenu', function (e) {
+    var anchor = e.target.closest('[data-emotion-self="1"]');
+    if (anchor) {
+        e.preventDefault();
+        openEmotionMenu(e.clientX, e.clientY);
+    } else {
+        closeEmotionMenu();
+    }
+});
+
+document.addEventListener('click', function () {
+    closeEmotionMenu();
+});
+
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeEmotionMenu();
+});
+
 function handleMessage(msg) {
     console.log('[MSG]', msg.type);
 
     switch (msg.type) {
+
+        case 'roomsList':
+            state.rooms = msg.rooms || [];
+            renderRoomsBrowser(state.rooms);
+            break;
 
         case 'roomCreated':
             setState({ playerId: msg.playerId, roomCode: msg.roomCode, isHost: true });
@@ -267,6 +463,27 @@ function handleMessage(msg) {
             }
             break;
 
+        case 'playerLeft':
+            showNotification(msg.nickname + ' вышел из игры', 'info');
+            if (msg.players) setState({ players: msg.players });
+            break;
+
+        case 'spectatorsUpdate':
+            setState({ spectators: msg.spectators || [] });
+            break;
+
+        case 'chatBroadcast':
+            appendChatMsg(msg.msg);
+            break;
+
+        case 'chatMessageDeleted':
+            removeChatMsgFromDom(msg.messageId);
+            break;
+
+        case 'playerEmotion':
+            showEmotionBubble(msg.playerId, msg.emotion);
+            break;
+
         case 'kicked':
             showNotification(msg.message || 'Вы исключены из комнаты', 'error');
             playSound('warning');
@@ -375,6 +592,10 @@ function handleMessage(msg) {
             handleBunkerVoteResult(msg);
             break;
 
+        case 'bunkerPlayerKicked':
+            handleBunkerPlayerKicked(msg);
+            break;
+
         case 'bunkerTieVotePhase':
             handleBunkerTieVotePhase(msg);
             break;
@@ -418,7 +639,7 @@ function handleLobbyUpdate(msg) {
         }
     }
 
-    setState({ players: msg.players, settings: msg.settings, isHost: amIHost });
+    setState({ players: msg.players, spectators: msg.spectators || [], settings: msg.settings, isHost: amIHost });
 
     if (state.phase === 'lobby') {
         // Частичное обновление без полной перерисовки
@@ -427,6 +648,7 @@ function handleLobbyUpdate(msg) {
             try {
                 updatePlayersList(currentScreen);
                 updateStartButton(currentScreen);
+                updateRoomHeader(currentScreen);
                 if (amIHost) updateSettingsPanel(currentScreen);
             } catch (e) {
                 console.error('[socket] Partial update failed, doing full render:', e);
@@ -588,7 +810,9 @@ function handleGameOver(msg) {
 // ═══════════════════════════════════════════
 
 function handleBunkerStart(msg) {
-    // Сохраняем свои карты
+    if (msg.chatEnabled !== false) {
+        setState({ chatMessages: msg.chatHistory || [] });
+    }
     setState({
         myCards: msg.yourCards,
         myActionCards: msg.yourActionCards || [],
@@ -737,6 +961,30 @@ function handleBunkerVoteResult(msg) {
     }
 }
 
+function handleBunkerPlayerKicked(msg) {
+    var bunker = Object.assign({}, state.bunker);
+    bunker.eliminatedPlayers = msg.eliminatedPlayers || bunker.eliminatedPlayers;
+    bunker.revealedCards = msg.revealedCards || bunker.revealedCards;
+
+    setState({
+        bunker: bunker,
+        players: msg.players || state.players,
+    });
+
+    showNotification('🚫 Ведущий исключил «' + msg.nickname + '» из бункера', 'warning');
+    playSound('warning');
+
+    // Возможные последующие сообщения (bunkerTurn / bunkerVoteResult / bunkerGameOver)
+    // сами перерисуют экран корректно; здесь просто обновляем то, что видно сейчас.
+    if (state.phase === 'bunkerReveal') {
+        var remainingTime = state.timerRemaining;
+        navigate('bunkerReveal');
+        if (remainingTime > 0) startTimer(remainingTime);
+    } else if (state.phase === 'bunkerVote') {
+        navigate('bunkerVote');
+    }
+}
+
 function handleBunkerTieVotePhase(msg) {
     var bunker = Object.assign({}, state.bunker);
     bunker.tiedPlayers = msg.tiedPlayers;
@@ -768,6 +1016,7 @@ function handleBunkerGameOver(msg) {
 function handleBunkerActionCardPlayed(msg) {
     showNotification(msg.emoji + ' ' + msg.effect, 'info');
     playSound('start');
+    playActionCardFX(msg.emoji, msg.cardName, msg.nickname);
 
     // Сохраняем сыгранную карту в историю этого игрока
     var pid = msg.playerId;
@@ -820,6 +1069,9 @@ function handleGameStateSync(msg) {
                 hasRevealedThisTurn: false,
             },
         });
+        if (msg.chatEnabled !== false && msg.chatHistory) {
+            setState({ chatMessages: msg.chatHistory });
+        }
         if (rs === 'bunkerReveal') navigate('bunkerReveal');
         else if (rs === 'bunkerVote') navigate('bunkerVote');
         else if (rs === 'bunkerTieVote') navigate('bunkerTieVote');
@@ -869,6 +1121,13 @@ function handleBunkerActionCardUpdate(msg) {
     if (msg.extraCards !== undefined) {
         setState({ myExtraCards: msg.extraCards });
     }
+    // Сохраняем что подсветить после re-render
+    if (msg.changedCards && msg.changedCards.length) {
+        window._bunkerHighlightSlots = msg.changedCards.slice();
+    }
+    if (msg.extraSlot) {
+        window._bunkerHighlightExtra = msg.extraSlot;
+    }
     // Перерисовываем текущий экран
     if (state.phase === 'bunkerReveal') {
         var remainingTime = state.timerRemaining;
@@ -878,4 +1137,120 @@ function handleBunkerActionCardUpdate(msg) {
         navigate('bunkerVote');
     }
     playSound('success');
+
+    // Показываем богатое уведомление для владельца/затронутого
+    if (msg.ownerEffect) showActionResultToast(msg);
+}
+
+function getActionToastContainer() {
+    var c = document.getElementById('action-toast-container');
+    if (!c) {
+        c = document.createElement('div');
+        c.id = 'action-toast-container';
+        document.body.appendChild(c);
+    }
+    return c;
+}
+
+function showActionResultToast(msg) {
+    // Рендерим в следующем тике — после того как navigate() перерисовал экран
+    setTimeout(function () { buildActionResultToast(msg); }, 0);
+}
+
+function buildActionResultToast(msg) {
+    var container = getActionToastContainer();
+    var prev = container.querySelector('.action-result-toast');
+    if (prev) prev.remove();
+
+    var toast = document.createElement('div');
+    toast.className = 'action-result-toast';
+
+    var html = '';
+    html += '<div class="action-result-glow"></div>';
+    html += '<div class="action-result-header">';
+    html += '  <div class="action-result-emoji">' + (msg.emoji || '⚡') + '</div>';
+    html += '  <div class="action-result-name">' + escapeHtmlLocal(msg.cardName || 'Карта действия') + '</div>';
+    if (msg.fromPlayer) {
+        html += '  <div class="action-result-from">от <b>' + escapeHtmlLocal(msg.fromPlayer) + '</b></div>';
+    }
+    html += '  <button class="action-result-close" aria-label="Закрыть">✕</button>';
+    html += '</div>';
+    html += '<div class="action-result-body">' + escapeHtmlLocal(msg.ownerEffect) + '</div>';
+    toast.innerHTML = html;
+    container.appendChild(toast);
+
+    // Форсируем reflow, чтобы transition сыграл даже если rAF не успеет тикнуть
+    void toast.offsetWidth;
+    toast.classList.add('action-result-toast-in');
+
+    var timer = setTimeout(function () { closeActionResultToast(toast); }, 7000);
+
+    var closeBtn = toast.querySelector('.action-result-close');
+    if (closeBtn) closeBtn.addEventListener('click', function () {
+        clearTimeout(timer);
+        closeActionResultToast(toast);
+    });
+}
+function closeActionResultToast(toast) {
+    toast.classList.add('action-result-toast-out');
+    setTimeout(function () { if (toast.parentNode) toast.remove(); }, 350);
+}
+function escapeHtmlLocal(str) {
+    if (str == null) return '';
+    return String(str).replace(/[&<>"']/g, function (c) {
+        return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : '&#39;';
+    });
+}
+
+// ═══════════════════════════════════════════
+// ЭФФЕКТ РОЗЫГРЫША КАРТЫ ДЕЙСТВИЯ — видно всей комнате
+// ═══════════════════════════════════════════
+
+function getActionFxContainer() {
+    var c = document.getElementById('action-fx-container');
+    if (!c) {
+        c = document.createElement('div');
+        c.id = 'action-fx-container';
+        document.body.appendChild(c);
+    }
+    return c;
+}
+
+function buildActionFxSparks(count, spread) {
+    var html = '';
+    for (var i = 0; i < count; i++) {
+        var angle = (Math.PI * 2 * i) / count + (Math.random() * 0.35 - 0.175);
+        var dist = spread * (0.6 + Math.random() * 0.55);
+        var dx = Math.cos(angle) * dist;
+        var dy = Math.sin(angle) * dist;
+        var delay = Math.random() * 0.16;
+        var size = 5 + Math.random() * 7;
+        html += '<span class="bunker-fx-spark" style="--dx:' + dx.toFixed(1) + 'px;--dy:' + dy.toFixed(1) + 'px;--delay:' + delay.toFixed(2) + 's;width:' + size.toFixed(1) + 'px;height:' + size.toFixed(1) + 'px;"></span>';
+    }
+    return html;
+}
+
+function playActionCardFX(emoji, cardName, nickname) {
+    var container = getActionFxContainer();
+    container.innerHTML = ''; // предыдущий эффект (если ещё не успел исчезнуть) не должен мешать новому
+
+    var fx = document.createElement('div');
+    fx.className = 'bunker-fx-overlay';
+
+    var html = '';
+    html += '<div class="bunker-fx-ring"></div>';
+    html += '<div class="bunker-fx-ring2"></div>';
+    html += buildActionFxSparks(16, 150);
+    html += '<div class="bunker-fx-emoji">' + escapeHtmlLocal(emoji || '⚡') + '</div>';
+    html += '<div class="bunker-fx-name">' + escapeHtmlLocal(cardName || 'Карта действия') + '</div>';
+    if (nickname) {
+        html += '<div class="bunker-fx-player">разыграл(а) ' + escapeHtmlLocal(nickname) + '</div>';
+    }
+    fx.innerHTML = html;
+    container.appendChild(fx);
+
+    setTimeout(function () {
+        fx.classList.add('bunker-fx-overlay-out');
+        setTimeout(function () { if (fx.parentNode) fx.remove(); }, 380);
+    }, 1350);
 }

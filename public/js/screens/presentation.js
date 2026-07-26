@@ -1,5 +1,5 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 
 // ═══════════════════════════════════════════
 // Конфиг типов карт — легко расширяется
@@ -74,6 +74,7 @@ export function renderPresentation(container) {
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Капитал</div>';
     html += '    <div class="text-2xl font-black text-accent-blue">' + state.myCapital + '</div>';
     html += '  </div>';
+    html += '  <button id="btn-exit-game" class="px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
 
     // ═══════ EVENT ═══════
@@ -207,6 +208,10 @@ export function renderPresentation(container) {
     container.innerHTML = html;
 
     // ═══════ EVENT LISTENERS ═══════
+    var btnExitGame = container.querySelector('#btn-exit-game');
+    if (btnExitGame) btnExitGame.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
     container.querySelector('#btn-toggle-prev')?.addEventListener('click', function () {
         var list = container.querySelector('#prev-list');
         var arrow = container.querySelector('#prev-arrow');

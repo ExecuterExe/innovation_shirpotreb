@@ -1,5 +1,5 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 
 var submitted = false;
@@ -82,7 +82,8 @@ export function renderCardInput(container) {
     var totalPhases = phaseNames.filter(function (name) { return PHASE_CONFIG[name]; }).length;
 
     var html = '';
-    html += '<div class="max-w-2xl mx-auto px-4 py-8 min-h-screen flex flex-col items-center justify-center">';
+    html += '<div class="max-w-2xl mx-auto px-4 py-8 min-h-screen flex flex-col items-center justify-center relative">';
+    html += '<button id="btn-exit-game" class="fixed top-4 right-4 z-20 px-2.5 py-1.5 rounded-lg border border-corp-border bg-corp-black/60 text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
 
     // Header
     html += '<div class="text-center mb-8">';
@@ -161,6 +162,11 @@ export function renderCardInput(container) {
     container.innerHTML = html;
 
     // ═══════ LISTENERS ═══════
+    var btnExitGame = container.querySelector('#btn-exit-game');
+    if (btnExitGame) btnExitGame.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
+
     var input = container.querySelector('#card-input');
     var btnSubmit = container.querySelector('#btn-submit-card');
     var charCount = container.querySelector('#char-count');

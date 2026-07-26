@@ -1,5 +1,6 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
+import { renderBunkerChat } from '../components/bunker-chat.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { BUNKER_CARD_TYPES } from './bunker-game.js';
@@ -18,13 +19,17 @@ export function renderBunkerVote(container) {
     var paused = bunker.paused;
 
     var html = '';
-    html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen">';
+    html += '<div class="bunker-layout">';
+    html += '<div id="bunker-main-content" class="bunker-main-col">';
 
     // Header
-    html += '<div class="text-center mb-6">';
+    html += '<div class="flex items-start justify-between mb-6">';
+    html += '<div class="text-center flex-1">';
     html += '  <h2 class="text-2xl font-black text-accent-red mb-2">🗳 Голосование</h2>';
     html += '  <p class="text-sm text-corp-muted">Кого исключить из бункера? Или пропустите голосование.</p>';
     html += '  <p class="text-xs text-corp-dim mt-1">Осталось кикнуть: <span class="text-accent-red font-bold">' + (bunker.remainingKicks || '?') + '</span></p>';
+    html += '</div>';
+    html += '<button id="btn-exit-vote" class="flex-shrink-0 ml-2 px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕ Выйти</button>';
     html += '</div>';
 
     // Timer
@@ -85,9 +90,14 @@ export function renderBunkerVote(container) {
             html += '  <div class="text-sm font-bold text-accent-gold">' + escapeHtml(p.nickname);
             if (isSelf) html += ' <span class="text-corp-muted text-xs font-normal">(Вы)</span>';
             html += '  </div>';
+            html += '  <div class="flex items-center gap-2 flex-shrink-0">';
+            if (isHost && !isSelf) {
+                html += '<button class="bunker-kick-btn" data-bunker-kick="' + p.id + '" data-bunker-kick-name="' + escapeHtml(p.nickname) + '" title="Исключить из бункера">🚫</button>';
+            }
             if (!isSelf) {
                 html += '  <div class="vote-indicator w-8 h-8 rounded-full border-2 border-corp-border flex items-center justify-center text-xs font-bold transition-all flex-shrink-0" data-vote-target="' + p.id + '"></div>';
             }
+            html += '  </div>';
             html += '</div>';
 
             // Раскрытые карты
@@ -167,8 +177,32 @@ export function renderBunkerVote(container) {
         html += '</div>';
     }
 
-    html += '</div>';
+    html += '</div>'; // end bunker-main-col
+    html += '</div>'; // end bunker-layout
     container.innerHTML = html;
+
+    renderBunkerChat(container);
+
+    // Выход
+    var btnExitVote = container.querySelector('#btn-exit-vote');
+    if (btnExitVote) btnExitVote.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
+
+    // Ведущий: исключить игрока из бункера прямо во время голосования
+    var bunkerKickBtns = container.querySelectorAll('.bunker-kick-btn');
+    for (var bki = 0; bki < bunkerKickBtns.length; bki++) {
+        (function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var targetId = btn.getAttribute('data-bunker-kick');
+                var targetName = btn.getAttribute('data-bunker-kick-name') || 'игрока';
+                if (!targetId) return;
+                if (!window.confirm('Исключить «' + targetName + '» из бункера? Это действие необратимо для текущей игры.')) return;
+                sendMsg({ type: 'bunkerHostKick', targetPlayerId: targetId });
+            });
+        })(bunkerKickBtns[bki]);
+    }
 
     // ═══════ VOTING LOGIC ═══════
     var selectedVote = null;

@@ -1,5 +1,5 @@
 import { state, escapeHtml } from '../app.js';
-import { sendMsg } from '../socket.js';
+import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { CARD_TYPES } from './presentation.js';
@@ -44,6 +44,7 @@ export function renderInvesting(container) {
     }
     html += '  </div>';
 
+    html += '  <button id="btn-exit-game" class="px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
 
     // ═══════ HEADER ═══════
@@ -188,6 +189,11 @@ export function renderInvesting(container) {
     html += '</div>'; // end main
 
     container.innerHTML = html;
+
+    var btnExitGame = container.querySelector('#btn-exit-game');
+    if (btnExitGame) btnExitGame.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
 
     var kickBtns = container.querySelectorAll('.kick-player-btn');
     for (var kk = 0; kk < kickBtns.length; kk++) {
