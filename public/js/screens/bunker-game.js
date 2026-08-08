@@ -187,14 +187,14 @@ export function renderBunkerReveal(container) {
                 html += '<div class="bunker-reveal-btn rounded-xl p-3 ' + ct.gradient + ' border-2 border-white/20 cursor-pointer hover:scale-[1.03] hover:border-white/40 hover:shadow-lg transition-all text-center" data-card-key="' + ct.key + '" data-my-slot="' + ct.key + '">';
                 html += '  <div class="text-[0.65rem] font-bold text-white/85 uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
                 html += '  <div class="text-xs font-bold text-white leading-snug">' + escapeHtml(cardValue) + '</div>';
-                html += '  <div class="text-[0.45rem] text-white/50 mt-1">▲ нажмите</div>';
+                html += '  <div class="text-[0.55rem] text-white/50 mt-1">▲ нажмите</div>';
                 html += '</div>';
             } else {
                 // Заблокировано — пока предмет не раскрыт
                 html += '<div class="rounded-xl p-3 bg-corp-graphite border border-corp-border text-center opacity-40 relative" data-my-slot="' + ct.key + '">';
                 html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
                 html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(cardValue) + '</div>';
-                html += '  <div class="text-[0.4rem] text-accent-gold mt-1">🔒 сначала предмет</div>';
+                html += '  <div class="text-[0.55rem] text-accent-gold mt-1">🔒 сначала предмет</div>';
                 html += '</div>';
             }
 
@@ -225,13 +225,13 @@ export function renderBunkerReveal(container) {
             html += '<div class="bunker-reveal-btn mt-2 rounded-xl p-3 ' + hct.gradient + ' border-2 border-white/20 cursor-pointer hover:scale-[1.01] hover:border-white/40 hover:shadow-lg transition-all" data-card-key="historicalFact">';
             html += '  <div class="text-[0.65rem] font-bold text-white/85 uppercase tracking-widest mb-1">' + hct.emoji + ' ' + hct.label + '</div>';
             html += '  <div class="text-xs font-bold text-white leading-snug">' + escapeHtml(hValue) + '</div>';
-            html += '  <div class="text-[0.45rem] text-white/50 mt-1">▲ нажмите</div>';
+            html += '  <div class="text-[0.55rem] text-white/50 mt-1">▲ нажмите</div>';
             html += '</div>';
         } else if (isMyTurn && !bunker.hasRevealedThisTurn && !itemAlreadyRevealed) {
             html += '<div class="mt-2 rounded-xl p-3 bg-corp-graphite border border-corp-border opacity-40 relative">';
             html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + hct.emoji + ' ' + hct.label + '</div>';
             html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(hValue) + '</div>';
-            html += '  <div class="text-[0.4rem] text-accent-gold mt-1">🔒 сначала предмет</div>';
+            html += '  <div class="text-[0.55rem] text-accent-gold mt-1">🔒 сначала предмет</div>';
             html += '</div>';
         } else {
             html += '<div class="mt-2 rounded-xl p-3 bg-corp-graphite border border-corp-border">';
@@ -256,7 +256,7 @@ export function renderBunkerReveal(container) {
             }
             if (!ect) continue;
             html += '<div class="rounded-xl p-2.5 ' + ect.bg + ' ' + ect.border + ' border text-center min-w-[110px] ring-1 ring-accent-gold/30" data-my-extra="' + ek + '">';
-            html += '  <div class="text-[0.45rem] font-bold text-accent-gold uppercase tracking-widest mb-1">+1 ' + ect.emoji + ' ' + ect.label + '</div>';
+            html += '  <div class="text-[0.55rem] font-bold text-accent-gold uppercase tracking-widest mb-1">+1 ' + ect.emoji + ' ' + ect.label + '</div>';
             html += '  <div class="text-[0.65rem] font-bold ' + ect.color + ' leading-snug">' + escapeHtml(myExtraCards[ek]) + '</div>';
             html += '</div>';
         }
@@ -993,9 +993,13 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
             if (playerRevealed[BUNKER_CARD_TYPES[rci].key]) revealedCount++;
         }
 
+        // p.connected приходит с сервера; undefined у старых сообщений — считаем «на связи»
+        var isOffline = !isMe && p.connected === false;
+
         var borderClass = '';
         if (isCurrent) borderClass = ' border-accent-gold/40 bunker-current-pulse';
         else if (isEliminated) borderClass = ' border-accent-red/20 opacity-30';
+        else if (isOffline) borderClass = ' border-corp-border opacity-50';
         else if (isMe) borderClass = ' border-accent-blue/20';
 
         var clickable = !isMe ? ' cursor-pointer hover:border-corp-light/20 transition-colors' : '';
@@ -1010,7 +1014,8 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
         html += '  <div class="flex items-center gap-1.5 flex-1 min-w-0">';
         if (isCurrent) html += '<span class="text-sm flex-shrink-0">🎤</span>';
         if (isEliminated) html += '<span class="text-sm flex-shrink-0">💀</span>';
-        html += '    <span class="text-sm font-bold ' + (isEliminated ? 'text-accent-red line-through' : 'text-corp-light') + ' truncate">';
+        else if (isOffline) html += '<span class="text-sm flex-shrink-0" title="Игрок отключился">📴</span>';
+        html += '    <span class="text-sm font-bold ' + (isEliminated ? 'text-accent-red line-through' : (isOffline ? 'text-corp-muted' : 'text-corp-light')) + ' truncate">';
         html += escapeHtml(p.nickname);
         html += '    </span>';
         if (isMe) html += '<span class="text-accent-blue text-[0.55rem] flex-shrink-0">(Вы)</span>';

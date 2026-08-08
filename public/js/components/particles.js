@@ -20,8 +20,8 @@ export function initParticles() {
             y: Math.random() * canvas.height,
             vx: (Math.random() - 0.5) * 0.25,
             vy: (Math.random() - 0.5) * 0.2 - 0.08,
-            radius: Math.random() * 1.5 + 0.3,
-            opacity: Math.random() * 0.15 + 0.03,
+            radius: Math.random() * 1.8 + 0.5,
+            opacity: Math.random() * 0.22 + 0.06,
         });
     }
 
@@ -57,7 +57,7 @@ function animate() {
                 ctx.beginPath();
                 ctx.moveTo(particles[a].x, particles[a].y);
                 ctx.lineTo(particles[b].x, particles[b].y);
-                ctx.strokeStyle = 'rgba(0, 180, 255, ' + (0.04 * (1 - dist / 150)) + ')';
+                ctx.strokeStyle = 'rgba(0, 180, 255, ' + (0.07 * (1 - dist / 150)) + ')';
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
             }

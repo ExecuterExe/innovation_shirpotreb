@@ -9,29 +9,29 @@ export function renderWelcome(container) {
     html += '<div class="flex flex-col items-center justify-center min-h-screen px-6 py-12">';
 
     // Logo
-    html += '<div class="mb-5 animate-float">';
-    html += '<div class="text-7xl md:text-8xl select-none" style="filter: drop-shadow(0 0 40px rgba(0,180,255,0.35)) drop-shadow(0 0 80px rgba(0,180,255,0.12));">🚀</div>';
+    html += '<div class="hero-reveal-1 mb-5 animate-float">';
+    html += '<div class="hero-rocket text-7xl md:text-8xl select-none" style="filter: drop-shadow(0 0 40px rgba(0,180,255,0.35)) drop-shadow(0 0 80px rgba(0,180,255,0.12));">🚀</div>';
     html += '</div>';
 
     // Title — градиент синий→голубой
-    html += '<h1 class="font-display font-black text-3xl md:text-5xl text-center tracking-tight leading-none mb-1" style="text-wrap:balance">';
+    html += '<h1 class="hero-reveal-2 font-display font-black text-3xl md:text-5xl text-center tracking-tight leading-none mb-1" style="text-wrap:balance">';
     html += '<span class="text-gradient-blue">ИННОВАЦИОННЫЙ</span>';
     html += '<br>';
     html += '<span class="text-corp-white" style="letter-spacing:-0.01em">ШИРПОТРЕБ</span>';
     html += '</h1>';
 
     // Подзаголовок
-    html += '<p class="text-xs font-bold text-corp-muted uppercase tracking-[0.18em] mb-6">Питчинг · Инвестиции · Хаос</p>';
+    html += '<p class="hero-reveal-3 text-xs font-bold text-corp-muted uppercase tracking-[0.18em] mb-6">Питчинг · Инвестиции · Хаос</p>';
 
     // Rotating startup — в рамке как цитата
-    html += '<div class="h-10 flex items-center justify-center mb-8 overflow-hidden w-full max-w-sm">';
+    html += '<div class="hero-reveal-4 h-10 flex items-center justify-center mb-8 overflow-hidden w-full max-w-sm">';
     html += '<p id="rotating-startup" class="text-corp-dim text-xs md:text-sm font-mono text-center italic px-4 py-2 rounded-xl bg-white/[0.025] border border-white/[0.06]">';
     html += 'Загрузка гениальных идей...';
     html += '</p>';
     html += '</div>';
 
     // ═══════ RULES BUTTONS ═══════
-    html += '<div class="w-full max-w-md mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">';
+    html += '<div class="hero-reveal-5 w-full max-w-md mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">';
     html += '<button id="btn-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
     html += 'bg-accent-gold-dim border border-accent-gold/25 text-accent-gold hover:bg-accent-gold/15 hover:border-accent-gold/45 transition-all">';
     html += '  <span>📖</span>';
@@ -55,7 +55,7 @@ export function renderWelcome(container) {
     html += '</div>';
 
     // Main card
-    html += '<div class="corp-card-elevated w-full max-w-md p-7 space-y-5">';
+    html += '<div class="hero-reveal-6 corp-card-elevated w-full max-w-md p-7 space-y-5">';
 
     // Nickname
     html += '<div>';
@@ -243,13 +243,11 @@ function startRotating(container) {
         startupInterval = null;
     }
 
-    // Первая загрузка через 1.5 сек
-    setTimeout(function () {
-        fetchRandomCombo(function (text) {
-            var el = container.querySelector('#rotating-startup');
-            if (el) el.textContent = '«' + text + '»';
-        });
-    }, 1500);
+    // Первая загрузка сразу — самая смешная строчка страницы не должна ждать
+    fetchRandomCombo(function (text) {
+        var el = container.querySelector('#rotating-startup');
+        if (el) el.textContent = '«' + text + '»';
+    });
 
     // Далее каждые 5 секунд
     startupInterval = setInterval(function () {
@@ -670,6 +668,29 @@ function buildRule(dot, title, desc) {
 
 // ═══════ ACTIONS ═══════
 
+function setButtonPending(btn, pendingText) {
+    if (!btn || btn.disabled) return;
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.classList.add('opacity-70', 'cursor-wait');
+    btn.textContent = pendingText;
+}
+
+// Возвращает кнопки Create/Join в исходное состояние — вызывается при ошибке от сервера
+// (например, неверный код комнаты), чтобы кнопка не осталась залипшей в состоянии загрузки.
+export function resetWelcomeButtons() {
+    var btns = document.querySelectorAll('#btn-create, #btn-join');
+    for (var i = 0; i < btns.length; i++) {
+        var btn = btns[i];
+        if (btn.dataset.originalHtml) {
+            btn.innerHTML = btn.dataset.originalHtml;
+            delete btn.dataset.originalHtml;
+        }
+        btn.disabled = false;
+        btn.classList.remove('opacity-70', 'cursor-wait');
+    }
+}
+
 function doCreateRoom(container) {
     var input = container.querySelector('#w-nickname');
     if (!input) return;
@@ -679,6 +700,7 @@ function doCreateRoom(container) {
         input.focus();
         return;
     }
+    setButtonPending(container.querySelector('#btn-create'), '🚀 Создаём...');
     sendMsg({ type: 'createRoom', nickname: nickname, settings: {} });
 }
 
@@ -702,6 +724,7 @@ function doJoinRoom(container) {
         codeInput.focus();
         return;
     }
+    setButtonPending(container.querySelector('#btn-join'), 'Входим...');
     sendMsg({ type: 'joinRoom', nickname: nickname, roomCode: code, password: password });
 }
 

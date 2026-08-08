@@ -556,15 +556,24 @@ export function renderBunkerGameOver(container) {
     html += '    </div>';
     html += '  </div>';
 
-    html += '  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">';
-    html += '    <button id="btn-generate-prompt" class="btn-neon-solid py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">';
-    html += '      🧠 Подробный запрос';
+    // Вердикт — главная кнопка: сразу после игры за столом хотят именно его,
+    // а длинные разборы читает потом тот, кому интересно.
+    html += '  <button id="btn-generate-prompt-verdict" class="btn-neon-solid w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer mb-2">';
+    html += '    ⚡ Вердикт за 30 секунд';
+    html += '  </button>';
+
+    html += '  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">';
+    html += '    <button id="btn-generate-prompt" class="py-3 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer bg-blue-900/20 border border-blue-700/30 text-accent-blue hover:bg-blue-800/30 transition-colors">';
+    html += '      🧠 Подробный';
     html += '    </button>';
-    html += '    <button id="btn-generate-prompt-mini" class="py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer bg-purple-900/20 border border-purple-700/30 text-purple-300 hover:bg-purple-800/30 transition-colors">';
-    html += '      ⚡ Быстрый мини-промпт';
+    html += '    <button id="btn-generate-prompt-mini" class="py-3 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer bg-purple-900/20 border border-purple-700/30 text-purple-300 hover:bg-purple-800/30 transition-colors">';
+    html += '      🎴 Мини по карточкам';
+    html += '    </button>';
+    html += '    <button id="btn-generate-prompt-impact" class="py-3 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer bg-cyan-900/20 border border-cyan-700/30 text-accent-cyan hover:bg-cyan-800/30 transition-colors">';
+    html += '      🔬 Разбор изобретений';
     html += '    </button>';
     html += '  </div>';
-    html += '  <div class="text-[0.6rem] text-corp-dim text-center mb-3">Подробный — эпичная история на 1500+ слов. Мини — короткий вердикт за 30 секунд чтения.</div>';
+    html += '  <div class="text-[0.6rem] text-corp-dim text-center mb-3 leading-relaxed">Вердикт — только исход, три абзаца, читается вслух.<br>Подробный — эпичная история на 1500+ слов. Мини — быстрый прогон по каждой карточке.<br>Разбор — экспертный отчёт: как карточки повлияли на саму катастрофу.</div>';
 
     // Скрытый контейнер для промпта
     html += '  <div id="ai-prompt-container" class="hidden">';
@@ -616,47 +625,45 @@ export function renderBunkerGameOver(container) {
         });
     }
 
-    // Генерация промпта
-    var btnGen = container.querySelector('#btn-generate-prompt');
-    if (btnGen) {
-        btnGen.addEventListener('click', function () {
-            var promptText = generateBunkerAIPrompt(bunker, survivors, eliminated);
+    // Генерация промптов. Кнопок несколько, поэтому при клике по одной
+    // остальные возвращаем в исходный вид — иначе на них копятся галочки
+    // от прошлых нажатий и непонятно, какой промпт сейчас в поле.
+    var promptButtons = [
+        { id: '#btn-generate-prompt-verdict', idle: '⚡ Вердикт за 30 секунд', done: '✓ Вердикт готов!',       build: generateBunkerAIPromptVerdict },
+        { id: '#btn-generate-prompt',         idle: '🧠 Подробный',            done: '✓ Промпт готов!',        build: generateBunkerAIPrompt },
+        { id: '#btn-generate-prompt-mini',    idle: '🎴 Мини по карточкам',    done: '✓ Мини-промпт готов!',   build: generateBunkerAIPromptMini },
+        { id: '#btn-generate-prompt-impact',  idle: '🔬 Разбор изобретений',   done: '✓ Разбор готов!',        build: generateBunkerAIPromptImpact },
+    ];
+
+    promptButtons.forEach(function (cfg) {
+        var el = container.querySelector(cfg.id);
+        if (!el) return;
+        el.addEventListener('click', function () {
             var promptContainer = container.querySelector('#ai-prompt-container');
             var promptTextarea = container.querySelector('#ai-prompt-text');
+            if (!promptContainer || !promptTextarea) return;
 
-            if (promptContainer && promptTextarea) {
-                promptTextarea.value = promptText;
-                promptContainer.classList.remove('hidden');
-                btnGen.textContent = '✓ Промпт сгенерирован!';
-                btnGen.classList.add('opacity-50');
+            promptButtons.forEach(function (other) {
+                var otherEl = container.querySelector(other.id);
+                if (otherEl) {
+                    otherEl.textContent = other.idle;
+                    otherEl.classList.remove('opacity-50');
+                }
+            });
 
-                // Скроллим к промпту
-                promptContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            promptTextarea.value = cfg.build(bunker, survivors, eliminated);
+            promptContainer.classList.remove('hidden');
+            el.textContent = cfg.done;
+            el.classList.add('opacity-50');
+
+            var copyStatus = container.querySelector('#copy-status');
+            if (copyStatus) copyStatus.textContent = '';
+
+            // Скроллим к промпту
+            promptContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
             playSound('success');
         });
-    }
-
-    // Генерация мини-промпта
-    var btnGenMini = container.querySelector('#btn-generate-prompt-mini');
-    if (btnGenMini) {
-        btnGenMini.addEventListener('click', function () {
-            var promptText = generateBunkerAIPromptMini(bunker, survivors, eliminated);
-            var promptContainer = container.querySelector('#ai-prompt-container');
-            var promptTextarea = container.querySelector('#ai-prompt-text');
-
-            if (promptContainer && promptTextarea) {
-                promptTextarea.value = promptText;
-                promptContainer.classList.remove('hidden');
-                btnGenMini.textContent = '✓ Мини-промпт готов!';
-                btnGenMini.classList.add('opacity-50');
-
-                // Скроллим к промпту
-                promptContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            playSound('success');
-        });
-    }
+    });
 
     // Копирование промпта
     var btnCopy = container.querySelector('#btn-copy-prompt');
@@ -800,6 +807,21 @@ function generateBunkerAIPrompt(bunker, survivors, eliminated) {
 // Форматирование одного игрока для промпта
 // ═══════════════════════════════════════════
 
+// Единый список карточек для всех промптов — и для вывода, и для подсчёта
+var PROMPT_CARD_MAP = [
+    { key: 'adjective', label: '🎨 Прилагательное' },
+    { key: 'item', label: '📦 Предмет' },
+    { key: 'modifier', label: '📜 Модификатор' },
+    { key: 'feature', label: '✨ Особенность' },
+    { key: 'gift', label: '🎁 Бонус к продукту' },
+    { key: 'hiddenDefect', label: '⚠️ Скрытый дефект' },
+    { key: 'packaging', label: '📦 Упаковка' },
+    { key: 'review', label: '💬 Первый отзыв клиента' },
+    { key: 'historicalFact', label: '📜 Исторический факт' },
+];
+
+var PROMPT_CARD_KEYS = PROMPT_CARD_MAP.map(function (c) { return c.key; });
+
 function formatPlayerForPrompt(player, index) {
     var cards = player.cards || {};
     var lines = [];
@@ -814,23 +836,10 @@ function formatPlayerForPrompt(player, index) {
     lines.push('🏷 Продукт: ' + (productName.trim() || 'Не определён'));
     lines.push('');
 
-    // Все карточки
-    var cardMap = [
-        { key: 'adjective', label: '🎨 Прилагательное' },
-        { key: 'item', label: '📦 Предмет' },
-        { key: 'modifier', label: '📜 Модификатор' },
-        { key: 'feature', label: '✨ Особенность' },
-        { key: 'gift', label: '🎁 Бонус к продукту' },
-        { key: 'hiddenDefect', label: '⚠️ Скрытый дефект' },
-        { key: 'packaging', label: '📦 Упаковка' },
-        { key: 'review', label: '💬 Первый отзыв клиента' },
-        { key: 'historicalFact', label: '📜 Исторический факт' },
-    ];
-
-    for (var i = 0; i < cardMap.length; i++) {
-        var val = cards[cardMap[i].key];
+    for (var i = 0; i < PROMPT_CARD_MAP.length; i++) {
+        var val = cards[PROMPT_CARD_MAP[i].key];
         if (val) {
-            lines.push('  ' + cardMap[i].label + ': ' + val);
+            lines.push('  ' + PROMPT_CARD_MAP[i].label + ': ' + val);
         }
     }
 
@@ -866,27 +875,282 @@ function generateBunkerAIPromptMini(bunker, survivors, eliminated) {
         }
     }
 
+    var totalCards = countPromptCards(survivors) + countPromptCards(eliminated);
+    var totalPlayers = survivors.length + eliminated.length;
+
     lines.push('══════════════════════════════════════');
-    lines.push('📋 ЗАДАНИЕ (коротко, до 350 слов):');
+    lines.push('📋 ЗАДАНИЕ — быстро, но по КАЖДОЙ карточке:');
     lines.push('══════════════════════════════════════');
     lines.push('');
-    lines.push('1. Вердикт: ДА/НЕТ/ЧАСТИЧНО + одна конкретная цифра');
+    lines.push('1. ПОКАРТОЧНЫЙ ПРОГОН — это главная часть ответа.');
+    lines.push('   На каждого игрока — свой блок. Внутри блока');
+    lines.push('   РОВНО ОДНА строка на каждую карточку, не длиннее 10 слов:');
+    lines.push('');
+    lines.push('   <карточка дословно> — <что она даёт при ЭТОЙ катастрофе> <✅ / 😐 / 💀>');
+    lines.push('     ✅ спасает   😐 бесполезна   💀 губит');
+    lines.push('');
+    lines.push('   Закрывай блок строкой: ⇒ ИТОГ: <вердикт по продукту, 5-7 слов>');
+    lines.push('');
+    lines.push('   Пропускать карточки НЕЛЬЗЯ — упаковка, отзыв, бонус');
+    lines.push('   и исторический факт идут наравне с предметом.');
+    lines.push('   Всего карточек к разбору: ' + totalCards + ' у ' + totalPlayers + ' игроков.');
+    lines.push('   Значков на строку — ровно один, без пояснений после него.');
+    lines.push('');
+    lines.push('2. Вердикт: ДА/НЕТ/ЧАСТИЧНО + одна конкретная цифра');
     lines.push('   (сколько % выжило или сколько дней продержались).');
     lines.push('');
-    lines.push('2. MVP и FAIL:');
-    lines.push('   — Чей продукт спас (используй название + одну деталь из бонуса/упаковки)');
+    lines.push('3. MVP и FAIL — ссылайся на строки из пункта 1:');
+    lines.push('   — Чей продукт спас (название + одна деталь из бонуса/упаковки)');
     lines.push('   — Чей дефект всех подставил (обыграй буквально)');
     lines.push('');
-    lines.push('3. Самый абсурдный момент первой недели:');
-    lines.push('   — Один абзац');
+    lines.push('4. Самый абсурдный момент первой недели:');
+    lines.push('   — Один абзац, не больше');
     lines.push('   — Обязательно упомяни ОТЗЫВ одного из игроков как пророчество');
     lines.push('');
-    lines.push('4. Мог ли выбывший изменить всё? (1 предложение)');
+    lines.push('5. Мог ли выбывший изменить всё? (1 предложение)');
     lines.push('');
     lines.push('Стиль:');
     lines.push('— Как стендап-комик пересказывает новости');
     lines.push('— Чёрный юмор + конкретика');
     lines.push('— Без «возможно», «вероятно» — только факты из параллельной реальности');
+    lines.push('— В пункте 1 — только строки, никакой прозы и вступлений.');
+    lines.push('— Пункты 2-5 держи сжатыми: рубленые фразы, без разгона и повторов.');
+    lines.push('  Разбор из пункта 1 не сокращай ради краткости — он важнее.');
+
+    return lines.join('\n');
+}
+
+// Сколько карточек реально роздано — нужно, чтобы задать модели
+// честный объём разбора вместо абстрактного «коротко»
+function countPromptCards(players) {
+    var n = 0;
+    for (var i = 0; i < players.length; i++) {
+        var cards = players[i].cards || {};
+        for (var k = 0; k < PROMPT_CARD_KEYS.length; k++) {
+            if (cards[PROMPT_CARD_KEYS[k]]) n++;
+        }
+    }
+    return n;
+}
+
+// ═══════════════════════════════════════════
+// ГЕНЕРАТОР ПРОМПТА «ВЕРДИКТ»
+// Самый короткий из четырёх: только исход, без покарточного разбора.
+// На вход даётся сжатый состав — если вывалить все девять карт на игрока,
+// модель начинает их перечислять и вердикт превращается в мини-промпт.
+// ═══════════════════════════════════════════
+
+function generateBunkerAIPromptVerdict(bunker, survivors, eliminated) {
+    var lines = [];
+
+    lines.push('=== 🏠 БУНКЕР — ФИНАЛЬНЫЙ ВЕРДИКТ ===');
+    lines.push('');
+    lines.push('Скажи одно: пережили они катастрофу с тем, что у них было, или нет.');
+    lines.push('');
+    lines.push('КАТАСТРОФА:');
+    lines.push(bunker.globalProblem || 'Неизвестная угроза');
+    lines.push('');
+
+    lines.push('В БУНКЕРЕ (' + survivors.length + '):');
+    for (var si = 0; si < survivors.length; si++) {
+        lines.push(formatPlayerCompact(survivors[si]));
+    }
+    lines.push('');
+
+    if (eliminated.length > 0) {
+        lines.push('ОСТАЛИСЬ СНАРУЖИ (' + eliminated.length + '):');
+        for (var ei = 0; ei < eliminated.length; ei++) {
+            lines.push(formatPlayerCompact(eliminated[ei]));
+        }
+        lines.push('');
+    }
+
+    lines.push('══════════════════════════════════════');
+    lines.push('📋 ЧТО НУЖНО — три абзаца, читается вслух за 30 секунд:');
+    lines.push('══════════════════════════════════════');
+    lines.push('');
+    lines.push('1. ВЕРДИКТ первой строкой, заглавными:');
+    lines.push('   ВЫЖИЛИ / ВЫЖИЛИ ЧАСТИЧНО / НЕ ВЫЖИЛИ');
+    lines.push('   и сразу срок — сколько они продержались. Конкретная цифра.');
+    lines.push('');
+    lines.push('2. ПОЧЕМУ — 2-3 предложения.');
+    lines.push('   Чего им хватило, чего не хватило, что стало последней каплей.');
+    lines.push('   Говори о бункере как о целом: «у них было», «им не хватило».');
+    lines.push('');
+    lines.push('3. КТО ОКАЗАЛСЯ ЛИШНИМ — одна фраза.');
+    lines.push('   Чьё присутствие ничего не изменило — или всё испортило.');
+    lines.push('   Если зря выгнали кого-то из оставшихся снаружи — скажи это здесь.');
+    lines.push('');
+    lines.push('Всё. Больше ничего.');
+    lines.push('');
+    lines.push('🚫 НЕЛЬЗЯ:');
+    lines.push('— Разбирать предметы по характеристикам. Это приговор, а не экспертиза.');
+    lines.push('— Списков, таблиц, заголовков, оценок в баллах, процентов по каждому.');
+    lines.push('— Хроники по дням и сцен из жизни бункера.');
+    lines.push('— «Возможно» и «скорее всего». Вердикт выносится один раз и без оговорок.');
+    lines.push('');
+    lines.push('⚡ ТОН:');
+    lines.push('— Как диктор, зачитывающий результат в прямом эфире: спокойно и окончательно.');
+    lines.push('— Мрачно, но с сухой усмешкой. Абсурд предметов принимай как данность,');
+    lines.push('  всерьёз и без подмигиваний.');
+    lines.push('— Три абзаца максимум. Ни одного лишнего слова.');
+
+    return lines.join('\n');
+}
+
+// Сжатая строка про игрока: название продукта и пара решающих для выживания
+// деталей. Полный список карт здесь намеренно не разворачивается.
+function formatPlayerCompact(player) {
+    var cards = player.cards || {};
+
+    var productName = '';
+    if (cards.adjective) productName += cards.adjective + ' ';
+    if (cards.item) productName += cards.item;
+    if (cards.modifier) productName += ' ' + cards.modifier;
+    productName = productName.trim() || 'продукт не определён';
+
+    var parts = ['— ' + (player.nickname || 'Неизвестный') + ': ' + productName];
+    if (cards.feature) parts.push('умеет: ' + cards.feature);
+    if (cards.gift) parts.push('в комплекте: ' + cards.gift);
+    if (cards.hiddenDefect) parts.push('дефект: ' + cards.hiddenDefect);
+
+    return parts.join(' | ');
+}
+
+// ═══════════════════════════════════════════
+// ГЕНЕРАТОР ПРОМПТА «РАЗБОР ИЗОБРЕТЕНИЙ»
+// Не история выживания, а экспертиза: что каждая карточка сделала
+// с самой катастрофой. Сознательно построен на другом каркасе,
+// чем два промпта выше — там повествование, здесь отчёт.
+// ═══════════════════════════════════════════
+
+function generateBunkerAIPromptImpact(bunker, survivors, eliminated) {
+    var lines = [];
+
+    lines.push('=== 🔬 ИННОВАЦИОННЫЙ ШИРПОТРЕБ — ЭКСПЕРТИЗА ВОЗДЕЙСТВИЯ ===');
+    lines.push('');
+    lines.push('Ты — ведущий аналитик Комиссии по оценке последствий глобальной катастрофы.');
+    lines.push('Твоя работа — не рассказывать истории, а РАЗБИРАТЬ МЕХАНИЗМЫ.');
+    lines.push('Перед тобой реестр изобретений, оказавшихся в эпицентре событий.');
+    lines.push('Установи, как каждое из них — и каждая отдельная его характеристика —');
+    lines.push('повлияло на ход самой катастрофы.');
+    lines.push('');
+    lines.push('Пиши как эксперт, от точности отчёта которого зависит всё:');
+    lines.push('сухо по форме, беспощадно по содержанию, драматично по сути.');
+    lines.push('');
+
+    // Явные рамки — иначе модель по инерции скатывается в «день первый, день второй»
+    lines.push('══════════════════════════════════════');
+    lines.push('🚫 РАМКИ ОТЧЁТА — НАРУШАТЬ ЗАПРЕЩЕНО:');
+    lines.push('══════════════════════════════════════');
+    lines.push('— НИКАКОЙ хронологии: ни «день первый», ни «первая неделя», ни «спустя месяц».');
+    lines.push('— НИКАКИХ сцен выживания, диалогов, конфликтов и бункерного быта.');
+    lines.push('— Не пересказывай, как людям жилось. Разбирай, что сделали ПРЕДМЕТЫ.');
+    lines.push('— Не спрашивай «выжили ли они» — оценивай, что стало с САМОЙ КАТАСТРОФОЙ.');
+    lines.push('— Никаких «возможно» и «наверное»: у эксперта выводы, а не догадки.');
+    lines.push('— Без вступлений и извинений: начинай сразу с ШАГА 1.');
+    lines.push('');
+
+    // Объект экспертизы
+    lines.push('══════════════════════════════════════');
+    lines.push('🌍 ОБЪЕКТ ЭКСПЕРТИЗЫ — КАТАСТРОФА:');
+    lines.push('══════════════════════════════════════');
+    lines.push(bunker.globalProblem || 'Неизвестная угроза');
+    lines.push('');
+
+    // Реестр
+    lines.push('══════════════════════════════════════');
+    lines.push('🧾 РЕЕСТР ИЗОБРЕТЕНИЙ');
+    lines.push('══════════════════════════════════════');
+    lines.push('');
+    lines.push('▼ ДОПУЩЕНЫ В БУНКЕР — сработали в полную силу (' + survivors.length + '):');
+    lines.push('');
+    for (var si = 0; si < survivors.length; si++) {
+        lines.push(formatPlayerForPrompt(survivors[si], si + 1));
+    }
+
+    if (eliminated.length > 0) {
+        lines.push('▼ ОТСЕЧЕНЫ — не были задействованы (' + eliminated.length + '):');
+        lines.push('');
+        for (var ei = 0; ei < eliminated.length; ei++) {
+            lines.push(formatPlayerForPrompt(eliminated[ei], ei + 1));
+        }
+    }
+
+    // Регламент
+    lines.push('══════════════════════════════════════');
+    lines.push('📋 РЕГЛАМЕНТ ЭКСПЕРТИЗЫ');
+    lines.push('══════════════════════════════════════');
+    lines.push('');
+    lines.push('ШАГ 1. ДЕКОМПОЗИЦИЯ КАТАСТРОФЫ');
+    lines.push('Разложи катастрофу на 3-5 конкретных поражающих факторов —');
+    lines.push('что именно она убивает, ломает, отравляет или отнимает.');
+    lines.push('Дай каждому короткое имя. Дальше ссылайся на них по этим именам:');
+    lines.push('это система координат всего отчёта.');
+    lines.push('');
+    lines.push('ШАГ 2. ПОКАРТОЧНЫЙ РАЗБОР — ПО КАЖДОМУ ИЗОБРЕТЕНИЮ');
+    lines.push('Выдай досье строго в таком виде:');
+    lines.push('');
+    lines.push('  ▸ ПРОДУКТ: <название> | автор: <ник> | статус: <в бункере / отсечён>');
+    lines.push('');
+    lines.push('    ОТДЕЛЬНАЯ СТРОКА НА КАЖДУЮ КАРТОЧКУ, формат:');
+    lines.push('    <карточка дословно> → <какой поражающий фактор задевает и каким');
+    lines.push('    именно физическим или социальным механизмом> → <↓ гасит / = нейтрально /');
+    lines.push('    ↑ разгоняет> <сила 0-10>');
+    lines.push('');
+    lines.push('    ⚙️ СОВОКУПНЫЙ ЭФФЕКТ: одно плотное предложение — что продукт');
+    lines.push('       целиком сделал с катастрофой.');
+    lines.push('    🎯 РОЛЬ В ИСХОДЕ: переломная / весомая / фоновая / вредоносная');
+    lines.push('');
+    lines.push('Пропускать карточки запрещено — разбирается каждая, включая упаковку');
+    lines.push('и исторический факт. Скрытый дефект и отзыв клиента идут наравне');
+    lines.push('с остальными: часто именно они переворачивают итоговую оценку.');
+    lines.push('Отсечённые изобретения разбираются так же подробно, но их вектор —');
+    lines.push('это нереализованный потенциал, а не фактическое воздействие.');
+    lines.push('');
+    lines.push('ШАГ 3. ЦЕПНЫЕ РЕАКЦИИ');
+    lines.push('Найди 3-4 связки, где изобретения РАЗНЫХ авторов сработали вместе.');
+    lines.push('Формат: <продукт A> + <продукт B> = <что получилось на выходе>');
+    lines.push('(синергия / взаимное гашение / незапланированный побочный эффект)');
+    lines.push('Описывай механизм, а не сцену.');
+    lines.push('');
+    lines.push('ШАГ 4. РЕЙТИНГ ВЛИЯНИЯ');
+    lines.push('Таблица всех изобретений по силе воздействия на катастрофу —');
+    lines.push('от максимального к нулевому.');
+    lines.push('Колонки: место | продукт | автор | вектор | оценка 0-10 | обоснование одной фразой.');
+    lines.push('Отдельно назови:');
+    lines.push('  🏆 РЕШАЮЩИЙ ФАКТОР — изобретение, без которого всё пошло бы иначе.');
+    lines.push('  ☠️ КРИТИЧЕСКИЙ ПРОСЧЁТ — конкретная карточка, нанёсшая больше всего вреда.');
+    lines.push('  🃏 НЕДООЦЕНЁННОЕ — то, чью роль никто не мог предугадать.');
+    lines.push('');
+    lines.push('ШАГ 5. СОСТОЯНИЕ КАТАСТРОФЫ НА МОМЕНТ ОТЧЁТА');
+    lines.push('— Пройдись по каждому поражающему фактору из шага 1 и укажи его судьбу:');
+    lines.push('  СНЯТ / ОСЛАБЛЕН / БЕЗ ИЗМЕНЕНИЙ / УСИЛЕН.');
+    lines.push('— Изменила ли катастрофа свою природу? Во что она превратилась?');
+    lines.push('— Итоговый статус одной строкой:');
+    lines.push('  ЛОКАЛИЗОВАНА / СДЕРЖИВАЕТСЯ / НЕОБРАТИМА / ПЕРЕРОДИЛАСЬ ВО ЧТО-ТО ХУДШЕЕ.');
+    lines.push('');
+
+    if (eliminated.length > 0) {
+        lines.push('ШАГ 6. ПЕРЕСЧЁТ ПО ОТСЕЧЁННЫМ');
+        lines.push('По каждому отсечённому изобретению — одна строка:');
+        lines.push('какой поражающий фактор оно закрывало и как изменился бы');
+        lines.push('итоговый статус из шага 5, будь оно допущено.');
+        lines.push('Без сожалений и морали — только расчёт.');
+        lines.push('');
+    }
+
+    lines.push('══════════════════════════════════════');
+    lines.push('⚡ ТРЕБОВАНИЯ К ТЕКСТУ:');
+    lines.push('══════════════════════════════════════');
+    lines.push('— Голос эксперта: точный, холодный, местами циничный.');
+    lines.push('  Драма рождается из фактов, а не из прилагательных.');
+    lines.push('— Каждое утверждение опирается на конкретную карточку, названную дословно.');
+    lines.push('— Абсурдные предметы разбирай абсолютно всерьёз, с инженерной дотошностью —');
+    lines.push('  в этом весь эффект. Ни разу не подмигивай читателю.');
+    lines.push('— Держи структуру отчёта: заголовки шагов, досье, таблица. Это не эссе.');
+    lines.push('— Объём: столько, сколько нужно на полный разбор всех карточек, без сокращений.');
+    lines.push('');
 
     return lines.join('\n');
 }

@@ -381,9 +381,9 @@ export function renderLobby(container) {
     }
     html += '</span>';
     if (state.isHost) {
-        html += '<button id="btn-toggle-code" class="p-2 rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скрыть/показать код">' + (IS_CODE_HIDDEN ? '🙈' : '👁') + '</button>';
+        html += '<button id="btn-toggle-code" class="min-w-10 min-h-10 flex items-center justify-center rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скрыть/показать код">' + (IS_CODE_HIDDEN ? '🙈' : '👁') + '</button>';
     }
-    html += '<button id="btn-copy" class="p-2 rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скопировать">📋</button>';
+    html += '<button id="btn-copy" class="min-w-10 min-h-10 flex items-center justify-center rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скопировать">📋</button>';
     html += '</div>';
     html += '<p class="text-xs text-corp-muted mt-3">' + (IS_CODE_HIDDEN && state.isHost ? 'Код скрыт. Нажмите 👁 чтобы снова показать.' : 'Отправьте этот код инвесторам') + '</p>';
     html += '</div>';

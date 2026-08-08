@@ -5,6 +5,7 @@ import { updatePlayersList, updateStartButton, updateSettingsPanel, updateRoomHe
 import { speakSequence, stopSpeaking } from './components/speech.js';
 import { appendChatMsg, renderBunkerChat, removeChatMsgFromDom } from './components/bunker-chat.js';
 import { setPendingReveal } from './screens/bunker-game.js';
+import { resetWelcomeButtons } from './screens/welcome.js';
 
 var ws = null;
 var reconnectAttempts = 0;
@@ -461,11 +462,24 @@ function handleMessage(msg) {
             } else {
                 showNotification(msg.nickname + ' отключился', 'error');
             }
+            if (msg.players) setState({ players: msg.players });
+            refreshCurrentScreen();
             break;
 
         case 'playerLeft':
             showNotification(msg.nickname + ' вышел из игры', 'info');
             if (msg.players) setState({ players: msg.players });
+            // setState сам ничего не перерисовывает — без этого ушедший игрок
+            // так и остаётся в сетке участников до следующей смены экрана.
+            refreshCurrentScreen();
+            break;
+
+        case 'roomClosed':
+            showNotification(msg.message || 'Комната закрыта', 'error');
+            playSound('warning');
+            try { sessionStorage.removeItem('gameSession'); } catch (e) {}
+            setState({ playerId: null, roomCode: null, isHost: false, isSpectator: false, spectators: [], players: [] });
+            navigate('welcome');
             break;
 
         case 'spectatorsUpdate':
@@ -495,6 +509,7 @@ function handleMessage(msg) {
         case 'error':
             showNotification(msg.message, 'error');
             playSound('warning');
+            resetWelcomeButtons();
             break;
 
         case 'tiebreakerReadyAccepted':
@@ -514,11 +529,15 @@ function handleMessage(msg) {
         case 'playerEliminated':
             showNotification(msg.nickname + ' выбыл из раунда', 'error');
             playSound('warning');
+            if (msg.players) setState({ players: msg.players });
+            refreshCurrentScreen();
             break;
 
         case 'playerReconnected':
             showNotification(msg.nickname + ' вернулся!', 'success');
             playSound('join');
+            if (msg.players) setState({ players: msg.players });
+            refreshCurrentScreen();
             break;
 
         case 'cardInputPhase':
@@ -969,6 +988,19 @@ function handleBunkerVoteResult(msg) {
     }
 }
 
+// Экраны со списком участников, которые можно безболезненно перерисовать:
+// пользовательского ввода, который бы затёрся, на них нет.
+var REFRESHABLE_PHASES = ['bunkerReveal', 'bunkerVote', 'bunkerTieVote'];
+
+// setState() ничего не рендерит сам, поэтому изменения состава игроков
+// нужно явным образом «докатить» до текущего экрана.
+function refreshCurrentScreen() {
+    if (REFRESHABLE_PHASES.indexOf(state.phase) === -1) return;
+    var remainingTime = state.timerRemaining;
+    navigate(state.phase);
+    if (remainingTime > 0) startTimer(remainingTime);
+}
+
 function handleBunkerPlayerKicked(msg) {
     var bunker = Object.assign({}, state.bunker);
     bunker.eliminatedPlayers = msg.eliminatedPlayers || bunker.eliminatedPlayers;
@@ -979,18 +1011,18 @@ function handleBunkerPlayerKicked(msg) {
         players: msg.players || state.players,
     });
 
-    showNotification('🚫 Ведущий исключил «' + msg.nickname + '» из бункера', 'warning');
+    if (msg.reason === 'disconnect') {
+        showNotification('📴 «' + msg.nickname + '» не вернулся и выбыл из бункера', 'warning');
+    } else if (msg.reason === 'leave') {
+        showNotification('🚪 «' + msg.nickname + '» покинул бункер', 'warning');
+    } else {
+        showNotification('🚫 Ведущий исключил «' + msg.nickname + '» из бункера', 'warning');
+    }
     playSound('warning');
 
     // Возможные последующие сообщения (bunkerTurn / bunkerVoteResult / bunkerGameOver)
     // сами перерисуют экран корректно; здесь просто обновляем то, что видно сейчас.
-    if (state.phase === 'bunkerReveal') {
-        var remainingTime = state.timerRemaining;
-        navigate('bunkerReveal');
-        if (remainingTime > 0) startTimer(remainingTime);
-    } else if (state.phase === 'bunkerVote') {
-        navigate('bunkerVote');
-    }
+    refreshCurrentScreen();
 }
 
 function handleBunkerTieVotePhase(msg) {

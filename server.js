@@ -2346,6 +2346,15 @@ const playerRooms = new Map(); // ws -> { roomCode, playerId }
 const disconnectTimers = new Map(); // playerId -> setTimeout id
 const browserClients = new Set(); // WS connections not yet in a room
 const RECONNECT_TIMEOUT = 300000; // 5 минут на возврат (мобильные могут долго переподключаться)
+
+// ── Уборка «мёртвых» комнат ────────────────────────────────────────────
+// Комната живёт в памяти даже когда все отключились: игрокам даётся RECONNECT_TIMEOUT
+// на возврат. Но если никто так и не вернулся — её нужно снести, иначе она навсегда
+// висит в списке открытых комнат и держит игроков «в игре».
+const ROOM_SWEEP_INTERVAL = 30 * 1000;                    // как часто проверяем комнаты
+const EMPTY_ROOM_GRACE = RECONNECT_TIMEOUT + 60 * 1000;   // 6 мин без единого подключённого — удаляем
+const IDLE_GAME_TIMEOUT = 30 * 60 * 1000;                 // 30 мин без действий игроков — принудительно завершаем партию
+const DEAD_ROOM_TIMEOUT = 2 * 60 * 60 * 1000;             // 2 часа полной тишины — удаляем в любом состоянии
 const ANON_NAMES = [
     'Богатый Волк', 'Миллионер из трущоб', 'Тихий Единорог', 'Крипто-Барон', 'Смелый Кальмар',
     'Железный Инвестор', 'Ночной Брокер', 'Солнечный Капиталист', 'Лазерный Банкир', 'Громкий Фонд',
@@ -2474,9 +2483,32 @@ function createRoom(hostId, settings) {
         },
         investmentCaps: {},
         anonAliases: {},
+        // Для уборки заброшенных комнат
+        createdAt: Date.now(),
+        lastActivityAt: Date.now(),
+        emptySince: null,
     };
     rooms.set(code, room);
     return room;
+}
+
+// Любое сообщение от игрока комнаты = комната жива
+function touchRoom(room) {
+    if (room) room.lastActivityAt = Date.now();
+}
+
+// Сколько живых (реально подключённых) участников в комнате — игроки + зрители
+function countConnectedParticipants(room) {
+    var n = 0;
+    room.players.forEach(function (p) {
+        if (p.connected && p.ws && p.ws.readyState === 1) n++;
+    });
+    if (room.spectators) {
+        room.spectators.forEach(function (s) {
+            if (s.ws && s.ws.readyState === 1) n++;
+        });
+    }
+    return n;
 }
 
 function addPlayer(room, playerId, nickname, ws) {
@@ -2642,11 +2674,21 @@ function handlePlayerTimeout(room, playerId) {
     console.log(`[TIMEOUT] "${player.nickname}" не вернулся — выбывает`);
     player.eliminated = true;
 
+    // В «Бункере» отвалившегося нужно именно вывести из партии: пока он не попал
+    // в bunker.eliminatedPlayers, он остаётся «живым» в сетке участников,
+    // получает ходы и блокирует подсчёт голосов.
+    if (BUNKER_ACTIVE_STATES.includes(room.state)) {
+        removeFromBunkerGame(room, playerId, 'disconnect');
+        broadcastRoomsList();
+        return;
+    }
+
     broadcastToRoom(room, {
         type: 'playerEliminated',
         playerId: playerId,
         nickname: player.nickname,
         message: player.nickname + ' не вернулся и выбывает из раунда',
+        players: getPlayersPublicInfo(room),
     });
 
     switch (room.state) {
@@ -2673,59 +2715,6 @@ function handlePlayerTimeout(room, playerId) {
             if (room.tiedPlayers.includes(playerId)) {
                 player.tbReady = true;
                 checkAllTiebreakerReady(room);
-            }
-            break;
-
-        case 'bunkerReveal': {
-            var bActivePlayers = getBunkerActivePlayers(room);
-            if (room.bunker.currentTurnIndex < bActivePlayers.length &&
-                bActivePlayers[room.bunker.currentTurnIndex] === playerId) {
-                clearTimer(room);
-                // Авто-раскрываем случайную карту
-                var unrevealed = getUnrevealedCards(room, playerId);
-                if (unrevealed.length > 0) {
-                    var autoKey = unrevealed[Math.floor(Math.random() * unrevealed.length)];
-                    bunkerRevealCard(room, playerId, autoKey, true);
-                }
-                room.bunker.currentTurnIndex++;
-                showBunkerCurrentTurn(room);
-            }
-            break;
-        }
-
-        case 'bunkerVote':
-            if (!room.bunker.votes.has(playerId)) {
-                room.bunker.votes.set(playerId, '__skip__');
-                var activeCount3 = 0;
-                var votedCount3 = 0;
-                room.players.forEach(p => {
-                    if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
-                        activeCount3++;
-                        if (room.bunker.votes.has(p.id)) votedCount3++;
-                    }
-                });
-                if (votedCount3 >= activeCount3) {
-                    clearTimer(room);
-                    processBunkerVotes(room);
-                }
-            }
-            break;
-
-        case 'bunkerTieVote':
-            if (!room.bunker.tieVotes.has(playerId)) {
-                room.bunker.tieVotes.set(playerId, '__skip__');
-                var activeCount4 = 0;
-                var votedCount4 = 0;
-                room.players.forEach(p => {
-                    if (!room.bunker.eliminatedPlayers.includes(p.id) && p.connected) {
-                        activeCount4++;
-                        if (room.bunker.tieVotes.has(p.id)) votedCount4++;
-                    }
-                });
-                if (votedCount4 >= activeCount4) {
-                    clearTimer(room);
-                    processBunkerTieVotes(room);
-                }
             }
             break;
 
@@ -2764,6 +2753,19 @@ function handlePlayerTimeout(room, playerId) {
             }
             break;
     }
+
+    // Раньше выбывший по таймауту так и оставался в room.players, поэтому игра,
+    // из которой все разошлись, висела «активной» бесконечно. Считаем живых —
+    // если играть уже некому, подводим итоги и комната уходит из списка открытых.
+    if (REGULAR_ACTIVE_STATES.includes(room.state)) {
+        var stillPlaying = 0;
+        room.players.forEach(p => { if (p.connected && !p.eliminated) stillPlaying++; });
+        if (stillPlaying <= 1) {
+            clearTimer(room);
+            showFinalResults(room);
+        }
+    }
+    broadcastRoomsList();
 }
 
 // Отправить игроку его текущее состояние при реконнекте
@@ -3571,12 +3573,16 @@ function getPublicRoomInfo(room) {
     }
 
     var hostPlayer = room.players.get(room.hostId);
+    // Считаем только тех, кто реально на связи: отвалившиеся во время партии висят
+    // в room.players до конца окна реконнекта и раздували счётчик в списке комнат.
+    var connectedCount = 0;
+    room.players.forEach(function (p) { if (p.connected && p.ws && p.ws.readyState === 1) connectedCount++; });
     return {
         code: room.code,
         roomName: s.roomName || '',
         stateType,
         stateLabel,
-        playerCount: room.players.size,
+        playerCount: connectedCount,
         maxPlayers: s.maxPlayers || 8,
         spectatorCount: room.spectators ? room.spectators.size : 0,
         hostName: hostPlayer ? hostPlayer.nickname : '???',
@@ -3594,6 +3600,9 @@ function getPublicRoomsList() {
     rooms.forEach(function(room) {
         if (room.settings.roomPrivate) return;
         if (ROOM_LIST_HIDDEN_STATES.includes(room.state)) return;
+        // Комната ещё жива в памяти (идёт окно на реконнект), но за столом никого нет —
+        // показывать её в общем списке незачем: зайти туда всё равно не к кому.
+        if (countConnectedParticipants(room) === 0) return;
         list.push(getPublicRoomInfo(room));
     });
     return list;
@@ -3652,6 +3661,10 @@ wss.on('connection', (ws) => {
         let msg;
         resetAfkTimer(); // Сбрасываем AFK при любой активности
         try { msg = JSON.parse(data.toString()); } catch (e) { return; }
+
+        // Отмечаем, что в комнате что-то происходит — иначе уборщик сочтёт её заброшенной
+        var actInfo = playerRooms.get(ws);
+        if (actInfo) touchRoom(rooms.get(actInfo.roomCode));
 
         switch (msg.type) {
             // ==================== СОЗДАНИЕ КОМНАТЫ ====================
@@ -3908,6 +3921,9 @@ wss.on('connection', (ws) => {
                 if (dTimerR) { clearTimeout(dTimerR); disconnectTimers.delete(reconnPlayerId); }
                 reconnPlayer.ws = ws;
                 reconnPlayer.connected = true;
+                reconnRoom.emptySince = null;
+                touchRoom(reconnRoom);
+                browserClients.delete(ws);
                 playerRooms.set(ws, { roomCode: reconnCode, playerId: reconnPlayerId });
                 console.log(`[RECONNECT] "${reconnPlayer.nickname}" reconnected to ${reconnCode}`);
                 broadcastToRoom(reconnRoom, {
@@ -3917,6 +3933,7 @@ wss.on('connection', (ws) => {
                     players: getPlayersPublicInfo(reconnRoom),
                 });
                 sendCurrentStateToPlayer(reconnRoom, reconnPlayer, ws);
+                broadcastRoomsList();
                 break;
             }
 
@@ -4001,22 +4018,31 @@ wss.on('connection', (ws) => {
                 }
                 var lvPlayer = lvRoom.players.get(lvInfo.playerId);
                 if (!lvPlayer) break;
+                var lvNick = lvPlayer.nickname;
+                var lvWasBunker = BUNKER_ACTIVE_STATES.includes(lvRoom.state);
                 lvRoom.players.delete(lvInfo.playerId);
                 playerRooms.delete(ws);
                 var lvTimer = disconnectTimers.get(lvInfo.playerId);
                 if (lvTimer) { clearTimeout(lvTimer); disconnectTimers.delete(lvInfo.playerId); }
-                console.log(`[LEAVE] "${lvPlayer.nickname}" left ${lvRoom.code}`);
+                console.log(`[LEAVE] "${lvNick}" left ${lvRoom.code}`);
                 if (lvRoom.players.size === 0 && (!lvRoom.spectators || lvRoom.spectators.size === 0)) {
-                    clearTimer(lvRoom);
-                    rooms.delete(lvRoom.code);
+                    destroyRoom(lvRoom, 'empty');
                 } else {
                     if (lvRoom.hostId === lvInfo.playerId) {
                         var lvFirst = lvRoom.players.values().next().value;
                         if (lvFirst) { lvRoom.hostId = lvFirst.id; lvFirst.isHost = true; }
                     }
-                    broadcastToRoom(lvRoom, { type: 'playerLeft', playerId: lvInfo.playerId, nickname: lvPlayer.nickname, players: getPlayersPublicInfo(lvRoom) });
-                    if (lvRoom.state === 'lobby') broadcastToRoom(lvRoom, getLobbyState(lvRoom));
-                    else maybeEndGameForLowPlayerCount(lvRoom, lvInfo.playerId);
+                    broadcastToRoom(lvRoom, { type: 'playerLeft', playerId: lvInfo.playerId, nickname: lvNick, players: getPlayersPublicInfo(lvRoom) });
+                    if (lvRoom.state === 'lobby') {
+                        broadcastToRoom(lvRoom, getLobbyState(lvRoom));
+                    } else if (lvWasBunker) {
+                        // Ушедшего надо вывести из партии целиком: пометить выбывшим, сдвинуть
+                        // ход и пересчитать голоса — иначе он «ходит» и после выхода.
+                        removeFromBunkerGame(lvRoom, lvInfo.playerId, 'leave', lvNick);
+                        maybeEndGameForLowPlayerCount(lvRoom, lvInfo.playerId);
+                    } else {
+                        maybeEndGameForLowPlayerCount(lvRoom, lvInfo.playerId);
+                    }
                 }
                 // Клиент вернулся на главную — снова считаем его "браузером" комнат
                 browserClients.add(ws);
@@ -4751,6 +4777,7 @@ wss.on('connection', (ws) => {
                         type: 'spectatorsUpdate',
                         spectators: getSpectatorsPublicInfo(room),
                     });
+                    broadcastRoomsList();
                     return;
                 }
                 const player = room.players.get(info.playerId);
@@ -4763,9 +4790,7 @@ wss.on('connection', (ws) => {
                         // В лобби — просто удаляем
                         room.players.delete(info.playerId);
                         if (room.players.size === 0) {
-                            clearTimer(room);
-                            rooms.delete(room.code);
-                            console.log(`[ROOM] ${room.code} deleted (empty)`);
+                            destroyRoom(room, 'empty');
                         } else {
                             if (room.hostId === info.playerId) {
                                 const first = room.players.values().next().value;
@@ -4795,6 +4820,9 @@ wss.on('connection', (ws) => {
                         }, RECONNECT_TIMEOUT);
 
                         disconnectTimers.set(info.playerId, timerId);
+                        // Счётчик живых игроков в списке комнат изменился — обновляем его сразу,
+                        // а не только когда кто-то дойдёт до конца партии.
+                        broadcastRoomsList();
                     }
                 }
             }
@@ -4813,6 +4841,97 @@ const pingInterval = setInterval(() => {
 }, 30000);
 
 wss.on('close', () => { clearInterval(pingInterval); });
+
+// =====================================================================
+// УБОРКА ЗАБРОШЕННЫХ КОМНАТ
+// =====================================================================
+
+// Полностью убирает комнату: гасит таймеры, отвязывает сокеты, чистит список.
+function destroyRoom(room, reason) {
+    if (!room || !rooms.has(room.code)) return;
+
+    clearTimer(room);
+    if (room.autoFinalTimer) { clearTimeout(room.autoFinalTimer); room.autoFinalTimer = null; }
+
+    // Таймеры реконнекта игроков этой комнаты больше не нужны
+    room.players.forEach(function (p) {
+        var t = disconnectTimers.get(p.id);
+        if (t) { clearTimeout(t); disconnectTimers.delete(p.id); }
+    });
+
+    // Если кто-то всё же остался на связи — выкидываем его на главную
+    var closeMsg = JSON.stringify({
+        type: 'roomClosed',
+        message: reason === 'idle'
+            ? 'Комната закрыта: слишком долго не было активности.'
+            : 'Комната закрыта: в ней не осталось игроков.',
+    });
+    playerRooms.forEach(function (info, ws) {
+        if (info.roomCode !== room.code) return;
+        playerRooms.delete(ws);
+        if (ws.readyState === 1) {
+            ws.send(closeMsg);
+            browserClients.add(ws);
+            ws.send(JSON.stringify({ type: 'roomsList', rooms: getPublicRoomsList() }));
+        }
+    });
+
+    rooms.delete(room.code);
+    console.log(`[ROOM] ${room.code} deleted (${reason})`);
+    broadcastRoomsList();
+}
+
+// Принудительно завершает зависшую партию, чтобы она перешла в состояние «Завершена».
+function forceFinishStaleGame(room) {
+    clearTimer(room);
+    if (BUNKER_ACTIVE_STATES.includes(room.state)) {
+        endBunkerGame(room);
+    } else if (REGULAR_ACTIVE_STATES.includes(room.state)) {
+        showFinalResults(room);
+    }
+}
+
+const roomSweepInterval = setInterval(() => {
+    var now = Date.now();
+    var toDestroy = [];
+    var toFinish = [];
+
+    rooms.forEach(function (room) {
+        var alive = countConnectedParticipants(room);
+
+        if (alive === 0) {
+            if (!room.emptySince) room.emptySince = now;
+            // Никто не вернулся за всё окно реконнекта — комната мертва
+            if (now - room.emptySince > EMPTY_ROOM_GRACE) {
+                toDestroy.push([room, 'empty']);
+                return;
+            }
+        } else {
+            room.emptySince = null;
+        }
+
+        // Полная тишина слишком долго — сносим, даже если сокеты формально живы
+        if (now - room.lastActivityAt > DEAD_ROOM_TIMEOUT) {
+            toDestroy.push([room, 'idle']);
+            return;
+        }
+
+        // Партия идёт, но игроки давно ничего не делают — доигрывать нечего
+        var inGame = BUNKER_ACTIVE_STATES.includes(room.state) || REGULAR_ACTIVE_STATES.includes(room.state);
+        if (inGame && now - room.lastActivityAt > IDLE_GAME_TIMEOUT) {
+            toFinish.push(room);
+        }
+    });
+
+    // Мутируем rooms только после обхода, чтобы не ломать forEach
+    toFinish.forEach(function (room) {
+        console.log(`[SWEEP] ${room.code} — партия зависла без активности, завершаем`);
+        forceFinishStaleGame(room);
+    });
+    toDestroy.forEach(function (pair) { destroyRoom(pair[0], pair[1]); });
+}, ROOM_SWEEP_INTERVAL);
+
+wss.on('close', () => { clearInterval(roomSweepInterval); });
 
 // =====================================================================
 // ЗАПУСК СЕРВЕРА
@@ -5828,20 +5947,28 @@ function eliminateFromBunker(room, eliminatedId, voteCounts) {
 }
 
 // Ведущий принудительно исключает игрока из бункера прямо во время игры
-// (в отличие от eliminateFromBunker — не завязано на итоги голосования,
-// поэтому аккуратно чинит currentTurnIndex/зависшие голоса самостоятельно).
 function hostKickFromBunker(room, targetId) {
-    var target = room.players.get(targetId);
-    if (!target) return false;
-    if (!room.bunker.revealOrder.includes(targetId)) return false;
+    return removeFromBunkerGame(room, targetId, 'hostKick');
+}
+
+// Убирает игрока из идущей партии «Бункера»: помечает выбывшим, раскрывает его карты,
+// чинит currentTurnIndex и пересчитывает зависшее голосование
+// (в отличие от eliminateFromBunker — не завязано на итоги голосования).
+// reason: 'hostKick' — кик ведущим, 'disconnect' — не вернулся после обрыва, 'leave' — вышел сам.
+// nicknameFallback нужен, когда игрок уже удалён из room.players (выход по кнопке).
+function removeFromBunkerGame(room, targetId, reason, nicknameFallback) {
+    if (!room.bunker || !room.bunker.revealOrder.includes(targetId)) return false;
     if (room.bunker.eliminatedPlayers.includes(targetId)) return false;
+
+    var target = room.players.get(targetId);
+    var nickname = target ? target.nickname : (nicknameFallback || '???');
 
     var wasRevealing = room.state === 'bunkerReveal';
     var activeBefore = wasRevealing ? getBunkerActivePlayers(room) : null;
     var kickedIndex = wasRevealing ? activeBefore.indexOf(targetId) : -1;
 
     room.bunker.eliminatedPlayers.push(targetId);
-    target.eliminated = true;
+    if (target) target.eliminated = true;
 
     if (room.bunker.revealedCards[targetId]) {
         getBunkerCardKeys().forEach(key => {
@@ -5849,14 +5976,21 @@ function hostKickFromBunker(room, targetId) {
         });
     }
 
-    sendChatMsg(room, 'alert', 'Ведущий исключил ' + target.nickname + ' из бункера!');
+    if (reason === 'hostKick') {
+        sendChatMsg(room, 'alert', 'Ведущий исключил ' + nickname + ' из бункера!');
+    } else if (reason === 'disconnect') {
+        sendChatMsg(room, 'alert', nickname + ' не вернулся после обрыва связи и выбывает из бункера.');
+    } else {
+        sendChatMsg(room, 'alert', nickname + ' покинул бункер.');
+    }
 
     var activeAfter = getBunkerActivePlayers(room);
 
     broadcastToRoom(room, {
         type: 'bunkerPlayerKicked',
+        reason: reason,
         playerId: targetId,
-        nickname: target.nickname,
+        nickname: nickname,
         revealedCards: room.bunker.revealedCards,
         eliminatedPlayers: room.bunker.eliminatedPlayers,
         remainingPlayers: activeAfter.length,
@@ -5939,6 +6073,9 @@ function startNextBunkerRound(room) {
 }
 
 function endBunkerGame(room) {
+    // Финал могут запустить сразу несколько путей (голосование, выход игроков,
+    // уборщик заброшенных комнат) — второй раз подводить итоги не нужно.
+    if (room.state === 'bunkerGameOver') return;
     room.state = 'bunkerGameOver';
     broadcastRoomsList();
     sendChatMsg(room, 'event', '🏁 Игра завершена! Победители определены.');
