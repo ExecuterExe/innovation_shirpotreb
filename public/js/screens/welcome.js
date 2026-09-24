@@ -8,109 +8,86 @@ var startupInterval = null;
 
 export function renderWelcome(container) {
     var html = '';
-    html += '<div class="flex flex-col items-center justify-center min-h-screen px-6 py-12">';
+    html += '<div class="welcome-page px-5 sm:px-8 py-10 lg:py-14">';
+    // Мягкое свечение фона: жёлтое за заголовком, синее — от логотипа
+    html += '<div class="welcome-glow welcome-glow-yellow"></div>';
+    html += '<div class="welcome-glow welcome-glow-blue"></div>';
 
-    // Логотип. Появление и парение — на разных элементах: обе анимации задают
-    // свойство animation, и на одном элементе парение перебивало бы появление.
-    html += '<div class="hero-reveal-1 mb-4">';
+    html += '<div class="welcome-grid max-w-6xl mx-auto">';
+
+    // ═══════ ЗАГОЛОВОК ═══════
+    html += '<div class="welcome-top">';
+    html += '<div class="flex flex-col items-center lg:items-start text-center lg:text-left">';
+    // Появление и парение логотипа — на разных элементах: обе анимации задают animation
+    html += '<div class="hero-reveal-1 mb-3">';
     html += '<div class="animate-float">';
-    html += '<div id="hero-logo" class="hero-logo select-none" title="Впарь!">' + logoSvg({ size: 190, animated: true }) + '</div>';
+    html += '<div id="hero-logo" class="hero-logo select-none" title="Впарь!">' + logoSvg({ size: 170, animated: true }) + '</div>';
     html += '</div>';
     html += '</div>';
-
-    // Название и слоган — как в презентации: белое имя, жёлтый слоган
-    html += '<h1 class="hero-reveal-2 font-display font-black text-5xl md:text-7xl text-center text-corp-white tracking-tight leading-none mb-2" style="letter-spacing:-0.02em">ВПАРИТЬ</h1>';
-    html += '<p class="hero-reveal-3 font-display font-black text-lg md:text-2xl text-center text-accent-brand mb-2">Сделай бред инвестицией</p>';
-
-    // Подзаголовок
-    html += '<p class="hero-reveal-3 text-xs font-bold text-corp-muted uppercase tracking-[0.18em] mb-6">Питчинг · Инвестиции · Хаос</p>';
-
-    // Rotating startup — в рамке как цитата
-    html += '<div class="hero-reveal-4 h-10 flex items-center justify-center mb-8 overflow-hidden w-full max-w-sm">';
-    html += '<p id="rotating-startup" class="text-corp-dim text-xs md:text-sm font-mono text-center italic px-4 py-2 rounded-xl bg-white/[0.025] border border-white/[0.06]">';
-    html += 'Загрузка гениальных идей...';
+    html += '<h1 class="hero-reveal-2 font-display font-black text-6xl md:text-8xl text-corp-white leading-none" style="letter-spacing:-0.03em">ВПАРИТЬ</h1>';
+    // Бывшее название — пока все привыкают к новому
+    html += '<div class="hero-reveal-2 welcome-ex mt-3">';
+    html += '<span class="welcome-ex-tag">ex</span>';
+    html += '<span>Инновационный ширпотреб</span>';
+    html += '</div>';
+    html += '<p class="hero-reveal-3 font-display font-black text-2xl md:text-3xl text-accent-brand mt-5">Сделай бред инвестицией</p>';
+    html += '<p class="hero-reveal-3 text-base md:text-lg text-corp-dim leading-relaxed mt-3 max-w-xl">';
+    html += 'Онлайн-игра, где за две минуты нужно продать инвесторам абсурдный продукт. ';
+    html += 'Тренирует импровизацию и убедительную подачу — и это очень смешно.';
     html += '</p>';
     html += '</div>';
+    html += '</div>'; // end welcome-top
 
-    // ═══════ RULES BUTTONS ═══════
-    html += '<div class="hero-reveal-5 w-full max-w-md mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">';
-    html += '<button id="btn-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
-    html += 'bg-accent-gold-dim border border-accent-gold/25 text-accent-gold hover:bg-accent-gold/15 hover:border-accent-gold/45 transition-all">';
-    html += '  <span>📖</span>';
-    html += '  <span>Правила игры</span>';
-    html += '  <span id="rules-arrow" class="text-[0.6rem] text-accent-gold/60 transition-transform">▼</span>';
-    html += '</button>';
-    html += '<button id="btn-bunker-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
-    html += 'bg-accent-red-dim border border-accent-red/25 text-accent-red hover:bg-accent-red/15 hover:border-accent-red/45 transition-all">';
-    html += '  <span>🏠</span>';
-    html += '  <span>Правила бункера</span>';
-    html += '  <span id="bunker-rules-arrow" class="text-[0.6rem] text-accent-red/60 transition-transform">▼</span>';
-    html += '</button>';
-    html += '</div>';
+    // ═══════ ФОРМА ВХОДА ═══════
+    html += '<div class="welcome-side">';
+    html += '<div class="hero-reveal-4 corp-card-elevated welcome-card p-6 sm:p-7 space-y-5">';
 
-    // ═══════ RULES PANELS ═══════
-    html += '<div id="rules-panel" class="hidden w-full max-w-2xl mb-8">';
-    html += buildRulesContent();
-    html += '</div>';
-    html += '<div id="bunker-rules-panel" class="hidden w-full max-w-2xl mb-8">';
-    html += buildBunkerRulesContent();
-    html += '</div>';
-
-    // Main card
-    html += '<div class="hero-reveal-6 corp-card-elevated w-full max-w-md p-7 space-y-5">';
-
-    // Nickname
     html += '<div>';
     html += '<label class="block text-[0.6rem] font-black text-corp-muted uppercase tracking-[0.16em] mb-2">Ваш позывной</label>';
     html += '<input type="text" id="w-nickname" class="input-corp" placeholder="Как вас называть?" maxlength="20" autocomplete="off">';
     html += '</div>';
 
-    // Create
     html += '<button id="btn-create" class="btn-neon-solid w-full py-4 rounded-2xl text-sm font-black tracking-wider uppercase cursor-pointer">';
     html += '📣 Создать комнату';
     html += '</button>';
 
-    // Solo
-    html += '<button id="btn-solo" class="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-bold cursor-pointer btn-ghost rounded-2xl">';
-    html += '  <span>🎲</span>';
-    html += '  <span class="text-corp-dim">Одиночный режим</span>';
-    html += '  <span class="text-xs text-corp-muted font-normal">— без регистрации</span>';
-    html += '</button>';
-
-    // Divider
     html += '<div class="flex items-center gap-3">';
     html += '<div class="flex-1 h-px" style="background:linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)"></div>';
-    html += '<span class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-[0.15em]">или войти</span>';
+    html += '<span class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-[0.15em]">или войти по коду</span>';
     html += '<div class="flex-1 h-px" style="background:linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)"></div>';
     html += '</div>';
 
-    // Join
     html += '<div class="flex gap-3">';
-    html += '<input type="text" id="w-room-code" class="input-corp input-corp-code flex-1" placeholder="КОД" maxlength="5" autocomplete="off">';
+    html += '<input type="text" id="w-room-code" class="input-corp input-corp-code flex-1 min-w-0" placeholder="КОД" maxlength="5" autocomplete="off">';
     html += '<button id="btn-join" class="btn-neon px-6 py-3 rounded-2xl text-sm font-bold uppercase tracking-wider whitespace-nowrap cursor-pointer">';
     html += 'Войти →';
     html += '</button>';
     html += '</div>';
 
-    // Password field (for private rooms)
     html += '<div id="w-password-wrap" class="hidden">';
     html += '<input type="text" id="w-password" class="input-corp text-sm" placeholder="🔑 Пароль (для закрытой комнаты)" maxlength="30" autocomplete="off">';
     html += '</div>';
 
+    html += '<button id="btn-solo" class="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-bold cursor-pointer btn-ghost">';
+    html += '  <span>🎲</span>';
+    html += '  <span class="text-corp-dim">Потренироваться одному</span>';
+    html += '  <span class="hidden sm:inline text-xs text-corp-muted font-normal">— без комнаты</span>';
+    html += '</button>';
+
     html += '</div>'; // end card
 
-    // Rooms browser
-    html += '<div class="w-full max-w-md mt-5">';
-    html += '<div class="text-[0.6rem] font-black text-corp-muted uppercase tracking-[0.18em] mb-3 text-center">🌐 Открытые комнаты</div>';
+    // Открытые комнаты
+    html += '<div class="hero-reveal-5 mt-6">';
+    html += '<div class="text-[0.6rem] font-black text-corp-muted uppercase tracking-[0.18em] mb-3 text-center lg:text-left">🌐 Открытые комнаты</div>';
     html += '<div id="rooms-list" class="space-y-2">';
     html += '<div class="text-center text-xs text-corp-dim py-3">Загрузка...</div>';
     html += '</div>';
     html += '</div>';
 
-    // Fake door: замеряем, есть ли вообще спрос на платную «преподавательскую» версию.
+    // Fake door: замеряем спрос на платную «преподавательскую» версию.
     // Кнопка ведёт не в продукт, а в форму ожидания — клики и оставленные почты
     // и есть данные о готовности платить.
-    html += '<div class="w-full max-w-md mt-5">';
+    html += '<div class="hero-reveal-6 mt-5">';
     html += '<button id="btn-teacher" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[0.7rem] font-black uppercase tracking-wider cursor-pointer ';
     html += 'bg-accent-green-dim border border-accent-green/25 text-accent-green hover:bg-accent-green/15 hover:border-accent-green/45 transition-all">';
     html += '  <span>📊</span>';
@@ -125,9 +102,69 @@ export function renderWelcome(container) {
     html += '  <div id="teacher-result" class="hidden text-xs font-bold text-accent-green text-center"></div>';
     html += '</div>';
     html += '</div>';
+    html += '</div>'; // end welcome-side
+
+    // ═══════ ЖИВОЙ ПРИМЕР + КАК ИГРАТЬ ═══════
+    html += '<div class="welcome-bottom">';
+
+    html += '<div class="hero-reveal-5">';
+    html += '<div class="flex items-center justify-between gap-3 mb-4">';
+    html += '<div class="text-[0.65rem] font-black text-corp-muted uppercase tracking-[0.18em]">🃏 Что может выпасть</div>';
+    html += '<button id="btn-demo-shuffle" class="demo-shuffle-btn" title="Другой продукт">🎲 Ещё</button>';
+    html += '</div>';
+    html += '<div id="demo-cards" class="demo-cards">';
+    html += demoCardHtml('adjective', 'Прилагательное', 'ЛЕТАЮЩИЙ');
+    html += demoCardHtml('item', 'Предмет', 'УТЮГ');
+    html += demoCardHtml('feature', 'Особенность', 'КОТОРЫЙ ОТПУГИВАЕТ КОМАРОВ');
+    html += '</div>';
+    html += '<p class="text-sm text-corp-muted mt-3 text-center lg:text-left">Сложите карты в продукт — и убедите всех, что без него жить нельзя.</p>';
+    html += '</div>';
+
+    // Три шага
+    html += '<div class="hero-reveal-6 welcome-steps mt-8">';
+    html += welcomeStep('1', '🃏', 'Получите карты', 'Случайные слова — основа вашего «инновационного» продукта');
+    html += welcomeStep('2', '🎤', 'Впарьте за 2 минуты', 'Питч перед остальными: кому нужно, почему прорыв');
+    html += welcomeStep('3', '💰', 'Соберите инвестиции', 'Игроки вкладывают жетоны. Угадал победителя — ×2');
+    html += '</div>';
+
+    // Коротко о формате
+    html += '<div class="hero-reveal-6 flex flex-wrap justify-center lg:justify-start gap-2 mt-6">';
+    html += welcomeFact('👥', '3–18 игроков');
+    html += welcomeFact('⏱', '20–40 минут');
+    html += welcomeFact('💸', 'Бесплатно');
+    html += welcomeFact('🏠', 'Режим «Бункер»');
+    html += welcomeFact('📱', 'С телефона');
+    html += '</div>';
+
+    // Правила
+    html += '<div class="hero-reveal-6 w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8">';
+    html += '<button id="btn-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
+    html += 'bg-accent-gold-dim border border-accent-gold/25 text-accent-gold hover:bg-accent-gold/15 hover:border-accent-gold/45 transition-all">';
+    html += '  <span>📖</span>';
+    html += '  <span>Правила игры</span>';
+    html += '  <span id="rules-arrow" class="text-[0.6rem] text-accent-gold/60 transition-transform">▼</span>';
+    html += '</button>';
+    html += '<button id="btn-bunker-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
+    html += 'bg-accent-red-dim border border-accent-red/25 text-accent-red hover:bg-accent-red/15 hover:border-accent-red/45 transition-all">';
+    html += '  <span>🏠</span>';
+    html += '  <span>Правила бункера</span>';
+    html += '  <span id="bunker-rules-arrow" class="text-[0.6rem] text-accent-red/60 transition-transform">▼</span>';
+    html += '</button>';
+    html += '</div>';
+
+    html += '</div>'; // end welcome-bottom
+    html += '</div>'; // end welcome-grid
+
+    // Панели правил — во всю ширину под сеткой
+    html += '<div id="rules-panel" class="hidden w-full max-w-3xl mx-auto mt-8">';
+    html += buildRulesContent();
+    html += '</div>';
+    html += '<div id="bunker-rules-panel" class="hidden w-full max-w-3xl mx-auto mt-8">';
+    html += buildBunkerRulesContent();
+    html += '</div>';
 
     // Footer
-    html += '<div class="flex flex-wrap items-center justify-center gap-5 mt-8">';
+    html += '<div class="flex flex-wrap items-center justify-center gap-5 mt-12">';
     html += '<a href="https://t.me/innovative_shirpotreb" target="_blank" class="flex items-center gap-1.5 text-[0.65rem] font-semibold text-corp-muted hover:text-accent-blue transition-colors uppercase tracking-wider">⚡ Telegram</a>';
     html += '<div class="w-px h-3 bg-corp-border"></div>';
     html += '<a href="https://www.donationalerts.com/r/tortyaka" target="_blank" class="flex items-center gap-1.5 text-[0.65rem] font-semibold text-corp-muted hover:text-accent-gold transition-colors uppercase tracking-wider">🍕 Поддержать</a>';
@@ -135,13 +172,12 @@ export function renderWelcome(container) {
     html += '<a href="mailto:lokomas@inbox.ru" class="flex items-center gap-1.5 text-[0.65rem] font-semibold text-corp-muted hover:text-corp-light transition-colors uppercase tracking-wider">✉ Фидбек</a>';
     html += '</div>';
 
-    // Connection
-    html += '<div id="conn-status" class="flex items-center gap-2 mt-4">';
+    html += '<div id="conn-status" class="flex items-center justify-center gap-2 mt-4">';
     html += '<div class="conn-dot bg-accent-gold"></div>';
     html += '<span class="conn-text text-xs font-semibold text-accent-gold">Подключение...</span>';
     html += '</div>';
 
-    html += '</div>'; // end main wrapper
+    html += '</div>'; // end welcome-page
 
     container.innerHTML = html;
 
@@ -253,65 +289,90 @@ export function renderWelcome(container) {
         });
     }
 
+    var btnShuffle = container.querySelector('#btn-demo-shuffle');
+    if (btnShuffle) btnShuffle.addEventListener('click', function () {
+        showNextDemo(container);
+        restartDemoTimer(container);
+    });
+
     startRotating(container);
 }
 
 // ═══════════════════════════════════════════
-// НОВАЯ РОТАЦИЯ — берёт комбинации с сервера
+// ЖИВЫЕ КАРТЫ — случайный продукт с сервера, карты переворачиваются
 // ═══════════════════════════════════════════
+
+var DEMO_INTERVAL_MS = 5500;
+
+function demoCardHtml(kind, label, word) {
+    return '<div class="demo-card demo-card-' + kind + '" data-demo="' + kind + '">'
+        + '<div class="demo-card-inner">'
+        + '<div class="demo-card-label">' + label + '</div>'
+        + '<div class="demo-card-word">' + escapeText(word) + '</div>'
+        + '</div>'
+        + '</div>';
+}
+
+function welcomeStep(num, emoji, title, desc) {
+    return '<div class="welcome-step">'
+        + '<div class="welcome-step-num">' + num + '</div>'
+        + '<div class="welcome-step-emoji">' + emoji + '</div>'
+        + '<div class="welcome-step-title">' + title + '</div>'
+        + '<div class="welcome-step-desc">' + desc + '</div>'
+        + '</div>';
+}
+
+function welcomeFact(emoji, text) {
+    return '<span class="welcome-fact"><span>' + emoji + '</span>' + text + '</span>';
+}
+
+function escapeText(t) {
+    return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 function fetchRandomCombo(callback) {
     fetch('/api/random-combo')
         .then(function (res) { return res.json(); })
-        .then(function (data) {
-            if (data && data.text) callback(data.text);
-        })
-        .catch(function () {
-            // Если сервер недоступен — показываем заглушку
-            callback('Загрузка...');
-        });
+        .then(function (data) { if (data && data.item) callback(data); })
+        .catch(function () { /* сервер недоступен — остаются прежние карты */ });
 }
 
-function startRotating(container) {
-    if (startupInterval) {
-        clearInterval(startupInterval);
-        startupInterval = null;
-    }
-
-    // Первая загрузка сразу — самая смешная строчка страницы не должна ждать
-    fetchRandomCombo(function (text) {
-        var el = container.querySelector('#rotating-startup');
-        if (el) el.textContent = '«' + text + '»';
+// Карты по очереди переворачиваются и показывают новый продукт
+function showNextDemo(container) {
+    fetchRandomCombo(function (combo) {
+        ['adjective', 'item', 'feature'].forEach(function (kind, i) {
+            setTimeout(function () {
+                var card = container.querySelector('[data-demo="' + kind + '"]');
+                if (!card) return;
+                card.classList.remove('demo-card-flip');
+                void card.offsetWidth; // перезапуск анимации
+                card.classList.add('demo-card-flip');
+                // Слово меняется в середине переворота, когда карта стоит ребром
+                setTimeout(function () {
+                    var w = card.querySelector('.demo-card-word');
+                    if (w) w.textContent = combo[kind];
+                }, 260);
+            }, i * 140);
+        });
     });
+}
 
-    // Далее каждые 5 секунд
+function restartDemoTimer(container) {
+    if (startupInterval) clearInterval(startupInterval);
     startupInterval = setInterval(function () {
-        var el = container.querySelector('#rotating-startup');
-        if (!el) {
+        if (!container.querySelector('#demo-cards')) {
             clearInterval(startupInterval);
             startupInterval = null;
             return;
         }
+        showNextDemo(container);
+    }, DEMO_INTERVAL_MS);
+}
 
-        // Анимация выхода
-        el.classList.add('startup-text-exit');
-
-        setTimeout(function () {
-            fetchRandomCombo(function (text) {
-                var el2 = container.querySelector('#rotating-startup');
-                if (!el2) return;
-
-                el2.textContent = '«' + text + '»';
-                el2.classList.remove('startup-text-exit');
-                el2.classList.add('startup-text-enter');
-
-                setTimeout(function () {
-                    var el3 = container.querySelector('#rotating-startup');
-                    if (el3) el3.classList.remove('startup-text-enter');
-                }, 400);
-            });
-        }, 300);
-    }, 5000);
+function startRotating(container) {
+    // Первый продукт — сразу, а не через интервал
+    setTimeout(function () { showNextDemo(container); }, 700);
+    restartDemoTimer(container);
 }
 
 // ═══════════════════════════════════════════

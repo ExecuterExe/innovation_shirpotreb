@@ -95,7 +95,11 @@ app.get('/api/random-combo', (req, res) => {
     const feature = declineFeature(featRaw, gender);
 
     res.json({
-        text: adjective + ' ' + item + ', ' + feature.toLowerCase()
+        text: adjective + ' ' + item + ', ' + feature.toLowerCase(),
+        // По частям — для живых карт на главной странице
+        adjective: adjective,
+        item: item,
+        feature: feature,
     });
 });
 

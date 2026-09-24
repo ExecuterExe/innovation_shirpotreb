@@ -2103,3 +2103,111 @@ body.timer-critical::after {
 @media (max-width: 1023px) {
     .game-main { padding-bottom: 84px; }
 }
+
+/* ═══════════════════════════════════════════
+   ГЛАВНАЯ СТРАНИЦА
+   ═══════════════════════════════════════════ */
+
+.welcome-page { position: relative; min-height: 100vh; overflow-x: hidden; }
+.welcome-glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; }
+.welcome-glow-yellow { width: 520px; height: 520px; left: 8%; top: 60px; background: rgba(255, 199, 44, 0.07); }
+.welcome-glow-blue { width: 420px; height: 420px; left: 2%; top: -60px; background: rgba(27, 47, 232, 0.14); }
+
+/* Раскладка: на телефоне заголовок → форма → примеры; на компьютере форма справа */
+.welcome-grid {
+    position: relative; z-index: 1;
+    display: grid; gap: 28px;
+    grid-template-areas: "top" "side" "bottom";
+}
+.welcome-top { grid-area: top; }
+.welcome-side { grid-area: side; width: 100%; max-width: 440px; margin: 0 auto; }
+.welcome-bottom { grid-area: bottom; min-width: 0; }
+@media (min-width: 1024px) {
+    .welcome-grid {
+        grid-template-columns: minmax(0, 1fr) 420px;
+        grid-template-areas: "top side" "bottom side";
+        column-gap: 64px; row-gap: 36px;
+        align-items: start;
+    }
+    .welcome-side { position: sticky; top: 28px; max-width: none; grid-row: 1 / span 2; }
+}
+
+/* Бывшее название */
+.welcome-ex {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 5px 14px 5px 5px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.09);
+    font-size: 0.85rem; font-weight: 700; color: #b0b0c0;
+}
+.welcome-ex-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #15151e; background: #8a8a9a; border-radius: 999px; padding: 2px 8px;
+}
+
+.welcome-card { box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 199, 44, 0.08); }
+
+/* Живые карты */
+.demo-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; perspective: 900px; }
+.demo-card { height: 172px; border-radius: 20px; overflow: hidden; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45); }
+.demo-card:nth-child(1) { transform: rotate(-2deg); }
+.demo-card:nth-child(3) { transform: rotate(2deg); }
+.demo-card-adjective { background: linear-gradient(145deg, #dc2626 0%, #b91c1c 50%, #7f1d1d 100%); }
+.demo-card-item      { background: linear-gradient(145deg, #0891b2 0%, #0e7490 50%, #164e63 100%); }
+.demo-card-feature   { background: linear-gradient(145deg, #7c3aed 0%, #6d28d9 50%, #4c1d95 100%); }
+.demo-card-inner { height: 100%; display: flex; flex-direction: column; }
+.demo-card-label {
+    padding: 10px 14px; background: rgba(0, 0, 0, 0.25);
+    font-size: 0.6rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(255, 255, 255, 0.72);
+}
+.demo-card-word {
+    flex: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+    padding: 10px 12px; font-weight: 900; font-size: 1.05rem; line-height: 1.2; color: #fff;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); overflow-wrap: anywhere;
+}
+.demo-card-flip .demo-card-inner { animation: demoFlip 0.52s cubic-bezier(0.45, 0, 0.25, 1); }
+@keyframes demoFlip {
+    0%   { transform: rotateY(0); }
+    50%  { transform: rotateY(90deg); filter: brightness(1.4); }
+    100% { transform: rotateY(0); }
+}
+.demo-shuffle-btn {
+    font-size: 0.72rem; font-weight: 800; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+    color: #ffc72c; background: rgba(255, 199, 44, 0.08); border: 1px solid rgba(255, 199, 44, 0.25);
+    transition: background 0.2s, transform 0.2s;
+}
+.demo-shuffle-btn:hover { background: rgba(255, 199, 44, 0.16); transform: rotate(-4deg); }
+.demo-shuffle-btn:active { transform: scale(0.94); }
+
+/* Три шага */
+.welcome-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.welcome-step {
+    position: relative; padding: 18px 16px 16px; border-radius: 18px;
+    background: linear-gradient(180deg, #1c1c26 0%, #16161e 100%); border: 1px solid #2e2e3a;
+}
+.welcome-step-num {
+    position: absolute; top: 12px; right: 14px;
+    font-family: 'Montserrat', 'Inter', sans-serif; font-weight: 900; font-size: 1.6rem; color: rgba(255, 199, 44, 0.22);
+}
+.welcome-step-emoji { font-size: 1.7rem; line-height: 1; }
+.welcome-step-title { margin-top: 10px; font-weight: 900; font-size: 0.95rem; color: #ededf5; }
+.welcome-step-desc { margin-top: 4px; font-size: 0.78rem; line-height: 1.45; color: #9a9aac; }
+
+.welcome-fact {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; color: #c4c4d0;
+    background: rgba(255, 255, 255, 0.035); border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+@media (max-width: 640px) {
+    .demo-card { height: 138px; border-radius: 16px; }
+    .demo-card-word { font-size: 0.8rem; padding: 8px; }
+    .demo-card-label { font-size: 0.5rem; padding: 8px 9px; letter-spacing: 0.06em; }
+    .welcome-steps { grid-template-columns: 1fr; }
+    .welcome-step { display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; align-items: center; padding: 14px; }
+    .welcome-step-emoji { grid-row: 1 / span 2; }
+    .welcome-step-title { margin-top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .demo-card-flip .demo-card-inner { animation: none; }
+}
