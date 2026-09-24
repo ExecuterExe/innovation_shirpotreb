@@ -2,7 +2,9 @@
 // ПАМЯТКА ПО ТИПАМ КАРТ (бункер)
 // ═══════════════════════════════════════════
 
-var LEGEND_COLLAPSED = false; // по умолчанию открыта — особенно полезно в первой игре
+// По умолчанию открыта на широком экране (в колонке слева). На телефоне она стоит над игрой,
+// поэтому там свёрнута в полоску — раскрывается по нажатию.
+var LEGEND_COLLAPSED = null;
 
 var LEGEND_ITEMS = [
     { emoji: '🎨', label: 'Прилагательное', desc: 'Это свойство продукта.' },
@@ -28,7 +30,7 @@ export function renderBunkerLegend(container) {
     var existing = document.getElementById('bunker-legend-panel');
     if (existing && (container.contains(existing) || document.getElementById('rail-extra'))) return; // уже отрисована
 
-    var isCollapsed = LEGEND_COLLAPSED;
+    var isCollapsed = LEGEND_COLLAPSED === null ? window.innerWidth < 1024 : LEGEND_COLLAPSED;
 
     var html = '';
     html += '<div id="bunker-legend-panel" class="bunker-legend-panel' + (isCollapsed ? ' bunker-legend-collapsed' : '') + '">';
@@ -73,7 +75,7 @@ export function renderBunkerLegend(container) {
     var toggleBtn = document.getElementById('btn-legend-toggle');
     if (toggleBtn) {
         toggleBtn.addEventListener('click', function () {
-            LEGEND_COLLAPSED = !LEGEND_COLLAPSED;
+            LEGEND_COLLAPSED = !isCollapsed;
             var panel = document.getElementById('bunker-legend-panel');
             if (panel) panel.remove();
             renderBunkerLegend(container);

@@ -1,3 +1,5 @@
+import { refreshPrepReady } from './screens/preparation.js';
+import { refreshBunkerDraft, resetBunkerDraftStep, updateBunkerDraftProgress } from './screens/bunker-draft.js';
 import { state, setState, navigate, startTimer, escapeHtml } from './app.js';
 import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
@@ -344,7 +346,7 @@ function handleMessage(msg) {
                     + 'Готовы: <span class="text-accent-blue font-black">' + msg.ready + '</span> / ' + msg.total
                     + '</div>';
             }
-            if (msg.readyIds) { setState({ readyIds: msg.readyIds }); updateRail(); }
+            if (msg.readyIds) { setState({ readyIds: msg.readyIds }); updateRail(); refreshPrepReady(); }
             break;
 
         case 'tiebreakerStart':
@@ -526,6 +528,18 @@ function handleMessage(msg) {
 
         // ═══════ БУНКЕР ═══════
 
+        case 'bunkerDraftStart':
+            handleBunkerDraftStart(msg);
+            break;
+
+        case 'bunkerDraftState':
+            handleBunkerDraftState(msg);
+            break;
+
+        case 'bunkerDraftProgress':
+            handleBunkerDraftProgress(msg);
+            break;
+
         case 'bunkerStart':
             showStageOverlay({
                 logo: true,
@@ -691,6 +705,15 @@ function handlePresentation(msg) {
             duration: 1400,
         });
         playSound('warning');
+    } else if ((state.phase === 'preparation' || state.phase === 'cardInput') && msg.currentPresenter) {
+        // Подготовка закончилась — объявляем питчи и кто первый
+        var firstIsMe = msg.currentPresenter.id === state.playerId;
+        showStageOverlay({
+            emoji: '🎤',
+            title: 'ПИТЧИ<span class="stage-accent">!</span>',
+            subtitle: firstIsMe ? 'Вы выступаете первым — на сцену!' : 'Первым выступает ' + escapeHtml(msg.currentPresenter.nickname),
+            duration: 1500,
+        });
     }
     setState({
         currentPresenter: msg.currentPresenter,
@@ -754,6 +777,14 @@ function handleInvesting(msg) {
         myCapLimit = capital;
     }
 
+    if (state.phase === 'presentation' && !msg.restored) {
+        showStageOverlay({
+            emoji: '💼',
+            title: 'ИНВЕСТИЦИИ',
+            subtitle: 'Вложите жетоны в лучшие идеи. Угадали победителя — получите ×2',
+            duration: 1500,
+        });
+    }
     setState({
         myCapital: capital,
         myInvestmentCap: Math.min(capital, myCapLimit),
@@ -806,6 +837,15 @@ function handleTied(msg) {
     if (msg.yourCards) upd.myCards = msg.yourCards;
     setState(upd);
 
+    if (!msg.restored && state.phase === 'investing') {
+        showStageOverlay({
+            tone: 'danger',
+            emoji: '⚔️',
+            title: 'НИЧЬЯ!',
+            subtitle: 'Решим дополнительными выступлениями',
+            duration: 1500,
+        });
+    }
     navigate('tied');
     if (!msg.restored) playSound('warning');
 }
@@ -848,6 +888,62 @@ function handleGameOver(msg) {
 // BUNKER HANDLERS
 // ═══════════════════════════════════════════
 
+// ═══════ Сборка продукта перед «Бункером» ═══════
+function handleBunkerDraftStart(msg) {
+    if (!msg.restored) {
+        resetBunkerDraftStep();
+        showStageOverlay({
+            logo: true,
+            title: 'СОБЕРИ ПРОДУКТ<span class="stage-accent">!</span>',
+            subtitle: 'Три варианта на каждую карту — выбирайте под катастрофу',
+        });
+        playSound('start');
+    }
+    if (msg.chatEnabled !== false) setState({ chatMessages: msg.chatHistory || [] });
+    setState({
+        players: msg.players || state.players,
+        myCards: {},
+        myActionCards: [],
+        // Состояние прошлой партии не должно просвечивать в колонке участников
+        bunker: {
+            globalProblem: msg.globalProblem,
+            revealOrder: [], revealedCards: {}, revealedCardValues: {}, eliminatedPlayers: [],
+            currentPlayerId: null, playedActionCards: {},
+        },
+        bunkerDraft: {
+            globalProblem: msg.globalProblem,
+            options: msg.options || {},
+            picks: msg.picks || {},
+            doneIds: msg.doneIds || [],
+            total: msg.total || 0,
+        },
+    });
+    navigate('bunkerDraft');
+}
+
+function handleBunkerDraftState(msg) {
+    var d = Object.assign({}, state.bunkerDraft || {});
+    d.options = msg.options || d.options;
+    d.picks = msg.picks || d.picks;
+    d.doneIds = msg.doneIds || d.doneIds;
+    d.total = msg.total || d.total;
+    setState({ bunkerDraft: d });
+    if (state.phase === 'bunkerDraft') refreshBunkerDraft();
+}
+
+function handleBunkerDraftProgress(msg) {
+    var d = Object.assign({}, state.bunkerDraft || {});
+    var before = (d.doneIds || []).length;
+    d.doneIds = msg.doneIds || [];
+    d.total = msg.total || d.total;
+    setState({ bunkerDraft: d });
+    // Прогресс приходит на каждый выбор любого игрока — реагируем, только когда кто-то дособирал
+    if (state.phase !== 'bunkerDraft' || d.doneIds.length === before) return;
+    updateBunkerDraftProgress();
+    updateRail();
+    if (d.doneIds.length > before) playSound('join');
+}
+
 function handleBunkerStart(msg) {
     if (msg.chatEnabled !== false) {
         setState({ chatMessages: msg.chatHistory || [] });
@@ -881,9 +977,16 @@ function handleBunkerStart(msg) {
         },
     });
 
+    setState({ bunkerDraft: null });
     navigate('bunkerReveal');
     playSound('start');
-    showNotification('Бункер начинается! У каждого 9 карт.', 'success');
+    if (msg.autoPicked > 0 && msg.autoPicked < 9) {
+        showNotification('Время вышло — ' + msg.autoPicked + ' ' + (msg.autoPicked === 1 ? 'карта выбрана' : msg.autoPicked < 5 ? 'карты выбраны' : 'карт выбрано') + ' случайно из ваших трёх вариантов', 'info');
+    } else if (msg.drafted) {
+        showNotification('Продукты собраны! Первым ход — откройте предмет.', 'success');
+    } else {
+        showNotification('Бункер начинается! У каждого 9 карт.', 'success');
+    }
 }
 
 function handleBunkerTurn(msg) {
@@ -926,6 +1029,8 @@ function handleBunkerCardRevealed(msg) {
     if (msg.playerId === state.playerId) {
         bunker.hasRevealedThisTurn = true;
     }
+    // Последняя открытая карта — показывается на сцене хода
+    bunker.lastReveal = { playerId: msg.playerId, cardKey: msg.cardKey, cardValue: msg.cardValue };
     setState({ bunker: bunker });
 
     setPendingReveal({

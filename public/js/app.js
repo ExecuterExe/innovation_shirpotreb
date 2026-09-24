@@ -14,7 +14,9 @@ import { renderTied, renderTiebreaker, renderTiebreakerVoting } from './screens/
 import { initSpeech } from './components/speech.js';
 import { mountRail } from './components/players-rail.js';
 import { syncReactionFab } from './components/reactions.js';
+import { roundPathHtml, ROUND_PATH_PHASES } from './components/round-path.js';
 import { renderBunkerReveal, renderBunkerVoteResult } from './screens/bunker-game.js';
+import { renderBunkerDraft } from './screens/bunker-draft.js';
 import { renderBunkerVote, renderBunkerTieVote, renderBunkerGameOver } from './screens/bunker-vote.js';
 import { renderSoloSettings, renderSoloCards } from './screens/solo.js';
 
@@ -113,10 +115,18 @@ export function navigate(phase) {
     var app = document.getElementById('app');
     if (!app) return;
 
+    // Перерисовка той же фазы (открыли карту, сменился ход) — без анимации и без прыжка наверх,
+    // иначе экран «мигает» и уезжает из-под пальца на каждом обновлении.
+    var samePhase = prevPhase === phase;
+    var keepScrollY = window.scrollY;
+    var oldRail = document.getElementById('game-rail');
+    var keepRailScroll = oldRail ? oldRail.scrollTop : 0;
+    var enterCls = samePhase ? '' : ' screen-enter';
+
     // Clear and render
     app.innerHTML = '';
     var wrapper = document.createElement('div');
-    wrapper.className = 'screen-enter min-h-screen';
+    wrapper.className = 'min-h-screen' + enterCls;
 
     // Экраны партии — в оболочке с колонкой участников слева.
     // Колонка не участвует в анимации смены экрана: меняется только основная часть.
@@ -128,7 +138,7 @@ export function navigate(phase) {
         rail = document.createElement('aside');
         rail.className = 'game-rail';
         rail.id = 'game-rail';
-        wrapper.className = 'game-main screen-enter min-h-screen';
+        wrapper.className = 'game-main min-h-screen' + enterCls;
         outer.appendChild(rail);
         outer.appendChild(wrapper);
         // Колонку ставим до экрана: экрану «Бункера» нужно место под памятку (#rail-extra)
@@ -148,6 +158,7 @@ export function navigate(phase) {
         case 'tiebreaker': renderTiebreaker(wrapper); break;
         case 'tiebreaker_voting': renderTiebreakerVoting(wrapper); break;
         case 'gameOver': renderGameOver(wrapper); break;
+        case 'bunkerDraft': renderBunkerDraft(wrapper); break;
         case 'bunkerReveal': renderBunkerReveal(wrapper); break;
         case 'bunkerVote': renderBunkerVote(wrapper); break;
         case 'bunkerTieVote': renderBunkerTieVote(wrapper); break;
@@ -159,14 +170,23 @@ export function navigate(phase) {
     }
 
     if (!rail) app.appendChild(outer);
+    // Лента раунда «Подготовка → Питчи → Инвестиции → Итоги» — сверху на каждом экране классики
+    if (ROUND_PATH_PHASES.indexOf(phase) !== -1 && wrapper.firstElementChild) {
+        wrapper.firstElementChild.insertAdjacentHTML('afterbegin', roundPathHtml(phase));
+    }
     syncReactionFab();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (samePhase) {
+        window.scrollTo(0, keepScrollY);
+        if (rail) rail.scrollTop = keepRailScroll;
+    } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 }
 
 var GAME_SHELL_PHASES = [
     'cardInput', 'preparation', 'presentation', 'investing', 'results',
     'tied', 'tiebreaker', 'tiebreaker_voting', 'gameOver',
-    'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver',
+    'bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver',
 ];
 
 // ==================== TIMER ====================
@@ -201,7 +221,8 @@ export function stopTimer() {
     document.body.classList.remove('timer-critical');
 }
 
-function updateTimerUI() {
+// Экспорт — чтобы экран, обновлённый «на месте», сразу показал таймер, а не пустое место до следующего тика
+export function updateTimerUI() {
     var remaining = state.timerRemaining;
     var total = state.timerDuration;
     var fraction = total > 0 ? remaining / total : 0;
@@ -281,7 +302,9 @@ function init() {
     }, { once: true });
 
     window.addEventListener('beforeunload', function (e) {
-        if (state.phase !== 'welcome' && state.phase !== 'lobby') {
+        // В одиночном режиме терять нечего: настройки сохранены, продукт сгенерируется заново
+        var calm = ['welcome', 'lobby', 'soloSettings', 'soloCards'];
+        if (calm.indexOf(state.phase) === -1) {
             e.preventDefault();
             e.returnValue = 'Игра в процессе!';
         }

@@ -117,7 +117,8 @@ export function renderResults(container) {
 
     // ═══════ INVESTMENT DETAILS ═══════
     html += '<div class="mb-8">';
-    html += '<h3 class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-4">💸 Кто и куда инвестировал</h3>';
+    html += '<button id="btn-toggle-details" class="results-fold">💸 Кто и куда инвестировал' + (details.length ? ' <span>(' + details.length + ')</span>' : '') + ' <i id="details-arrow">▼</i></button>';
+    html += '<div id="details-body" class="hidden mt-3">';
     if (details.length === 0) {
         html += '<p class="text-sm text-corp-muted">Никто не инвестировал</p>';
     } else {
@@ -154,6 +155,7 @@ export function renderResults(container) {
         }
         html += '</div>';
     }
+    html += '</div>'; // details-body
     html += '</div>';
 
     // ═══════ LUCKY INVESTORS ═══════
@@ -183,7 +185,7 @@ export function renderResults(container) {
 
     // ═══════ CONTROLS ═══════
     if (isHost) {
-        html += '<div class="text-center mt-10">';
+        html += '<div class="results-dock">';
         if (isLast) {
             html += '<button id="btn-show-final" class="btn-neon-solid px-12 py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">';
             html += '🏆 Финальные результаты';
@@ -195,10 +197,10 @@ export function renderResults(container) {
         }
         html += '</div>';
     } else {
-        html += '<div class="text-center mt-10">';
-        html += '<div class="inline-flex items-center gap-3 text-sm text-corp-muted font-semibold">';
+        html += '<div class="results-dock">';
+        html += '<div class="results-dock-wait">';
         html += '<div class="w-4 h-4 border-2 border-corp-muted border-t-accent-blue rounded-full animate-spin"></div>';
-        html += 'Ожидание хоста...';
+        html += isLast ? 'Ведущий сейчас откроет финал…' : 'Ведущий запустит раунд ' + ((state.currentRound || 1) + 1) + ' из ' + (state.totalRounds || '?') + '…';
         html += '</div>';
         html += '</div>';
     }
@@ -215,6 +217,15 @@ export function renderResults(container) {
     var btnExitGame = container.querySelector('#btn-exit-game');
     if (btnExitGame) btnExitGame.addEventListener('click', function () {
         if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
+
+    var btnDetails = container.querySelector('#btn-toggle-details');
+    if (btnDetails) btnDetails.addEventListener('click', function () {
+        var body = container.querySelector('#details-body');
+        var arrow = container.querySelector('#details-arrow');
+        if (!body) return;
+        body.classList.toggle('hidden');
+        if (arrow) arrow.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
     });
 
     var btnNext = container.querySelector('#btn-next-round');

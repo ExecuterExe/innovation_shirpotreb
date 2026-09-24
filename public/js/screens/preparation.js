@@ -23,13 +23,13 @@ export function renderPreparation(container) {
     html += '<div class="max-w-5xl mx-auto px-4 py-6 min-h-screen">';
 
     // HUD
-    html += '<div class="corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
+    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
     html += '  <div>';
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
     html += '    <div class="text-3xl font-black text-corp-white">' + state.currentRound;
     html += '      <span class="text-corp-muted text-2xl">/' + state.totalRounds + '</span></div>';
     html += '  </div>';
-    html += '  <div class="flex-1 max-w-md mx-6">';
+    html += '  <div class="classic-hud-mid flex-1 max-w-md mx-6">';
     html += '    <div class="flex justify-between text-xs font-bold text-corp-muted mb-1.5">';
     html += '      <span>ПОДГОТОВКА</span>';
     html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
@@ -95,10 +95,26 @@ export function renderPreparation(container) {
         html += '</div>';
     }
 
+    // Шпаргалка и «Я готов» — в обычном режиме (у стримера готовность — кнопкой под текстом питча)
+    if (!streamer && !isSpectator) {
+        html += '<div class="pitch-tips">';
+        html += '  <div class="pitch-tips-title">Шпаргалка питча</div>';
+        html += '  <div class="pitch-tips-grid">';
+        [['🎯', 'Кому', 'Для кого этот продукт?'], ['😫', 'Боль', 'Какую проблему он решает?'], ['✨', 'Фишка', 'Почему именно эти карты вместе?'], ['💰', 'Призыв', 'Почему вкладываться нужно сейчас?']].forEach(function (tip) {
+            html += '<div class="pitch-tip"><span class="pitch-tip-emoji">' + tip[0] + '</span><div><b>' + tip[1] + '</b><span>' + tip[2] + '</span></div></div>';
+        });
+        html += '  </div>';
+        html += '</div>';
+        html += '<div id="prep-ready" class="prep-ready">' + prepReadyInner() + '</div>';
+    }
+
     // Ready progress (visible to all)
-    html += '<div class="max-w-2xl mx-auto mt-6 text-center">';
-    html += '  <div id="ready-progress" class="text-sm font-semibold text-corp-muted"></div>';
-    html += '</div>';
+    // У игрока счётчик уже в блоке «Я готов»; общий — для стримера и зрителей
+    if (streamer || isSpectator) {
+        html += '<div class="max-w-2xl mx-auto mt-6 text-center">';
+        html += '  <div id="ready-progress" class="text-sm font-semibold text-corp-muted"></div>';
+        html += '</div>';
+    }
 
     // Order
     html += '<div class="mt-8 text-center">';
@@ -161,6 +177,8 @@ export function renderPreparation(container) {
         });
     }
 
+    bindPrepReady(container);
+
     // Skip (only in non-streamer mode)
     var btnSkip = container.querySelector('#btn-skip-prep');
     if (btnSkip) {
@@ -169,4 +187,58 @@ export function renderPreparation(container) {
             sendMsg({ type: 'skipTimer' });
         });
     }
+}
+// ═══════ «Я готов выступать» ═══════
+function amReady() {
+    return (state.readyIds || []).indexOf(state.playerId) !== -1;
+}
+
+function prepReadyInner() {
+    var ready = (state.readyIds || []).length;
+    var total = (state.players || []).length || 1;
+    if (amReady()) {
+        var left = Math.max(0, total - ready);
+        var html = '<div class="prep-ready-ok" data-mode="ready">✓ Вы готовы<span id="prep-ready-count">' + readyWaitText(left) + '</span></div>';
+        if (left > 0) html += '<button id="btn-not-ready" class="prep-ready-undo">Ещё думаю</button>';
+        return html;
+    }
+    return '<button id="btn-im-ready" class="prep-ready-btn" data-mode="wait">✓ Я готов выступать</button>'
+        + '<div class="prep-ready-note">Когда готовы все — питчи начнутся сразу, не дожидаясь таймера · <span id="prep-ready-count">готовы ' + ready + ' из ' + total + '</span></div>';
+}
+
+function bindPrepReady(root) {
+    var go = root.querySelector('#btn-im-ready');
+    if (go) go.addEventListener('click', function () {
+        sendMsg({ type: 'playerReady' });
+        state.readyIds = (state.readyIds || []).concat([state.playerId]);
+        refreshPrepReady();
+    });
+    var undo = root.querySelector('#btn-not-ready');
+    if (undo) undo.addEventListener('click', function () {
+        sendMsg({ type: 'playerUnready' });
+        state.readyIds = (state.readyIds || []).filter(function (id) { return id !== state.playerId; });
+        refreshPrepReady();
+    });
+}
+
+// Обновить только блок готовности (при readyProgress), не трогая остальной экран
+export function refreshPrepReady() {
+    var box = document.getElementById('prep-ready');
+    if (!box) return;
+    // Своё состояние не поменялось (пришла чужая готовность) — обновляем только счётчик:
+    // иначе кнопка перерисуется прямо под пальцем и нажатие потеряется
+    var mode = box.querySelector('[data-mode]');
+    var count = box.querySelector('#prep-ready-count');
+    if (mode && count && mode.getAttribute('data-mode') === (amReady() ? 'ready' : 'wait')) {
+        var ready = (state.readyIds || []).length;
+        var total = (state.players || []).length || 1;
+        count.textContent = amReady() ? readyWaitText(Math.max(0, total - ready)) : 'готовы ' + ready + ' из ' + total;
+        return;
+    }
+    box.innerHTML = prepReadyInner();
+    bindPrepReady(box);
+}
+
+function readyWaitText(left) {
+    return left > 0 ? ' · ждём ещё ' + left : ' · начинаем!';
 }

@@ -9,7 +9,7 @@ import { sendMsg } from '../socket.js';
 import { buildReactionBarHtml, bindReactionButtons } from './reactions.js';
 import { BUNKER_CARD_TYPES, openBunkerPlayerDetail, getBunkerRevealedValue } from '../screens/bunker-game.js';
 
-var BUNKER_PHASES = ['bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver'];
+var BUNKER_PHASES = ['bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver'];
 
 // Цвет аватара стабилен для игрока на всю партию
 function hueFor(id) {
@@ -107,6 +107,11 @@ function classicStatus(p) {
 
 function bunkerStatus(p) {
     var b = state.bunker || {};
+    if (state.phase === 'bunkerDraft') {
+        if (p.connected === false) return { icon: '📴', text: 'не в сети', tone: 'muted' };
+        var done = ((state.bunkerDraft && state.bunkerDraft.doneIds) || []).indexOf(p.id) !== -1;
+        return done ? { icon: '✓', text: 'собрал продукт', tone: 'green' } : { icon: '🃏', text: 'выбирает карты', tone: 'dim' };
+    }
     if ((b.eliminatedPlayers || []).indexOf(p.id) !== -1) return { icon: '💀', text: 'выбыл', tone: 'red' };
     if (p.connected === false) return { icon: '📴', text: 'не в сети', tone: 'muted' };
     if (b.currentPlayerId === p.id && state.phase === 'bunkerReveal') return { icon: '🎤', text: 'ходит', tone: 'gold' };
@@ -115,15 +120,18 @@ function bunkerStatus(p) {
 
 function bunkerRevealedChips(p) {
     var revealed = ((state.bunker && state.bunker.revealedCards) || {})[p.id] || {};
+    // В строке — не больше трёх карт, остальное по клику (иначе строка растягивается на пол-экрана)
     var html = '';
     var count = 0;
     for (var i = 0; i < BUNKER_CARD_TYPES.length; i++) {
         var ct = BUNKER_CARD_TYPES[i];
         if (!revealed[ct.key]) continue;
         count++;
+        if (count > 3) continue;
         var val = p.id === state.playerId ? ((state.myCards || {})[ct.key] || '???') : getBunkerRevealedValue(p.id, ct.key);
         html += '<span class="rail-chip ' + ct.color + '" title="' + escapeHtml(ct.label + ': ' + val) + '">' + ct.emoji + ' ' + escapeHtml(val) + '</span>';
     }
+    if (count > 3) html += '<span class="rail-chip rail-chip-more">+' + (count - 3) + '</span>';
     return { html: html, count: count };
 }
 
@@ -134,19 +142,22 @@ function rowHtml(p, isBunker) {
     if (isMe) cls += ' rail-row-me';
     if (st.tone === 'gold') cls += ' rail-row-live';
     if (st.icon === '💀' || st.tone === 'muted') cls += ' rail-row-out';
-    if (isBunker && !isMe) cls += ' rail-row-click';
+    var clickable = isBunker && !isMe && state.phase !== 'bunkerDraft';
+    if (clickable) cls += ' rail-row-click';
 
-    var html = '<div class="' + cls + '" data-rail-player="' + p.id + '"' + (isBunker && !isMe ? ' data-rail-detail="' + p.id + '"' : '') + '>';
+    var html = '<div class="' + cls + '" data-rail-player="' + p.id + '"' + (clickable ? ' data-rail-detail="' + p.id + '"' : '') + '>';
     html += avatarHtml(p);
     html += '<div class="rail-row-body">';
     html += '  <div class="rail-row-name"><span class="truncate">' + escapeHtml(displayName(p)) + '</span>' + (isMe ? '<span class="rail-you">вы</span>' : '') + '</div>';
     html += '  <div class="rail-row-status rail-tone-' + st.tone + '">' + st.icon + ' ' + escapeHtml(st.text) + '</div>';
-    if (isBunker) {
+    if (isBunker && st.icon !== '💀' && state.phase !== 'bunkerDraft') {
         var chips = bunkerRevealedChips(p);
         if (chips.count) html += '  <div class="rail-chips">' + chips.html + '</div>';
     }
     html += '</div>';
-    if (isBunker) {
+    if (isBunker && state.phase === 'bunkerDraft') {
+        // на сборке продукта карт ещё нет — ни счётчика, ни кика
+    } else if (isBunker) {
         var rc = bunkerRevealedChips(p).count;
         html += '<span class="rail-metric" title="Раскрыто карт">' + rc + '<small>/9</small></span>';
         var eliminated = ((state.bunker && state.bunker.eliminatedPlayers) || []).indexOf(p.id) !== -1;

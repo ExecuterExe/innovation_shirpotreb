@@ -24,7 +24,7 @@ export function renderInvesting(container) {
     html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen">';
 
     // ═══════ HUD ═══════
-    html += '<div class="corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
+    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
 
     html += '  <div>';
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
@@ -33,7 +33,7 @@ export function renderInvesting(container) {
     html += '    </div>';
     html += '  </div>';
 
-    html += '  <div class="flex-1 max-w-md mx-6">';
+    html += '  <div class="classic-hud-mid flex-1 max-w-md mx-6">';
     html += '    <div class="flex justify-between text-xs font-bold text-corp-muted mb-1.5">';
     html += '      <span>ИНВЕСТИРОВАНИЕ</span>';
     html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
@@ -406,12 +406,12 @@ function renderInvestingObserver(container, presentations, isHost) {
     var html = '';
     html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen">';
 
-    html += '<div class="corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
+    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
     html += '  <div>';
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
     html += '    <div class="text-2xl font-black text-corp-white">' + state.currentRound + '<span class="text-corp-muted text-lg">/' + state.totalRounds + '</span></div>';
     html += '  </div>';
-    html += '  <div class="flex-1 max-w-md mx-6">';
+    html += '  <div class="classic-hud-mid flex-1 max-w-md mx-6">';
     html += '    <div class="flex justify-between text-xs font-bold text-corp-muted mb-1.5">';
     html += '      <span>ИНВЕСТИРОВАНИЕ</span>';
     html += '      <span data-timer-text class="font-mono text-corp-light"></span>';

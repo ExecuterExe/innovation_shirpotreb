@@ -8,6 +8,12 @@ var startupInterval = null;
 
 export function renderWelcome(container) {
     var html = '';
+    // Бегущая строка «биржи стартапов» — наполняется продуктами с сервера
+    html += '<div class="ticker" aria-hidden="true">';
+    html += '<div class="ticker-label">📈 БИРЖА ВПАРИТЬ</div>';
+    html += '<div class="ticker-window"><div id="ticker-track" class="ticker-track"></div></div>';
+    html += '</div>';
+
     html += '<div class="welcome-page px-5 sm:px-8 py-10 lg:py-14">';
     // Мягкое свечение фона: жёлтое за заголовком, синее — от логотипа
     html += '<div class="welcome-glow welcome-glow-yellow"></div>';
@@ -24,7 +30,7 @@ export function renderWelcome(container) {
     html += '<div id="hero-logo" class="hero-logo select-none" title="Впарь!">' + logoSvg({ size: 170, animated: true }) + '</div>';
     html += '</div>';
     html += '</div>';
-    html += '<h1 class="hero-reveal-2 font-display font-black text-6xl md:text-8xl text-corp-white leading-none" style="letter-spacing:-0.03em">ВПАРИТЬ</h1>';
+    html += '<h1 class="hero-reveal-2 hero-title font-display font-black text-6xl md:text-8xl leading-none" style="letter-spacing:-0.03em">ВПАРИТЬ</h1>';
     // Бывшее название — пока все привыкают к новому
     html += '<div class="hero-reveal-2 welcome-ex mt-3">';
     html += '<span class="welcome-ex-tag">ex</span>';
@@ -32,7 +38,7 @@ export function renderWelcome(container) {
     html += '</div>';
     html += '<p class="hero-reveal-3 font-display font-black text-2xl md:text-3xl text-accent-brand mt-5">Сделай бред инвестицией</p>';
     html += '<p class="hero-reveal-3 text-base md:text-lg text-corp-dim leading-relaxed mt-3 max-w-xl">';
-    html += 'Онлайн-игра, где за две минуты нужно продать инвесторам абсурдный продукт. ';
+    html += 'Онлайн-игра, где нужно продать инвесторам абсурдный продукт. ';
     html += 'Тренирует импровизацию и убедительную подачу — и это очень смешно.';
     html += '</p>';
     html += '</div>';
@@ -123,43 +129,46 @@ export function renderWelcome(container) {
     // Три шага
     html += '<div class="hero-reveal-6 welcome-steps mt-8">';
     html += welcomeStep('1', '🃏', 'Получите карты', 'Случайные слова — основа вашего «инновационного» продукта');
-    html += welcomeStep('2', '🎤', 'Впарьте за 2 минуты', 'Питч перед остальными: кому нужно, почему прорыв');
+    html += welcomeStep('2', '🎤', 'Впарьте продукт', 'Питч перед остальными: кому нужно и почему это прорыв');
     html += welcomeStep('3', '💰', 'Соберите инвестиции', 'Игроки вкладывают жетоны. Угадал победителя — ×2');
     html += '</div>';
 
     // Коротко о формате
     html += '<div class="hero-reveal-6 flex flex-wrap justify-center lg:justify-start gap-2 mt-6">';
     html += welcomeFact('👥', '3–18 игроков');
-    html += welcomeFact('⏱', '20–40 минут');
     html += welcomeFact('💸', 'Бесплатно');
-    html += welcomeFact('🏠', 'Режим «Бункер»');
     html += welcomeFact('📱', 'С телефона');
+    html += welcomeFact('⚙️', 'Свои настройки');
+    html += welcomeFact('😂', 'Реакции зала');
     html += '</div>';
 
-    // Правила
-    html += '<div class="hero-reveal-6 w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8">';
-    html += '<button id="btn-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
-    html += 'bg-accent-gold-dim border border-accent-gold/25 text-accent-gold hover:bg-accent-gold/15 hover:border-accent-gold/45 transition-all">';
-    html += '  <span>📖</span>';
-    html += '  <span>Правила игры</span>';
-    html += '  <span id="rules-arrow" class="text-[0.6rem] text-accent-gold/60 transition-transform">▼</span>';
-    html += '</button>';
-    html += '<button id="btn-bunker-rules" class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer ';
-    html += 'bg-accent-red-dim border border-accent-red/25 text-accent-red hover:bg-accent-red/15 hover:border-accent-red/45 transition-all">';
-    html += '  <span>🏠</span>';
-    html += '  <span>Правила бункера</span>';
-    html += '  <span id="bunker-rules-arrow" class="text-[0.6rem] text-accent-red/60 transition-transform">▼</span>';
-    html += '</button>';
+    // Два режима — каждый со своими правилами
+    html += '<div class="hero-reveal-6 mt-10">';
+    html += '<div class="text-[0.65rem] font-black text-corp-muted uppercase tracking-[0.18em] mb-4 text-center lg:text-left">🎮 Два режима</div>';
+    html += '<div class="mode-cards">';
+    html += '<div class="mode-card mode-card-classic">';
+    html += '  <div class="mode-card-emoji">📣</div>';
+    html += '  <div class="mode-card-title">Классика</div>';
+    html += '  <div class="mode-card-desc">Получите карты, впарьте продукт и вложите жетоны в чужие стартапы. Кто соберёт больше всех инвестиций?</div>';
+    html += '  <button id="btn-rules" class="mode-card-btn">📖 Правила <span id="rules-arrow" class="mode-card-arrow">▼</span></button>';
+    html += '</div>';
+    html += '<div class="mode-card mode-card-bunker">';
+    html += '  <div class="mode-card-emoji">🏠</div>';
+    html += '  <div class="mode-card-title">Бункер</div>';
+    html += '  <div class="mode-card-desc">Конец света, мест мало. Раскрывайте карты стартапа по одной и голосуйте, кто человечество не спасёт.</div>';
+    html += '  <button id="btn-bunker-rules" class="mode-card-btn">📖 Правила <span id="bunker-rules-arrow" class="mode-card-arrow">▼</span></button>';
+    html += '</div>';
+    html += '</div>';
     html += '</div>';
 
     html += '</div>'; // end welcome-bottom
     html += '</div>'; // end welcome-grid
 
     // Панели правил — во всю ширину под сеткой
-    html += '<div id="rules-panel" class="hidden w-full max-w-3xl mx-auto mt-8">';
+    html += '<div id="rules-panel" class="hidden w-full max-w-5xl mx-auto mt-10">';
     html += buildRulesContent();
     html += '</div>';
-    html += '<div id="bunker-rules-panel" class="hidden w-full max-w-3xl mx-auto mt-8">';
+    html += '<div id="bunker-rules-panel" class="hidden w-full max-w-5xl mx-auto mt-10">';
     html += buildBunkerRulesContent();
     html += '</div>';
 
@@ -289,6 +298,8 @@ export function renderWelcome(container) {
         });
     }
 
+    applyInviteLink(container);
+
     var btnShuffle = container.querySelector('#btn-demo-shuffle');
     if (btnShuffle) btnShuffle.addEventListener('click', function () {
         showNextDemo(container);
@@ -373,403 +384,198 @@ function startRotating(container) {
     // Первый продукт — сразу, а не через интервал
     setTimeout(function () { showNextDemo(container); }, 700);
     restartDemoTimer(container);
+    startTicker(container);
+    setupDemoTilt(container);
+}
+
+// ═══════ БИРЖА СТАРТАПОВ — бегущая строка сверху ═══════
+function startTicker(container) {
+    var track = container.querySelector('#ticker-track');
+    if (!track) return;
+    fetch('/api/random-combos?n=10')
+        .then(function (r) { return r.json(); })
+        .then(function (list) {
+            if (!Array.isArray(list) || !list.length) throw new Error('empty');
+            var items = list.map(function (c) {
+                // Котировки выдуманные: почти всё растёт, но иногда рынок не верит в утюги
+                var up = Math.random() > 0.22;
+                var pct = up ? Math.floor(40 + Math.random() * 900) : Math.floor(5 + Math.random() * 60);
+                return '<span class="ticker-item"><span class="ticker-name">' + escapeText(c.adjective + ' ' + c.item) + '</span>'
+                    + '<span class="' + (up ? 'ticker-up' : 'ticker-down') + '">' + (up ? '▲ +' : '▼ −') + pct + '%</span></span>';
+            }).join('<span class="ticker-dot">•</span>');
+            // Дважды подряд — чтобы лента крутилась без шва
+            track.innerHTML = '<span class="ticker-run">' + items + '<span class="ticker-dot">•</span></span>'
+                + '<span class="ticker-run">' + items + '<span class="ticker-dot">•</span></span>';
+            var run = track.querySelector('.ticker-run');
+            var speed = 70; // пикселей в секунду
+            track.style.animationDuration = Math.max(20, run.offsetWidth / speed) + 's';
+            track.classList.add('ticker-go');
+        })
+        .catch(function () {
+            var t = container.querySelector('.ticker');
+            if (t) t.classList.add('hidden');
+        });
+}
+
+// ═══════ Карты слегка наклоняются за курсором ═══════
+var DEMO_BASE_TILT = { adjective: -2, item: 0, feature: 2 };
+
+function setupDemoTilt(container) {
+    if (!window.matchMedia || !window.matchMedia('(hover: hover)').matches) return;
+    try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { }
+    container.querySelectorAll('.demo-card').forEach(function (card) {
+        var base = DEMO_BASE_TILT[card.getAttribute('data-demo')] || 0;
+        card.addEventListener('mousemove', function (e) {
+            var r = card.getBoundingClientRect();
+            var px = (e.clientX - r.left) / r.width - 0.5;
+            var py = (e.clientY - r.top) / r.height - 0.5;
+            card.style.transform = 'rotate(' + base + 'deg) perspective(700px) rotateY(' + (px * 16).toFixed(1) + 'deg) rotateX(' + (-py * 14).toFixed(1) + 'deg) scale(1.04)';
+            card.style.setProperty('--shine-x', ((px + 0.5) * 100).toFixed(0) + '%');
+            card.style.setProperty('--shine-y', ((py + 0.5) * 100).toFixed(0) + '%');
+            card.classList.add('demo-card-hover');
+        });
+        card.addEventListener('mouseleave', function () {
+            card.style.transform = '';
+            card.classList.remove('demo-card-hover');
+        });
+    });
 }
 
 // ═══════════════════════════════════════════
-// RULES CONTENT (без изменений)
+// ПРАВИЛА — классика и «Бункер»
 // ═══════════════════════════════════════════
 
+function rulesSection(label, inner) {
+    return '<div class="rules-section"><div class="rules-section-label">' + label + '</div>' + inner + '</div>';
+}
+
+// Схема этапов: карточки со стрелками между ними
+function rulesFlow(steps) {
+    var html = '<div class="rules-flow">';
+    steps.forEach(function (st, i) {
+        html += '<div class="rules-flow-step">';
+        html += '<div class="rules-flow-head"><span class="rules-flow-num">' + (i + 1) + '</span><span class="rules-flow-emoji">' + st[0] + '</span></div>';
+        html += '<div class="rules-flow-title">' + st[1] + '</div>';
+        html += '<div class="rules-flow-desc">' + st[2] + '</div>';
+        html += '</div>';
+    });
+    html += '</div>';
+    return html;
+}
+
+function rulesTiles(tiles, cols) {
+    var html = '<div class="rules-tiles rules-tiles-' + (cols || 2) + '">';
+    tiles.forEach(function (t) {
+        html += '<div class="rules-tile rules-tone-' + (t[3] || 'gold') + '">';
+        html += '<div class="rules-tile-emoji">' + t[0] + '</div>';
+        html += '<div class="rules-tile-title">' + t[1] + '</div>';
+        html += '<div class="rules-tile-desc">' + t[2] + '</div>';
+        html += '</div>';
+    });
+    html += '</div>';
+    return html;
+}
+
 function buildRulesContent() {
-    var html = '';
-    html += '<div class="corp-card-elevated p-6 md:p-8 space-y-6 text-left">';
+    var html = '<div class="rules-card">';
 
-    // Intro
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">📣 Что это за игра?</h3>';
-    html += '<p class="text-sm text-corp-light leading-relaxed">';
-    html += 'Добро пожаловать в мир <span class="text-accent-gold font-bold">агрессивного маркетинга</span>! ';
-    html += 'Каждый игрок получает набор случайных карт и должен собрать из них «инновационный продукт», ';
-    html += 'а затем убедительно презентовать его остальным. Например:';
-    html += '</p>';
-    html += '<div class="mt-3 px-4 py-3 rounded-xl bg-corp-black/50 border-l-3 border-accent-gold/40">';
-    html += '<span class="text-accent-gold font-bold italic">«Жидкий утюг, который следит за вашим здоровьем»</span>';
-    html += '<span class="text-corp-muted"> — и это звучит как прорыв тысячелетия!</span>';
-    html += '</div>';
-    html += '</div>';
+    html += '<div class="rules-kicker">📖 ПРАВИЛА · КЛАССИКА</div>';
+    html += '<h3 class="rules-title">Продайте то, что продать невозможно</h3>';
+    html += '<p class="rules-lead">Каждый получает случайные карты, складывает из них «инновационный продукт» и убеждает остальных вложиться. Например:</p>';
+    html += '<div class="rules-example">«Жидкий утюг, который следит за вашим здоровьем»<span> — прорыв тысячелетия, не иначе</span></div>';
 
-    // Two roles
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎭 Две роли одновременно</h3>';
-    html += '<div class="grid md:grid-cols-2 gap-3">';
+    html += rulesSection('📋 Как проходит раунд', rulesFlow([
+        ['🃏', 'Подготовка', 'Каждый получает карты и придумывает, как сложить их в один продукт'],
+        ['🎤', 'Питчи', 'По очереди выступаете: что это, кому нужно и почему это прорыв'],
+        ['💰', 'Инвестиции', 'Тайно распределяете жетоны между чужими проектами. В себя — нельзя'],
+        ['🏆', 'Итоги', 'Больше всех собрал — лучший предприниматель. Вложился в него — получаешь ×2'],
+    ]));
 
-    html += '<div class="corp-card p-4 border-accent-gold/20">';
-    html += '<div class="text-2xl mb-2">🎤</div>';
-    html += '<div class="text-sm font-black text-accent-gold mb-1">Предприниматель</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">Презентуйте свой абсурдный продукт с серьёзным лицом. Чем убедительнее — тем больше инвестиций получите.</div>';
-    html += '</div>';
+    html += rulesSection('🎭 Две роли одновременно', rulesTiles([
+        ['🎤', 'Предприниматель', 'Презентуйте абсурдный продукт с серьёзным лицом. Чем убедительнее — тем больше инвестиций.', 'gold'],
+        ['💼', 'Инвестор', 'Найдите будущий хит среди чужих проектов. Угадали победителя — ставка удваивается.', 'blue'],
+    ], 2));
 
-    html += '<div class="corp-card p-4 border-accent-blue/20">';
-    html += '<div class="text-2xl mb-2">💼</div>';
-    html += '<div class="text-sm font-black text-accent-blue mb-1">Инвестор</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">Распознайте потенциальный хит среди чужих проектов и вложите жетоны. Угадаете победителя — удвоите капитал!</div>';
-    html += '</div>';
+    html += rulesSection('🏅 Три способа победить', rulesTiles([
+        ['💼', 'Лучший инвестор', 'Больше всех личного капитала к финалу', 'green'],
+        ['🎤', 'Лучший предприниматель', 'Больше всех привлёк инвестиций за игру', 'gold'],
+        ['🎭', 'Любимец зала', 'Больше всех реакций от зала во время своих выступлений', 'pink'],
+    ], 3));
 
-    html += '</div>';
-    html += '</div>';
+    var rules = [
+        ['no', 'Нельзя игнорировать карты', 'Выпало «Бетонный»? Объясните, почему продукт из бетона. «Ну просто так» — без инвестиций.'],
+        ['no', 'Нельзя вкладывать в себя', 'Только в чужие проекты — рискуйте чужими идеями.'],
+        ['yes', 'Банкрот не выбывает', 'Потеряли всё? Банк выдаст 1 жетон — вы всё ещё в игре.'],
+        ['yes', 'Ничья — это шоу', 'Дополнительные питчи лидеров и переголосование.'],
+    ];
+    var rh = '<div class="rules-golden">';
+    rules.forEach(function (r) {
+        rh += '<div class="rules-golden-row">';
+        rh += '<span class="rules-golden-mark rules-golden-' + r[0] + '">' + (r[0] === 'no' ? '✕' : '✓') + '</span>';
+        rh += '<div><div class="rules-golden-title">' + r[1] + '</div><div class="rules-golden-desc">' + r[2] + '</div></div>';
+        rh += '</div>';
+    });
+    rh += '</div>';
+    html += rulesSection('⚡ Золотые правила', rh);
 
-    // How to play
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">📋 Как проходит раунд</h3>';
-    html += '<div class="space-y-3">';
+    // Всё, что можно включить, — тремя группами, чтобы было ясно, что есть что
+    html += rulesSection('🃏 Колоды карт <span class="rules-where">лобби → «Карты»</span>',
+        '<p class="rules-group-lead">Что добавляется в руку каждого игрока — продукт становится сложнее и смешнее.</p>' + rulesTiles([
+        ['💬', 'Первый отзыв', '«Пока ждал — успел состариться!» Объясните, почему это хорошо', 'gold'],
+        ['🎯', 'Аудитория', 'Для кого продукт: «для трудоголиков», «для инопланетян»', 'pink'],
+        ['⚠️', 'Скрытый дефект', 'Недостаток, о котором знают все. Превратите его в преимущество', 'orange'],
+        ['📦', 'Упаковка', '«Замотано в 5 слоёв изоленты» — и это тоже ценность', 'teal'],
+        ['📜', 'Слово к предмету', '«Утюг ЛЮБВИ» или «Утюг ВНЕЗАПНОГО УСПЕХА»', 'green'],
+        ['🌱', 'Без особенности', 'Лайт-режим «Псевдоинновации»: только прилагательное и предмет', 'green'],
+    ], 3) + '<div class="rules-inline-note">🧟 <b>Генератор абсурда</b> — вместо нашей базы слова придумывают сами игроки, и всё перемешивается.</div>');
 
-    html += buildStep('1', 'Подготовка', 'Каждый игрок получает 3 случайные карты: Прилагательное, Предмет и Особенность. У вас есть время придумать, как их объединить в продукт.', '🎴');
-    html += buildStep('2', 'Питчи', 'По очереди выступаете перед остальными. Расскажите что это за продукт, кому он нужен и почему в него стоит вложиться.', '🎤');
-    html += buildStep('3', 'Инвестирование', 'Все игроки тайно распределяют свои жетоны между понравившимися проектами. В себя вкладывать нельзя!', '💰');
-    html += buildStep('4', 'Результаты', 'Кто собрал больше всего инвестиций — лучший предприниматель раунда. Те, кто в него вложился — получают ×2 от ставки!', '🏆');
+    html += rulesSection('🎲 Сюрпризы раунда <span class="rules-where">лобби → «Карты»</span>',
+        '<p class="rules-group-lead">Случайности, которые ломают заготовки и заставляют импровизировать.</p>' + rulesTiles([
+        ['🎲', 'События', 'Новое условие для всех каждый раунд: «продаём только государству»', 'blue'],
+        ['🦢', 'Чёрный лебедь', '20% шанс, что одну карту заменят прямо перед питчем', 'purple'],
+    ], 2));
 
-    html += '</div>';
-    html += '</div>';
+    html += rulesSection('⚙️ Настройки комнаты <span class="rules-where">лобби → «Партия»</span>',
+        '<p class="rules-group-lead">Как устроена сама партия: кто ведёт, сколько длится, как выступают.</p>' + rulesTiles([
+        ['🙋', 'Вопросы после питча', 'Слушатели поднимают руку и задают каверзные вопросы', 'gold'],
+        ['🎙', 'Ведущий без карт', 'Преподаватель ведёт партию, а играют участники', 'gold'],
+        ['⏱', 'Раунды и тайминги', 'Сколько раундов, капитал и время на каждый этап', 'blue'],
+        ['🎬', 'Стримерский режим', 'Питч текстом — для стрима и игры без микрофона', 'blue'],
+        ['🔊', 'Озвучка', 'Браузер зачитывает карты и питчи вслух', 'blue'],
+        ['🔒', 'Закрытая комната', 'Вход только по коду, при желании — ещё и по паролю', 'teal'],
+    ], 3));
 
-    // Winning
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🏅 Два пути к победе</h3>';
-    html += '<div class="space-y-2">';
-
-    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-accent-green-dim border border-accent-green/15">';
-    html += '<span class="text-xl flex-shrink-0">💼</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-accent-green">Лучший инвестор</div>';
-    html += '<div class="text-xs text-corp-dim">У кого к финалу больше всего личного капитала</div>';
+    html += '<div class="rules-note">😂 <b>Реакции зала</b> работают всегда, настраивать не нужно: жмите эмодзи или клавиши 1–8 прямо во время питча. По умолчанию партия — классика без усложнений.</div>';
     html += '</div>';
-    html += '</div>';
-
-    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-accent-gold-dim border border-accent-gold/15">';
-    html += '<span class="text-xl flex-shrink-0">🎤</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-accent-gold">Лучший предприниматель</div>';
-    html += '<div class="text-xs text-corp-dim">Кто привлёк больше всего инвестиций за все раунды</div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '</div>';
-    html += '</div>';
-
-    // Golden rules
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">⚡ Золотые правила</h3>';
-    html += '<div class="space-y-2">';
-
-    html += buildRule('🔴', 'Нельзя игнорировать карты', 'Если выпало «Бетонный» — объясните, почему продукт из бетона. Ответ «ну просто так» оставит вас без инвестиций.');
-    html += buildRule('🔴', 'Нельзя инвестировать в себя', 'Только в чужие проекты. Рискуйте чужими идеями!');
-    html += buildRule('🟢', 'Банкрот получает шанс', 'Потеряли весь капитал? Банк даёт 1 жетон — вы всё ещё в игре.');
-    html += buildRule('🟢', 'Ничья = дополнительные выступления', 'При одинаковых инвестициях — дополнительный раунд питчей и переголосование.');
-
-    html += '</div>';
-    html += '</div>';
-
-    // Events
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎲 Колода событий</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Опциональная колода, которая добавляет безумия. Каждый раунд вытягивается карта события — ';
-    html += 'дополнительное ограничение для ВСЕХ игроков. Например:';
-    html += '</p>';
-    html += '<div class="mt-3 space-y-2">';
-
-    html += '<div class="flex items-center gap-2 text-xs">';
-    html += '<span class="text-accent-gold">⚡</span>';
-    html += '<span class="text-corp-light italic">«Ваша аудитория — роботы и ИИ»</span>';
-    html += '</div>';
-
-    html += '<div class="flex items-center gap-2 text-xs">';
-    html += '<span class="text-accent-gold">⚡</span>';
-    html += '<span class="text-corp-light italic">«Продукт запрещён в 20 странах мира»</span>';
-    html += '</div>';
-
-    html += '<div class="flex items-center gap-2 text-xs">';
-    html += '<span class="text-accent-gold">⚡</span>';
-    html += '<span class="text-corp-light italic">«Целевая аудитория — пожилые люди 80+»</span>';
-    html += '</div>';
-
-    html += '</div>';
-    html += '</div>';
-
-    // Pseudo mode
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎯 Псевдоинновации</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Лайт-режим для новичков! Вместо трёх карт (прилагательное + предмет + особенность) ';
-    html += 'игроки получают только <span class="text-accent-blue font-bold">две карты</span>: ';
-    html += 'прилагательное и предмет. Например: «Жидкий утюг» — и всё! ';
-    html += 'Проще придумать питч, но сложнее выделиться среди конкурентов.';
-    html += '</p>';
-    html += '</div>';
-
-    // Custom cards
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🧟 Генератор абсурда</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Альтернативный источник карт! Вместо нашей базы на 240 млн+ комбинаций — ';
-    html += 'игроки сами придумывают прилагательные, предметы и особенности. ';
-    html += 'Все карты перемешиваются между участниками — и каждый получает монстра Франкенштейна, ';
-    html += 'которого нужно продать инвесторам!';
-    html += '</p>';
-    html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-gold/40">';
-    html += '<span class="text-sm">⚠️</span>';
-    html += '<span class="text-xs text-corp-dim">В этом режиме автоматические склонения не работают</span>';
-    html += '</div>';
-    html += '</div>';
-
-    // Reviews
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">💬 Карточка отзыва</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Опциональная механика! Каждый игрок получает дополнительную карточку — ';
-    html += '<span class="text-accent-gold font-bold">первый отзыв клиента</span> о продукте. ';
-    html += 'Это может быть что-то вроде «После использования от меня ушла жена. Спасибо!» ';
-    html += 'Используйте отзыв в своей презентации — объясните, почему это на самом деле хорошо!';
-    html += '</p>';
-    html += '</div>';
-
-    // Target Audience
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎯 Целевая аудитория</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Опциональная карточка! Каждый игрок получает дополнительную карту — ';
-    html += '<span class="text-accent-gold font-bold">для кого предназначен продукт</span>. ';
-    html += 'Это может быть что-то вроде «Для геймеров», «Для инопланетян» или «Для людей с ипотекой». ';
-    html += 'Используйте аудиторию в презентации — объясните, почему именно эти люди нуждаются в вашем продукте!';
-    html += '</p>';
-    html += '</div>';
-
-    // Hidden Defects
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">⚠️ Скрытый дефект</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Опциональная карточка! У каждого продукта есть ';
-    html += '<span class="text-accent-gold font-bold">тайный недостаток</span>, ';
-    html += 'о котором знают все. Это может быть «Разряжается за 1 час», ';
-    html += '«Может взорваться в любой момент» или даже «Слишком хорош для дефектов». ';
-    html += 'Задача предпринимателя — убедить инвесторов, что этот дефект на самом деле не так страшен ';
-    html += '(или даже является преимуществом)!';
-    html += '</p>';
-    html += '</div>';
-
-    // Packaging
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">📦 Упаковка</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Опциональная карточка! Каждый продукт приходит в ';
-    html += '<span class="text-accent-gold font-bold">абсурдной упаковке</span>. ';
-    html += 'Это может быть «Мусорный мешок», «Бронированный кейс», ';
-    html += '«Замотано в старый ковёр» или «Папка с грифом СОВЕРШЕННО СЕКРЕТНО». ';
-    html += 'Обыграйте упаковку в презентации — возможно, она добавляет ценности продукту!';
-    html += '</p>';
-    html += '</div>';
-
-    // Modifiers
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">📜 Модификаторы предмета</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Добавьте эпичности! Модификатор — это дополнительные слова после предмета. ';
-    html += 'Можно выбрать один из двух вариантов:';
-    html += '</p>';
-    html += '<div class="mt-3 space-y-2">';
-
-    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
-    html += '<span class="text-lg flex-shrink-0">📜</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-corp-light">Дополнение</div>';
-    html += '<div class="text-xs text-corp-dim">+1 слово: «Утюг <span class="text-accent-green font-bold">СПРАВЕДЛИВОСТИ</span>»</div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '<div class="flex items-start gap-3 p-3 rounded-xl bg-corp-black/30">';
-    html += '<span class="text-lg flex-shrink-0">🌀</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-corp-light">Метафора</div>';
-    html += '<div class="text-xs text-corp-dim">+2 слова: «Утюг <span class="text-accent-green font-bold">ТОКСИЧНОЙ ЭНЕРГЕТИКИ</span>»</div>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '</div>';
-    html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-gold/40">';
-    html += '<span class="text-sm">⚠️</span>';
-    html += '<span class="text-xs text-corp-dim">Не совместим с «Генератором абсурда». Можно выбрать только одну колоду модификаторов</span>';
-    html += '</div>';
-    html += '</div>';
-
-    // Black Swan
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🦢 Чёрный лебедь</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Опциональная механика хаоса! При переходе к выступлению у каждого игрока есть ';
-    html += '<span class="text-accent-red font-bold">20% шанс</span>, что одна из его карт ';
-    html += 'внезапно заменится на другую — прямо перед питчем! Заменяется только ';
-    html += '<span class="text-corp-light font-bold">одна</span> случайная карта (первая сработавшая). ';
-    html += 'Придётся импровизировать на ходу!';
-    html += '</p>';
-    html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-red/40">';
-    html += '<span class="text-sm">⚠️</span>';
-    html += '<span class="text-xs text-corp-dim">Не совместим с «Генератором абсурда» — работает только с нашей базой</span>';
-    html += '</div>';
-    html += '</div>';
-
-    // Questions after pitch
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🙋 Вопросы после питча</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Опциональная фаза! После каждого питча слушатели могут задать ';
-    html += '<span class="text-accent-brand font-bold">1–3 каверзных вопроса</span>. ';
-    html += 'Кто хочет спросить — поднимает руку кнопкой, все видят очередь. ';
-    html += 'Вопросов нет — ведущий сразу переходит дальше. ';
-    html += 'Время задаётся в настройках: 30, 60, 90 секунд или без таймера.';
-    html += '</p>';
-    html += '</div>';
-
-    // Streamer mode
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎬 Стримерский режим</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Для тех, кто играет через чат стрима или без микрофона. ';
-    html += 'В этом режиме игроки пишут текст питча, который показывается всем на экране. ';
-    html += 'Фаза подготовки завершается когда все нажмут «Готов» или по таймеру.';
-    html += '</p>';
-    html += '</div>';
-
-    // Speech
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🔊 Озвучка текста</h3>';
-    html += '<p class="text-sm text-corp-dim leading-relaxed">';
-    html += 'Голосовое сопровождение презентаций! Хост нажимает кнопку — и все игроки слышат ';
-    html += 'озвучку названия продукта, карточек и даже текста питча в стримерском режиме. ';
-    html += 'Использует встроенный синтезатор речи браузера — работает без интернета!';
-    html += '</p>';
-    html += '</div>';
-
-    html += '</div>'; // end rules card
     return html;
 }
 
 function buildBunkerRulesContent() {
-    var html = '';
-    html += '<div class="corp-card-elevated p-6 md:p-8 space-y-6 text-left" style="border-color:rgba(255,59,59,0.25)">';
+    var html = '<div class="rules-card rules-card-bunker">';
 
-    // Intro / atmosphere
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-red mb-3">☢️ Конец света не повод закрывать раунд</h3>';
-    html += '<p class="text-sm text-corp-light leading-relaxed">';
-    html += 'На табло загорается <span class="text-accent-red font-bold">глобальная катастрофа</span> — от неё некуда бежать. ';
-    html += 'Есть только один бункер, и мест в нём меньше, чем желающих выжить. У каждого из вас — стартап, ';
-    html += 'который якобы способен спасти человечество. Проблема в том, что у продукта есть ';
-    html += '<span class="text-accent-gold font-bold">скрытый дефект</span>, а у вас — весомая причина не показывать его раньше времени.';
-    html += '</p>';
-    html += '<div class="mt-3 px-4 py-3 rounded-xl bg-corp-black/50 border-l-3 border-accent-red/40">';
-    html += '<span class="text-accent-red font-bold italic">«У меня приложение для медитации... и да, работает без интернета. Что значит, ПОЧЕМУ это важно?!»</span>';
-    html += '</div>';
-    html += '</div>';
+    html += '<div class="rules-kicker">☢️ ПРАВИЛА · БУНКЕР</div>';
+    html += '<h3 class="rules-title">Конец света — не повод закрывать раунд</h3>';
+    html += '<p class="rules-lead">На табло — глобальная катастрофа. Бункер один, и мест в нём меньше, чем желающих выжить. У каждого — стартап, который якобы спасёт человечество. Проблема в том, что у продукта есть скрытый дефект, а у вас — причина не показывать его раньше времени.</p>';
+    html += '<div class="rules-example">«У меня приложение для медитации… и да, работает без интернета. Что значит, ПОЧЕМУ это важно?!»</div>';
 
-    // Why it's exciting
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-red mb-3">🔥 Почему тут жарко</h3>';
-    html += '<div class="grid md:grid-cols-2 gap-3">';
+    html += rulesSection('📋 Как проходит партия', rulesFlow([
+        ['🧪', 'Сборка продукта', 'Перед игрой выбираете каждую из 9 карт — одну из трёх. Сначала предмет, остальное согласуется с ним'],
+        ['🎴', 'Досье', '9 закрытых карт: от прилагательного до скрытого дефекта и исторического факта'],
+        ['🔓', 'Раскрытие', 'В свой ход открываете ровно одну карту — и решаете, с чего начать'],
+        ['🗳', 'Голосование', 'Дебаты и тайный голос за вылет. Можно воздержаться, при ничьей — переголосование'],
+        ['🏁', 'Бункер закрыт', 'Раунды идут, пока не останется столько выживших, сколько мест'],
+    ]));
 
-    html += '<div class="corp-card p-4 border-accent-red/20">';
-    html += '<div class="text-2xl mb-2">🃏</div>';
-    html += '<div class="text-sm font-black text-accent-red mb-1">Информация — оружие</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">Все карты закрыты. Вы решаете, что раскрыть, а что придержать до последнего — и в этом всё веселье.</div>';
-    html += '</div>';
+    html += rulesSection('🔥 Почему тут жарко', rulesTiles([
+        ['🧪', 'Продукт под катастрофу', 'Катастрофа известна ещё на сборке — выбирайте карты, которые её победят', 'gold'],
+        ['🗳', 'Никто никому не верит', 'Каждый раунд — голосование за вылет. Союзы рушатся за секунды', 'gold'],
+        ['💣', 'Карты действий', 'Заставить раскрыться, спасти от кика, ударить по конкретному игроку', 'blue'],
+        ['💀', 'Вылет — навсегда', 'Выкинули — все ваши карты раскрываются, дальше вы только смотрите', 'red'],
+        ['🤖', 'Финал решает ИИ', 'Все карты уходят в промпт для ИИ: спас ли ваш стартап человечество на самом деле', 'purple'],
+        ['🎙', 'Режим ведущего', 'Без таймеров: ведущий сам переключает ходы и запускает голосование', 'gold'],
+    ], 3));
 
-    html += '<div class="corp-card p-4 border-accent-gold/20">';
-    html += '<div class="text-2xl mb-2">🗳</div>';
-    html += '<div class="text-sm font-black text-accent-gold mb-1">Никто никому не верит</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">Каждый раунд — голосование за кик. Союзы рушатся за секунды, обвинения летят во все стороны.</div>';
-    html += '</div>';
-
-    html += '<div class="corp-card p-4 border-accent-blue/20">';
-    html += '<div class="text-2xl mb-2">💣</div>';
-    html += '<div class="text-sm font-black text-accent-blue mb-1">Карты действий</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">Особые карты меняют расклад: заставляют раскрыться раньше времени, спасают от кика или бьют по конкретному игроку.</div>';
-    html += '</div>';
-
-    html += '<div class="corp-card p-4 border-accent-red/20">';
-    html += '<div class="text-2xl mb-2">💀</div>';
-    html += '<div class="text-sm font-black text-accent-red mb-1">Вылет — это навсегда</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">Никаких вторых шансов. Как только вас выкинули — все ваши карты раскрываются, и вы смотрите, чем всё закончится.</div>';
-    html += '</div>';
-
-    html += '<div class="corp-card p-4 border-accent-purple/20 sm:col-span-2">';
-    html += '<div class="text-2xl mb-2">🤖</div>';
-    html += '<div class="text-sm font-black text-purple-400 mb-1">Финал решает ИИ</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">После игры все карты — включая те, что никто так и не раскрыл — уходят в промпт для ИИ. Он честно расскажет, спас ли ваш стартап человечество на самом деле. Есть подробная версия и мини — для тех, кто спешит.</div>';
-    html += '</div>';
-
-    html += '</div>';
-    html += '</div>';
-
-    // How to play
-    html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-red mb-3">📋 Как проходит партия</h3>';
-    html += '<div class="space-y-3">';
-
-    html += buildBunkerStep('1', 'Досье на продукт', 'Каждый получает 9 карт: прилагательное, предмет, модификатор, особенность, бонус, скрытый дефект, упаковку, отзыв клиента и исторический факт. Всё это — ваш стартап, который должен спасти мир.', '🎴');
-    html += buildBunkerStep('2', 'Раскрытие по очереди', 'В свой ход вы открываете ровно одну карту всем остальным. Решаете сами, с чего начать — с сильных сторон или с чего-то, что отвлечёт внимание от дефекта.', '🔓');
-    html += buildBunkerStep('3', 'Обсуждение и голосование', 'После раунда раскрытий — дебаты и тайное голосование за кандидата на вылет. Можно воздержаться. При ничьей — переголосование между лидерами.', '🗳');
-    html += buildBunkerStep('4', 'Бункер закрывается', 'Раунды повторяются, пока не останется столько выживших, сколько вмещает бункер. Они и делят вечную славу спасителей человечества.', '🏁');
-
-    html += '</div>';
-    html += '<div class="mt-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-corp-black/50 border-l-3 border-accent-gold/40">';
-    html += '<span class="text-sm">💡</span>';
-    html += '<span class="text-xs text-corp-dim">Совет: раскрытый дефект ещё не значит вылет — иногда лучше признаться в слабости самому, чем ждать, пока это сделают за вас</span>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '</div>'; // end rules card
-    return html;
-}
-
-function buildBunkerStep(num, title, desc, emoji) {
-    var html = '';
-    html += '<div class="flex items-start gap-4 p-4 rounded-xl bg-corp-black/30">';
-    html += '<div class="w-10 h-10 rounded-full bg-accent-red/15 border border-accent-red/25 flex items-center justify-center flex-shrink-0">';
-    html += '<span class="text-sm font-black text-accent-red">' + num + '</span>';
-    html += '</div>';
-    html += '<div>';
-    html += '<div class="flex items-center gap-2 mb-1">';
-    html += '<span class="text-base">' + emoji + '</span>';
-    html += '<span class="text-sm font-black text-corp-white">' + title + '</span>';
-    html += '</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">' + desc + '</div>';
-    html += '</div>';
-    html += '</div>';
-    return html;
-}
-
-function buildStep(num, title, desc, emoji) {
-    var html = '';
-    html += '<div class="flex items-start gap-4 p-4 rounded-xl bg-corp-black/30">';
-    html += '<div class="w-10 h-10 rounded-full bg-accent-blue/15 border border-accent-blue/25 flex items-center justify-center flex-shrink-0">';
-    html += '<span class="text-sm font-black text-accent-blue">' + num + '</span>';
-    html += '</div>';
-    html += '<div>';
-    html += '<div class="flex items-center gap-2 mb-1">';
-    html += '<span class="text-base">' + emoji + '</span>';
-    html += '<span class="text-sm font-black text-corp-white">' + title + '</span>';
-    html += '</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">' + desc + '</div>';
-    html += '</div>';
-    html += '</div>';
-    return html;
-}
-
-function buildRule(dot, title, desc) {
-    var html = '';
-    html += '<div class="flex items-start gap-3 py-2">';
-    html += '<span class="text-sm flex-shrink-0 mt-0.5">' + dot + '</span>';
-    html += '<div>';
-    html += '<div class="text-sm font-bold text-corp-light">' + title + '</div>';
-    html += '<div class="text-xs text-corp-dim leading-relaxed">' + desc + '</div>';
-    html += '</div>';
+    html += '<div class="rules-note">💡 Раскрытый дефект — ещё не вылет. Иногда лучше признаться в слабости самому, чем ждать, пока это сделают за вас.</div>';
     html += '</div>';
     return html;
 }
@@ -896,7 +702,28 @@ function doJoinRoom(container) {
         return;
     }
     setButtonPending(container.querySelector('#btn-join'), 'Входим...');
+    // Приглашение использовано — после выхода из комнаты главная снова чистая
+    try { if (location.search) history.replaceState(null, '', location.pathname); } catch (e) { }
     sendMsg({ type: 'joinRoom', nickname: nickname, roomCode: code, password: password });
+}
+
+// Ссылка-приглашение вида /?room=КОД: код уже вписан, остаётся назвать себя и войти
+function applyInviteLink(container) {
+    var code = '';
+    try { code = (new URLSearchParams(location.search).get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5); } catch (e) { }
+    if (code.length < 3) return;
+    var codeInput = container.querySelector('#w-room-code');
+    var nickInput = container.querySelector('#w-nickname');
+    var card = container.querySelector('.welcome-card');
+    if (!codeInput || !card) return;
+    codeInput.value = code;
+    var wrap = container.querySelector('#w-password-wrap');
+    if (wrap) wrap.classList.remove('hidden');
+    var banner = document.createElement('div');
+    banner.className = 'invite-banner';
+    banner.innerHTML = '<span class="text-xl">📨</span><span>Вас пригласили в комнату <b>' + code + '</b> — введите позывной и нажмите «Войти»</span>';
+    card.insertBefore(banner, card.firstChild);
+    if (nickInput) setTimeout(function () { nickInput.focus(); }, 300);
 }
 
 export function showPasswordField(container) {

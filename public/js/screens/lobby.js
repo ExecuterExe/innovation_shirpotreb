@@ -49,7 +49,8 @@ export function updatePlayersList(container) {
     var hostObserves = !!(state.settings && state.settings.hostObserves);
 
     var countEl = container.querySelector('#players-count');
-    if (countEl) countEl.textContent = countPlayingSeats() + (hostObserves ? ' + ведущий' : '');
+    var maxSeats = (state.settings && state.settings.maxPlayers) || 8;
+    if (countEl) countEl.textContent = countPlayingSeats() + ' / ' + maxSeats + (hostObserves ? ' + ведущий' : '');
 
     // Кого уже показывали — новенькие въезжают с подсветкой
     if (seenPlayers.room !== state.roomCode) seenPlayers = { room: state.roomCode, ids: {} };
@@ -71,16 +72,17 @@ export function updatePlayersList(container) {
         var isNew = !seen[p.id];
         nextSeen[p.id] = true;
 
-        html += '<div class="corp-card px-5 py-4 flex items-center gap-4 emotion-anchor' + (isNew ? ' player-row-enter' : '');
+        html += '<div class="lobby-player corp-card px-5 py-4 flex items-center gap-4 emotion-anchor' + (isNew ? ' player-row-enter' : '');
         if (observing) html += ' border-accent-gold/25';
         else if (isMe) html += ' border-accent-blue/20';
         html += '" data-player-id="' + p.id + '"' + (isMe ? ' data-emotion-self="1"' : '') + '>';
         if (observing) {
-            html += '<div class="w-9 h-9 rounded-full flex items-center justify-center text-base" style="background:rgba(255,199,44,0.12);border:1px solid rgba(255,199,44,0.3)">🎙</div>';
+            html += '<div class="lobby-avatar lobby-avatar-host">🎙</div>';
         } else {
-            html += '<div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black" style="background: linear-gradient(135deg, hsl(' + hue1 + ',40%,20%), hsl(' + hue2 + ',40%,15%)); color: hsl(' + hue3 + ',60%,65%);">';
-            html += seat;
-            html += '</div>';
+            // Цвет аватара — от id игрока, как в колонке участников во время игры
+            var hue = avatarHue(p.id);
+            var letter = (p.nickname || '?').trim().charAt(0).toUpperCase() || '?';
+            html += '<div class="lobby-avatar" style="background:linear-gradient(135deg,hsl(' + hue + ',55%,32%),hsl(' + ((hue + 40) % 360) + ',55%,22%));color:hsl(' + hue + ',85%,82%)">' + escapeHtml(letter) + '</div>';
         }
         html += '<div class="flex-1 min-w-0">';
         html += '<div class="font-bold text-corp-light truncate">' + escapeHtml(p.nickname) + '</div>';
@@ -111,6 +113,13 @@ export function updatePlayersList(container) {
         html += '</div>';
         html += '</div>';
     }
+    // Свободные места до минимума — видно, скольких ещё ждём
+    var missing = Math.max(0, 3 - countPlayingSeats());
+    for (var m = 0; m < missing; m++) {
+        html += '<div class="lobby-slot"><div class="lobby-avatar lobby-avatar-empty">?</div>';
+        html += '<div class="flex-1"><div class="font-bold text-corp-muted">Ждём игрока…</div><div class="text-[0.7rem] text-corp-dim">отправьте код или ссылку</div></div></div>';
+    }
+
     // Зрители
     var spectators = state.spectators || [];
     if (spectators.length > 0) {
@@ -150,20 +159,21 @@ export function updateStartButton(container) {
     var canStart = seats >= 3;
     var needText = seats + ' / 3 минимум' + (state.settings && state.settings.hostObserves ? ' (без ведущего)' : '');
 
-    var html = '';
+    var html = buildGameSummary(state.settings || {});
     if (isHost && canStart) {
         var isBunker = state.settings && state.settings.bunkerMode;
         var btnText = isBunker ? 'Начать выживание' : 'Начать питчинг';
         var btnEmoji = isBunker ? '🏠' : '📣';
-        html = '<button id="btn-start" class="btn-neon-solid w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">' + btnEmoji + ' ' + btnText + '</button>';
+        html += '<button id="btn-start" class="btn-neon-solid lobby-start-btn w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">' + btnEmoji + ' ' + btnText + '</button>';
     } else if (isHost) {
-        html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
+        html += '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
     } else if (canStart) {
-        html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание хоста</div><div class="inline-flex items-center gap-1.5"><div class="conn-dot bg-accent-blue w-1.5 h-1.5"></div><span class="text-sm font-bold text-accent-blue">Готово к старту</span></div></div>';
+        html += '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание хоста</div><div class="inline-flex items-center gap-1.5"><div class="conn-dot bg-accent-blue w-1.5 h-1.5"></div><span class="text-sm font-bold text-accent-blue">Готово к старту</span></div></div>';
     } else {
-        html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
+        html += '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
     }
     area.innerHTML = html;
+    updateLobbyPreview(container);
 
     // Re-attach start button listener
     var btnStart = container.querySelector('#btn-start');
@@ -195,26 +205,10 @@ export function updateSettingsPanel(container) {
     }
 
     // ─── ВКЛАДКИ ───
-    html += '<div class="flex gap-1 p-1 rounded-2xl mb-5" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.07)">';
-
-    html += '<button id="settings-tab-params" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[0.65rem] font-black uppercase tracking-wider transition-all cursor-pointer ';
-    html += isParams
-        ? 'text-accent-blue' + '" style="background:rgba(0,180,255,0.12);border:1px solid rgba(0,180,255,0.2)"'
-        : 'text-corp-muted hover:text-corp-light"';
-    html += '>⚙️ Партия</button>';
-
-    html += '<button id="settings-tab-modes" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[0.65rem] font-black uppercase tracking-wider transition-all cursor-pointer ';
-    html += isModes
-        ? 'text-accent-green' + '" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)"'
-        : 'text-corp-muted hover:text-corp-light"';
-    html += '>🎴 Механики</button>';
-
-    html += '<button id="settings-tab-bunker" class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-[0.65rem] font-black uppercase tracking-wider transition-all cursor-pointer ';
-    html += isBunker
-        ? 'text-accent-red' + '" style="background:rgba(255,59,59,0.1);border:1px solid rgba(255,59,59,0.2)"'
-        : (s.bunkerMode ? 'text-accent-red/70 hover:text-accent-red"' : 'text-corp-muted hover:text-corp-light"');
-    html += '>🏠 Бункер' + (s.bunkerMode ? ' <span style="width:6px;height:6px;border-radius:50%;background:#ff3b3b;display:inline-block;vertical-align:middle"></span>' : '') + '</button>';
-
+    html += '<div class="set-tabs">';
+    html += '<button id="settings-tab-params" class="set-tab' + (isParams ? ' set-tab-active' : '') + '"><span class="set-tab-emoji">🎮</span><span>Партия</span></button>';
+    html += '<button id="settings-tab-modes" class="set-tab' + (isModes ? ' set-tab-active' : '') + '"><span class="set-tab-emoji">🃏</span><span>Карты</span></button>';
+    html += '<button id="settings-tab-bunker" class="set-tab set-tab-bunker' + (isBunker ? ' set-tab-active' : '') + '"><span class="set-tab-emoji">🏠</span><span>Бункер</span>' + (s.bunkerMode ? '<span class="set-tab-dot"></span>' : '') + '</button>';
     html += '</div>';
 
     // ─── ВКЛАДКА: ПАРТИЯ ───
@@ -231,16 +225,17 @@ export function updateSettingsPanel(container) {
     html += '  <input type="checkbox" id="set-host-observes" class="toggle-corp flex-shrink-0"' + (observesOn ? ' checked' : '') + '>';
     html += '</label>';
 
-    html += '<div class="space-y-1">';
-    html += buildSetting('👥 Макс. игроков',       'maxPlayers', 'set-max-players', MAX_PLAYERS_MIN, MAX_PLAYERS_MAX, s.maxPlayers || 8, 1);
-    html += buildSetting('🔁 Количество раундов',  'rounds',     'set-rounds',      1, 7,   s.rounds || 3, 1);
-    html += buildSetting('💰 Стартовый капитал',   'capital',    'set-capital',     3, 30,  s.startCapital || 10, 1);
+    html += buildSectionDivider('Состав и раунды');
+    html += '<div class="set-tiles">';
+    html += buildStatTile('👥', 'Игроков', 'maxPlayers', 'set-max-players', MAX_PLAYERS_MIN, MAX_PLAYERS_MAX, s.maxPlayers || 8, 1, 'максимум');
+    html += buildStatTile('🔁', 'Раундов', 'rounds', 'set-rounds', 1, 7, s.rounds || 3, 1, 'в партии');
+    html += buildStatTile('💰', 'Капитал', 'capital', 'set-capital', 3, 30, s.startCapital || 10, 1, 'жетонов на старте');
     html += '</div>';
     html += buildSectionDivider('Тайминги');
-    html += '<div class="space-y-1">';
-    html += buildSetting('⏱ Подготовка',      'prep',    'set-prep',     30, 300, s.prepTime || 60,    15);
-    html += buildSetting('🎤 Питч',            'present', 'set-present',  60, 300, s.presentTime || 120, 15);
-    html += buildSetting('📈 Инвестирование',  'invest',  'set-invest',   30, 120, s.investTime || 60,   10);
+    html += '<div class="set-tiles">';
+    html += buildStatTile('⏱', 'Подготовка', 'prep', 'set-prep', 30, 300, s.prepTime || 60, 15, fmtTime(s.prepTime || 60));
+    html += buildStatTile('🎤', 'Питч', 'present', 'set-present', 60, 300, s.presentTime || 120, 15, fmtTime(s.presentTime || 120));
+    html += buildStatTile('📈', 'Инвестиции', 'invest', 'set-invest', 30, 120, s.investTime || 60, 10, fmtTime(s.investTime || 60));
     html += '</div>';
 
     // Вопросы после питча — необязательная фаза, по умолчанию выключена
@@ -257,6 +252,13 @@ export function updateSettingsPanel(container) {
     html += '</div>';
     html += '<div class="text-[0.6rem] text-corp-dim mt-1.5 px-1">Слушатели поднимают руку, ведущий переходит дальше кнопкой. «Без таймера» — пока ведущий не нажмёт «Дальше».</div>';
     html += '</div>';
+    html += buildSectionDivider('Формат выступлений');
+    html += '<div class="space-y-1.5">';
+    html += buildToggle('🎬 Текстовые питчи',        'Питч пишут текстом — для стрима и игры без микрофона', 'set-streamer', s.streamerMode,          false);
+    html += buildToggle('🕶 Зашифровать участников', 'Имена → псевдонимы (только с текстовыми питчами)',    'set-anon',     s.anonymizeParticipants, !s.streamerMode);
+    html += buildToggle('🔊 Озвучка',                'Браузер зачитывает карты и питчи вслух',              'set-speech',   s.useSpeech,             false);
+    html += '</div>';
+
     html += buildSectionDivider('Видимость комнаты');
     var isPrivate = !!s.roomPrivate;
     html += '<div class="space-y-2">';
@@ -325,12 +327,6 @@ export function updateSettingsPanel(container) {
     html += buildDeckTile('set-blackswan', '🦢', 'Чёрный лебедь', '20% шанс, что карту заменят прямо во время питча',        s.blackSwan, '#a78bfa');
     html += '</div>';
 
-    html += buildSectionDivider('Стриминг');
-    html += '<div class="space-y-0.5">';
-    html += buildToggle('Текстовые питчи',       'Для стримера / без микрофона',              'set-streamer', s.streamerMode,          false);
-    html += buildToggle('Зашифровать участников','Имена → псевдонимы (только в текст. режиме)', 'set-anon',    s.anonymizeParticipants, !s.streamerMode);
-    html += buildToggle('Озвучка текста',        'Хост управляет голосовым сопровождением',   'set-speech',   s.useSpeech,             false);
-    html += '</div>';
 
     html += '</div>';
 
@@ -364,13 +360,43 @@ export function updateSettingsPanel(container) {
     html += '  <input type="checkbox" id="set-bunker-hostmode" class="toggle-corp flex-shrink-0"' + (hostModeOn ? ' checked' : '') + '>';
     html += '</label>';
 
+    // Сборка продукта: выбор 1 из 3 перед игрой
+    html += buildSectionDivider('Карты игроков');
+    var draftOn = s.bunkerDraft !== false; // default on
+    var draftTime = parseInt(s.bunkerDraftTime, 10) || 120;
+    html += '<div class="draft-setting' + (draftOn ? ' draft-setting-on' : '') + ' mb-4">';
+    html += '<label for="set-bunker-draft" class="flex items-center justify-between cursor-pointer">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-sm font-black ' + (draftOn ? 'text-accent-gold' : 'text-corp-light') + '">🧪 Сборка продукта перед игрой</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">Каждый выбирает по 1 карте из 3 в каждой категории — меньше обидного рандома. Сначала предмет, остальное согласуется с ним.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-bunker-draft" class="toggle-corp flex-shrink-0"' + (draftOn ? ' checked' : '') + '>';
+    html += '</label>';
+    if (draftOn) {
+        html += '<div class="draft-time">';
+        html += '  <span class="draft-time-label">⏱ Время на выбор</span>';
+        html += '  <div class="draft-time-opts">';
+        [60, 90, 120, 180, 240].forEach(function (sec) {
+            var on = sec === draftTime;
+            html += '<label class="draft-time-opt' + (on ? ' draft-time-opt-on' : '') + '"><input type="radio" name="draft-time" value="' + sec + '" class="deck-toggle sr-only"' + (on ? ' checked' : '') + '>' + fmtDraftTime(sec) + '</label>';
+        });
+        html += '  </div>';
+        html += '</div>';
+    }
+    html += '</div>';
+
+    // Сколько выживет
+    html += buildSectionDivider('Места в бункере');
+    html += buildSurvivorsSetting(s);
+
     // Статистика режима
     html += buildSectionDivider('Как это работает');
     html += '<div class="grid grid-cols-2 gap-2 mb-4">';
-    html += buildInfoTile('🃏', '9 карт', 'у каждого игрока');
+    html += draftOn ? buildInfoTile('🧪', '1 из 3', 'выбор каждой карты') : buildInfoTile('🃏', '9 карт', 'у каждого игрока');
     html += buildInfoTile('👁', 'По одной', 'раскрытие за ход');
     html += buildInfoTile('🗳', 'Голосование', 'после каждого раунда');
-    html += buildInfoTile('🏆', '~50%', 'игроков выживает');
+    var surv = survivorsPreview(s);
+    html += buildInfoTile('🏆', surv.auto ? '~50%' : String(surv.count), surv.auto ? 'игроков выживает' : 'выживут в финале');
     html += '</div>';
 
     // Настройки бункера
@@ -406,7 +432,6 @@ export function updateSettingsPanel(container) {
 
     html += buildFutureSetting('⏱ Время на ход', '180 сек — раскрытие карт');
     html += buildFutureSetting('🗳 Время голосования', '90 сек — основное голосование');
-    html += buildFutureSetting('🎯 Кол-во выживших', 'Авто (~50% игроков)');
     html += '</div>';
 
     html += '</div>';
@@ -445,36 +470,26 @@ export function renderLobby(container) {
     // LEFT
     html += '<div class="flex-1 space-y-6">';
 
-    // Room code
-    html += '<div class="corp-card p-6">';
+    // Комната: код плитками по буквам + приглашение
+    html += '<div class="lobby-room">';
     html += '<div id="room-name-display">' + buildRoomNameHtml() + '</div>';
-    html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">Код комнаты</div>';
-    html += '<div class="flex items-center gap-4">';
-    html += '<span class="font-mono text-4xl md:text-5xl font-black text-accent-blue tracking-[0.2em]" style="text-shadow: 0 0 20px rgba(0,180,255,0.3);">';
-    if (IS_CODE_HIDDEN && state.isHost) {
-        html += '•••••';
-    } else if (codeAnimatedFor !== state.roomCode) {
-        // Первый показ кода — буквы выпадают по одной, как на табло
-        var codeStr = state.roomCode || '';
-        for (var ci = 0; ci < codeStr.length; ci++) {
-            html += '<span class="code-char" style="animation-delay:' + (0.15 + ci * 0.08).toFixed(2) + 's">' + escapeHtml(codeStr[ci]) + '</span>';
-        }
-        codeAnimatedFor = state.roomCode;
-    } else {
-        html += escapeHtml(state.roomCode || '');
-    }
-    html += '</span>';
+    html += '<div class="lobby-room-label">Код комнаты</div>';
+    html += '<div class="room-code-row">';
+    html += '<div class="room-code-tiles">' + buildCodeTiles() + '</div>';
     if (state.isHost) {
-        html += '<button id="btn-toggle-code" class="min-w-10 min-h-10 flex items-center justify-center rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скрыть/показать код">' + (IS_CODE_HIDDEN ? '🙈' : '👁') + '</button>';
+        html += '<button id="btn-toggle-code" class="room-icon-btn" title="Скрыть/показать код">' + (IS_CODE_HIDDEN ? '🙈' : '👁') + '</button>';
     }
-    html += '<button id="btn-copy" class="min-w-10 min-h-10 flex items-center justify-center rounded-lg hover:bg-corp-card transition-colors text-corp-muted hover:text-corp-light cursor-pointer" title="Скопировать">📋</button>';
     html += '</div>';
-    html += '<p class="text-xs text-corp-muted mt-3">' + (IS_CODE_HIDDEN && state.isHost ? 'Код скрыт. Нажмите 👁 чтобы снова показать.' : 'Отправьте этот код инвесторам') + '</p>';
+    html += '<div class="room-actions">';
+    html += '<button id="btn-copy" class="room-action-btn">📋 Код</button>';
+    html += '<button id="btn-copy-link" class="room-action-btn room-action-main">🔗 Ссылка-приглашение</button>';
+    html += '</div>';
+    html += '<p class="room-hint">' + (IS_CODE_HIDDEN && state.isHost ? 'Код скрыт — удобно для стрима. Нажмите 👁, чтобы показать.' : 'По ссылке друзья попадут сразу в комнату — останется ввести имя') + '</p>';
     html += '</div>';
 
     // Players
     html += '<div>';
-    html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Участники · <span id="players-count">' + (state.players || []).length + '</span></div>';
+    html += '<div class="flex items-center justify-between mb-3"><div class="text-xs font-bold text-corp-muted uppercase tracking-widest">👥 Участники</div><span id="players-count" class="lobby-count-pill"></span></div>';
     html += '<div class="space-y-2" id="players-list"></div>';
     html += '</div>';
 
@@ -491,9 +506,14 @@ export function renderLobby(container) {
 
     // RIGHT — settings (host only)
     if (isHost) {
-        html += '<div class="lg:w-[520px] space-y-4">';
-        html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-1">Приборная панель</div>';
-        html += '<div class="corp-card p-4 sm:p-7 space-y-5" id="settings-panel"></div>';
+        html += '<div class="lg:w-[520px] space-y-3">';
+        html += '<div class="flex items-center justify-between px-1"><div class="text-xs font-black text-corp-muted uppercase tracking-widest">⚙️ Настройки игры</div><div class="text-[0.65rem] font-bold text-corp-dim">меняете только вы</div></div>';
+        html += '<div class="corp-card settings-card p-4 sm:p-7 space-y-5" id="settings-panel"></div>';
+        html += '</div>';
+    } else {
+        // Игроки видят, во что будут играть, — обновляется, когда хост меняет настройки
+        html += '<div class="lg:w-[460px]">';
+        html += '<div id="lobby-preview" class="lobby-preview"></div>';
         html += '</div>';
     }
 
@@ -530,6 +550,19 @@ export function renderLobby(container) {
         });
     }
 
+    var btnLink = container.querySelector('#btn-copy-link');
+    if (btnLink) {
+        btnLink.addEventListener('click', function () {
+            if (!state.roomCode) return;
+            if (IS_CODE_HIDDEN && state.isHost) {
+                showNotification('Сначала покажите код комнаты', 'info');
+                return;
+            }
+            var link = location.origin + '/?room=' + state.roomCode;
+            copyText(link, '🔗 Ссылка скопирована — отправьте её друзьям', 'Ссылка: ' + link);
+        });
+    }
+
     var btnCopy = container.querySelector('#btn-copy');
     if (btnCopy) {
         btnCopy.addEventListener('click', function () {
@@ -553,6 +586,151 @@ export function renderLobby(container) {
 // ═══════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════
+
+function avatarHue(id) {
+    var h = 0, str = String(id || '');
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+    return h;
+}
+
+function copyText(text, okMsg, fallbackMsg) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text)
+            .then(function () { showNotification(okMsg, 'success'); })
+            .catch(function () { showNotification(fallbackMsg, 'info'); });
+    } else {
+        showNotification(fallbackMsg, 'info');
+    }
+}
+
+// Код комнаты — по плитке на букву; при первом показе буквы выпадают по одной
+function buildCodeTiles() {
+    var code = state.roomCode || '';
+    var hidden = IS_CODE_HIDDEN && state.isHost;
+    var animate = !hidden && codeAnimatedFor !== state.roomCode;
+    var html = '';
+    for (var i = 0; i < code.length; i++) {
+        html += '<span class="room-code-tile' + (animate ? ' code-char' : '') + '"' + (animate ? ' style="animation-delay:' + (0.15 + i * 0.08).toFixed(2) + 's"' : '') + '>' + (hidden ? '•' : escapeHtml(code[i])) + '</span>';
+    }
+    if (animate) codeAnimatedFor = state.roomCode;
+    return html;
+}
+
+function fmtTime(sec) {
+    sec = parseInt(sec, 10) || 0;
+    return Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2) + ' мин';
+}
+
+// Плитка настройки: крупное число и кнопки − / +
+function buildStatTile(emoji, label, stepName, inputId, min, max, value, step, sub) {
+    var html = '<div class="set-tile">';
+    html += '<div class="set-tile-top"><span class="set-tile-emoji">' + emoji + '</span><span class="set-tile-label">' + label + '</span></div>';
+    html += '<div class="set-tile-row">';
+    html += '<button class="stepper-btn set-tile-btn cursor-pointer" data-step="' + stepName + '" data-dir="-' + step + '">−</button>';
+    html += '<input type="number" id="' + inputId + '" class="stepper-input set-tile-input" min="' + min + '" max="' + max + '" value="' + value + '" step="' + step + '">';
+    html += '<button class="stepper-btn set-tile-btn cursor-pointer" data-step="' + stepName + '" data-dir="' + step + '">+</button>';
+    html += '</div>';
+    html += '<div class="set-tile-sub">' + sub + '</div>';
+    html += '</div>';
+    return html;
+}
+
+// Сколько выживет при текущем составе — та же логика, что на сервере
+function survivorsPreview(s) {
+    var n = (state.players || []).length;
+    var wanted = parseInt(s.bunkerSurvivors, 10) || 0;
+    var count = wanted || Math.max(2, Math.floor((n + 2) / 2));
+    var capped = n > 1 && count > n - 1;
+    if (n > 1) count = Math.max(1, Math.min(count, n - 1));
+    return { auto: !wanted, wanted: wanted, count: count, players: n, capped: capped };
+}
+
+function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+}
+
+function buildSurvivorsSetting(s) {
+    var p = survivorsPreview(s);
+    var html = '<div class="draft-setting draft-setting-on mb-4">';
+    html += '<div class="text-sm font-black text-accent-gold">🎯 Сколько игроков выживет</div>';
+    html += '<div class="text-[0.7rem] text-corp-dim mt-0.5">Игра идёт, пока в бункере не останется столько человек. «Авто» — примерно половина.</div>';
+    html += '<div class="draft-time" style="border-top:0;padding-top:0">';
+    html += '  <div class="draft-time-opts">';
+    [0, 1, 2, 3, 4, 5, 6].forEach(function (v) {
+        var on = v === p.wanted;
+        html += '<label class="draft-time-opt' + (on ? ' draft-time-opt-on' : '') + '"><input type="radio" name="survivors" value="' + v + '" class="deck-toggle sr-only"' + (on ? ' checked' : '') + '>' + (v ? v : 'Авто') + '</label>';
+    });
+    html += '  </div>';
+    html += '</div>';
+    var hint;
+    if (p.players < 2) hint = 'Ждём игроков…';
+    else if (p.capped) hint = '⚠️ Игроков пока ' + p.players + ' — выживут ' + p.count + ' (хотя бы одного нужно выгнать)';
+    else hint = 'Сейчас: ' + p.players + ' ' + plural(p.players, 'игрок', 'игрока', 'игроков') + ' → выживут <b>' + p.count + '</b>, выгнать нужно ' + (p.players - p.count);
+    html += '<div class="survivors-hint">' + hint + '</div>';
+    html += '</div>';
+    return html;
+}
+
+function fmtDraftTime(sec) {
+    return sec % 60 === 0 ? (sec / 60) + ' мин' : Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60);
+}
+
+// Короткая сводка «во что играем» — чипы над кнопкой старта и в карточке игроков
+function summaryChips(s) {
+    var chips = [];
+    if (s.bunkerMode) {
+        chips.push(['🏠', 'Бункер', 'red']);
+        chips.push(s.bunkerDraft !== false ? ['🧪', 'выбор карт 1 из 3', ''] : ['🃏', '9 случайных карт', '']);
+        if (parseInt(s.bunkerSurvivors, 10) > 0) chips.push(['🎯', 'выживут ' + survivorsPreview(s).count, '']);
+        chips.push([s.bunkerHostMode ? '🎙' : '⏱', s.bunkerHostMode ? 'темп ведёт хост' : 'ходы по таймеру', '']);
+        if (s.bunkerActionCards !== false) chips.push(['⚡', 'карты действий', '']);
+    } else {
+        chips.push(['📣', 'Классика', 'gold']);
+        var r = s.rounds || 3;
+        chips.push(['🔁', r + ' ' + (r === 1 ? 'раунд' : r < 5 ? 'раунда' : 'раундов'), '']);
+        chips.push(['🎤', 'питч ' + fmtTime(s.presentTime || 120).replace(' мин', ''), '']);
+        chips.push(['🃏', countHandCards(s) + ' ' + pluralCards(countHandCards(s)), '']);
+        if (s.cardSource === 'players') chips.push(['🧟', 'генератор абсурда', '']);
+        if (s.useEvents) chips.push(['🎲', 'события', '']);
+        if (s.blackSwan) chips.push(['🦢', 'чёрный лебедь', '']);
+        if (s.questionsTime) chips.push(['🙋', 'вопросы', '']);
+        if (s.streamerMode) chips.push(['🎬', 'текстом', '']);
+    }
+    if (s.hostObserves) chips.push(['🎙', 'с ведущим', '']);
+    return chips;
+}
+
+function buildGameSummary(s) {
+    var html = '<div class="lobby-summary">';
+    summaryChips(s).forEach(function (c) {
+        html += '<span class="lobby-chip' + (c[2] ? ' lobby-chip-' + c[2] : '') + '">' + c[0] + ' ' + c[1] + '</span>';
+    });
+    html += '</div>';
+    return html;
+}
+
+// Карточка «Во что играем» для игроков (у хоста вместо неё — настройки)
+function updateLobbyPreview(container) {
+    var box = container.querySelector('#lobby-preview');
+    if (!box) return;
+    var s = state.settings || {};
+    var html = '';
+    html += '<div class="lobby-preview-kicker">🎮 Во что играем</div>';
+    if (s.bunkerMode) {
+        html += '<div class="lobby-preview-title">🏠 Бункер</div>';
+        html += '<p class="lobby-preview-text">Конец света, мест мало. У каждого 9 закрытых карт стартапа: раскрываете по одной и голосуете, кто человечество не спасёт.</p>';
+    } else {
+        html += '<div class="lobby-preview-title">📣 Классика</div>';
+        html += '<p class="lobby-preview-text">Получите карты, впарьте продукт и вложите жетоны в чужие стартапы. Кто соберёт больше всех инвестиций?</p>';
+        html += buildDeckPreview(s);
+    }
+    html += '<div class="mt-4">' + buildGameSummary(s) + '</div>';
+    html += '<div class="lobby-preview-note">Хост ещё может поменять настройки — всё обновится здесь</div>';
+    box.innerHTML = html;
+}
 
 function buildSectionDivider(title) {
     return '<div class="flex items-center gap-2 my-4">'
@@ -1034,6 +1212,9 @@ function pushSettings(container) {
         bunkerHostMode: container.querySelector('#set-bunker-hostmode')?.checked || false,
         bunkerChat: container.querySelector('#set-bunker-chat') ? container.querySelector('#set-bunker-chat').checked : true,
         bunkerActionCards: container.querySelector('#set-bunker-actioncards') ? container.querySelector('#set-bunker-actioncards').checked : true,
+        bunkerSurvivors: container.querySelector('input[name="survivors"]:checked') ? parseInt(container.querySelector('input[name="survivors"]:checked').value, 10) : (parseInt(state.settings.bunkerSurvivors, 10) || 0),
+        bunkerDraft: container.querySelector('#set-bunker-draft') ? container.querySelector('#set-bunker-draft').checked : (state.settings.bunkerDraft !== false),
+        bunkerDraftTime: container.querySelector('input[name="draft-time"]:checked') ? parseInt(container.querySelector('input[name="draft-time"]:checked').value, 10) : (state.settings.bunkerDraftTime || 120),
         chatTTS: container.querySelector('#set-chat-tts')?.checked || false,
         roomPrivate: container.querySelector('#set-room-open') ? !container.querySelector('#set-room-open').checked : false,
         roomPassword: container.querySelector('#set-room-password')?.value || '',

@@ -8,12 +8,9 @@ export function showNotification(text, type = 'info') {
     const container = document.getElementById('notification-container');
     if (!container) return;
 
-    // Remove existing
-    const existing = container.querySelector('.notification-toast');
-    if (existing) {
-        existing.classList.add('exiting');
-        setTimeout(() => existing.remove(), 300);
-    }
+    // Новое уведомление сразу заменяет прежние: раньше убиралось только первое,
+    // и при быстрых событиях («ход», «карта открыта») тексты ложились друг на друга
+    container.querySelectorAll('.notification-toast').forEach((el) => el.remove());
 
     const icons = { error: '✕', success: '✓', info: 'ℹ' };
     const colors = {

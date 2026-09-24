@@ -24,6 +24,39 @@ export { BUNKER_CARD_TYPES };
 
 // Хранение последней раскрытой карты для анимации
 var pendingReveal = null;
+// Катастрофа развёрнута, пока игрок сам её не свернёт
+var problemOpen = true;
+var problemFull = false; // на телефоне текст катастрофы обрезан до 5 строк, пока его не развернут
+
+// Цвет каждого типа карты — для досье и сцены
+var BK_COLORS = {
+    adjective: '#f87171', item: '#22d3ee', modifier: '#34d399', feature: '#c084fc', gift: '#f472b6',
+    hiddenDefect: '#fb923c', packaging: '#2dd4bf', review: '#fbbf24', historicalFact: '#facc15',
+};
+export function bkColor(key) { return BK_COLORS[key] || '#ffc72c'; }
+function cardType(key) {
+    for (var i = 0; i < BUNKER_CARD_TYPES.length; i++) if (BUNKER_CARD_TYPES[i].key === key) return BUNKER_CARD_TYPES[i];
+    return null;
+}
+function avatarHue(id) {
+    var h = 0, str = String(id || '');
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+    return h;
+}
+
+// Карта досье. Состояния: open — видят все, hidden — видите только вы,
+// can — можно открыть сейчас, locked — сначала нужно открыть предмет
+function bkCardHtml(ct, value, cardState) {
+    var badge = { open: '👁 все видят', hidden: '🔒 только вы', can: '✨ открыть', locked: '⏳' }[cardState];
+    var cls = 'bk-card bk-card-' + cardState + (cardState === 'can' ? ' bunker-reveal-btn' : '');
+    var html = '<div class="' + cls + '" style="--bk:' + bkColor(ct.key) + '" data-my-slot="' + ct.key + '"' + (cardState === 'can' ? ' data-card-key="' + ct.key + '"' : '') + '>';
+    html += '<div class="bk-card-top"><span>' + ct.emoji + ' ' + ct.label + '</span><span class="bk-card-badge">' + badge + '</span></div>';
+    html += '<div class="bk-card-value">' + escapeHtml(value) + '</div>';
+    if (cardState === 'can') html += '<div class="bk-card-cta">Открыть всем →</div>';
+    if (cardState === 'locked') html += '<div class="bk-card-cta bk-card-cta-muted">сначала предмет</div>';
+    html += '</div>';
+    return html;
+}
 
 export function setPendingReveal(data) {
     pendingReveal = data;
@@ -56,94 +89,85 @@ export function renderBunkerReveal(container) {
         html += '<div class="mb-2 px-3 py-2 rounded-xl bg-corp-graphite border border-accent-gold/25 text-center text-xs text-accent-gold font-bold">👀 Режим зрителя — вы наблюдаете за игрой</div>';
     }
 
-    // ═══════ HEADER ═══════
-    html += '<div class="corp-card px-4 py-2.5 flex items-center justify-between flex-wrap gap-3 mb-3">';
-    html += '  <div>';
-    html += '    <div class="text-[0.65rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
-    html += '    <div class="text-lg font-black text-corp-white">' + (bunker.currentRound || 1) + '</div>';
-    html += '  </div>';
-    html += '  <div class="flex-1 max-w-sm mx-4">';
-    html += '    <div class="flex justify-between text-[0.6rem] font-bold text-corp-muted mb-1">';
-    html += '      <span>ХОД ' + ((bunker.currentTurnIndex || 0) + 1) + ' / ' + (bunker.totalTurns || '?') + '</span>';
-    if (bunker.hostMode) {
-        html += '      <span class="text-accent-gold font-black">🎙 ведущий управляет</span>';
-    } else {
-        html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
+    // ═══════ ШАПКА: раунд · очередь ходов · места в бункере ═══════
+    var activeIds = revealOrder.map(function (r) { return typeof r === 'object' ? r.id : r; })
+        .filter(function (id) { return eliminatedPlayers.indexOf(id) === -1; });
+    var turnIdx = bunker.currentTurnIndex || 0;
+    var seats = bunker.survivorsCount || 0;
+    var toKick = Math.max(0, activeIds.length - seats);
+    html += '<div class="bk-hud">';
+    html += '  <div class="bk-hud-round"><span>Раунд</span><b>' + (bunker.currentRound || 1) + '</b></div>';
+    html += '  <div class="bk-hud-mid">';
+    html += '    <div class="bk-hud-turns">';
+    for (var ti = 0; ti < activeIds.length; ti++) {
+        html += '<span class="bk-turn-dot' + (ti < turnIdx ? ' bk-turn-done' : ti === turnIdx ? ' bk-turn-now' : '') + '"></span>';
     }
     html += '    </div>';
-    if (bunker.hostMode) {
-        html += '    <div class="h-1.5 rounded-full" style="background:rgba(245,183,49,0.15);border:1px solid rgba(245,183,49,0.2)"></div>';
-    } else {
-        html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
-    }
+    html += '    <div class="bk-hud-line"><span>Ход ' + (turnIdx + 1) + ' из ' + (bunker.totalTurns || activeIds.length || '?') + '</span>';
+    html += bunker.hostMode ? '<span class="text-accent-gold">🎙 ведущий управляет</span>' : '<span data-timer-text class="font-mono text-corp-light"></span>';
+    html += '    </div>';
+    if (!bunker.hostMode) html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
     html += '  </div>';
-    html += '  <div class="text-right">';
-    html += '    <div class="text-[0.65rem] font-bold text-corp-muted uppercase tracking-widest">Выживших</div>';
-    html += '    <div class="text-lg font-black text-accent-green">' + (bunker.survivorsCount || '?') + '</div>';
+    html += '  <div class="bk-hud-seats">';
+    html += '    <span>Мест в бункере</span><b>🛏 ' + (seats || '?') + '</b>';
+    html += '    <small>' + (toKick > 0 ? 'выгнать ещё ' + toKick : 'места хватает всем') + '</small>';
     html += '  </div>';
-    html += '  <button id="btn-exit-bunker" class="p-2 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer" title="Выйти в меню">✕ Выйти</button>';
+    html += '  <button id="btn-exit-bunker" class="bk-hud-exit" title="Выйти в меню">✕</button>';
     html += '</div>';
 
-    // ═══════ ГЛОБАЛЬНАЯ ПРОБЛЕМА (сворачиваемая) ═══════
-    html += '<div class="mb-3">';
-    html += '  <button id="btn-toggle-problem" class="w-full corp-card border-accent-red/20 bg-accent-red-dim px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:border-accent-red/30 transition-colors">';
-    html += '    <span class="text-lg">🌍</span>';
-    html += '    <span class="text-[0.55rem] font-black text-accent-red uppercase tracking-widest flex-1 text-left">Глобальная проблема</span>';
-    html += '    <span id="problem-arrow" class="text-xs text-corp-muted transition-transform">▼</span>';
+    // ═══════ КАТАСТРОФА — развёрнута, пока игрок сам её не свернёт ═══════
+    html += '<div class="bk-disaster">';
+    html += '  <button id="btn-toggle-problem" class="bk-disaster-head">';
+    html += '    <span class="bk-disaster-icon">☢️</span>';
+    html += '    <span class="bk-disaster-label">Катастрофа</span>';
+    html += '    <span class="bk-disaster-hint">как ваш стартап спасёт от неё мир?</span>';
+    html += '    <span id="problem-arrow" class="bk-disaster-arrow"' + (problemOpen ? ' style="transform:rotate(180deg)"' : '') + '>▼</span>';
     html += '  </button>';
-    html += '  <div id="problem-body" class="hidden corp-card border-accent-red/10 border-t-0 rounded-t-none px-4 py-3">';
-    html += '    <div class="text-xs text-corp-light leading-relaxed">' + escapeHtml(bunker.globalProblem || '') + '</div>';
+    html += '  <div id="problem-body" class="bk-disaster-body' + (problemOpen ? '' : ' hidden') + (problemFull ? ' bk-disaster-full' : '') + '">';
+    html += '    <div class="bk-disaster-text">' + escapeHtml(bunker.globalProblem || '') + '</div>';
+    html += '    <button id="btn-problem-more" class="bk-disaster-more">читать полностью ▾</button>';
     html += '  </div>';
     html += '</div>';
 
-    // ═══════ ТЕКУЩИЙ ВЫСТУПАЮЩИЙ ═══════
+    // ═══════ СЦЕНА: кто ходит и какую карту он только что открыл ═══════
     var currentPlayer = null;
     for (var pi = 0; pi < players.length; pi++) {
         if (players[pi].id === currentPlayerId) { currentPlayer = players[pi]; break; }
     }
 
     if (currentPlayer) {
-        var stageClass = isMyTurn ? ' spotlight-glow border-accent-blue/30 bunker-current-pulse' : ' border-accent-gold/20';
-        html += '<div class="corp-card p-4 text-center mb-3' + stageClass + '">';
-        html += '  <div class="text-[0.55rem] text-corp-muted font-bold uppercase tracking-widest mb-1">Сейчас раскрывает</div>';
-        html += '  <h2 class="text-xl md:text-2xl font-black text-accent-gold">';
-        html += escapeHtml(currentPlayer.nickname);
-        html += '  </h2>';
+        var hue = avatarHue(currentPlayer.id);
+        var lastReveal = bunker.lastReveal && bunker.lastReveal.playerId === currentPlayerId ? bunker.lastReveal : null;
+        html += '<div class="bk-stage' + (isMyTurn ? ' bk-stage-me' : '') + '">';
+        html += '  <div class="bk-stage-who">';
+        html += '    <span class="bk-stage-avatar" style="background:linear-gradient(135deg,hsl(' + hue + ',55%,32%),hsl(' + ((hue + 40) % 360) + ',55%,22%));color:hsl(' + hue + ',85%,82%)">' + escapeHtml((currentPlayer.nickname || '?').trim().charAt(0).toUpperCase()) + '</span>';
+        html += '    <div class="text-left"><div class="bk-stage-label">' + (isMyTurn ? 'Сейчас ходите вы' : 'Сейчас ходит') + '</div><div class="bk-stage-name">' + escapeHtml(currentPlayer.nickname) + '</div></div>';
+        if (isMyTurn) html += '    <span class="bk-your-turn"><span class="w-2 h-2 rounded-full bg-white/80 animate-ping"></span>ВЫ В ЭФИРЕ</span>';
+        html += '  </div>';
 
-        if (isMyTurn) {
-            html += '<div class="inline-flex items-center gap-2 bg-accent-blue text-white px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider mt-2">';
-            html += '  <span class="w-2 h-2 rounded-full bg-white/80 animate-ping"></span>';
-            html += '  ВАШ ХОД!';
+        if (lastReveal) {
+            var lrt = cardType(lastReveal.cardKey);
+            html += '<div class="bk-stage-reveal" style="--bk:' + bkColor(lastReveal.cardKey) + '">';
+            html += '  <div class="bk-stage-reveal-label">' + (isMyTurn ? 'Вы открыли' : 'Только что открыл') + ' · ' + (lrt ? lrt.emoji + ' ' + lrt.label : '') + '</div>';
+            html += '  <div class="bk-stage-reveal-value">' + escapeHtml(lastReveal.cardValue || '') + '</div>';
+            html += '  <div class="bk-stage-reveal-hint">' + (isMyTurn ? 'Объясните всем, почему это спасёт мир' : 'Слушаем, как это спасёт мир') + '</div>';
             html += '</div>';
+        } else {
+            html += '<div class="bk-stage-wait">' + (isMyTurn ? '⬇ Откройте одну карту из своего досье' : '⏳ Выбирает, какую карту открыть…') + '</div>';
         }
 
-        // ═══════ FIX #2: Кнопки — «Закончил» ТОЛЬКО после раскрытия карты ═══════
-        html += '<div class="flex items-center justify-center gap-3 mt-3">';
-
+        // Кнопки — «Закончил» только после раскрытия карты
+        html += '<div class="flex items-center justify-center gap-3 mt-4 flex-wrap">';
         if (isMyTurn && bunker.hasRevealedThisTurn) {
-            // Карта уже раскрыта — можно завершить ход
-            html += '<button id="btn-bunker-finish" class="btn-neon px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">';
-            html += '✓ Закончил объяснение';
-            html += '</button>';
-        } else if (isMyTurn && !bunker.hasRevealedThisTurn) {
-            // Карта ещё не раскрыта — подсказка
-            html += '<div class="text-xs text-corp-muted italic">⬇ Сначала раскройте одну карту ниже</div>';
+            html += '<button id="btn-bunker-finish" class="btn-neon-solid px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer">✓ Закончил объяснение</button>';
         }
-
         if (isHost && bunker.hostMode) {
-            // Режим ведущего — большая кнопка "Следующий" всегда видна хосту
             var allDone = bunker.currentTurnIndex >= (bunker.totalTurns || 0) - 1;
-            var btnLabel = allDone ? '🗳 Начать голосование' : '⏭ Следующий игрок';
-            html += '<button id="btn-bunker-host-advance" class="btn-neon-solid px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer">';
-            html += btnLabel;
-            html += '</button>';
+            html += '<button id="btn-bunker-host-advance" class="btn-neon-solid px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider cursor-pointer">' + (allDone ? '🗳 Начать голосование' : '⏭ Следующий игрок') + '</button>';
         } else if (isHost && !isMyTurn) {
-            html += '<button id="btn-bunker-skip-turn" class="btn-neon px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">';
-            html += '⏭ Следующий';
-            html += '</button>';
+            html += '<button id="btn-bunker-skip-turn" class="btn-neon px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">⏭ Следующий</button>';
         }
         html += '</div>';
-
         html += '</div>';
     }
 
@@ -152,94 +176,27 @@ export function renderBunkerReveal(container) {
     var itemAlreadyRevealed = !!myRevealed['item'];
     if (!isSpectator) {
 
-    html += '<div class="mb-3">';
-    html += '  <h3 class="text-xs font-bold text-accent-blue uppercase tracking-widest mb-2">🃏 Ваш продукт</h3>';
+    var openedCount = 0;
+    for (var oc = 0; oc < BUNKER_CARD_TYPES.length; oc++) if (myRevealed[BUNKER_CARD_TYPES[oc].key]) openedCount++;
+    var canPickNow = isMyTurn && !bunker.hasRevealedThisTurn;
 
-    // Подсказка — если предмет ещё не раскрыт
-    if (!itemAlreadyRevealed && isMyTurn && !bunker.hasRevealedThisTurn) {
-        html += '  <div class="text-xs text-accent-gold mb-2 px-3 py-2 rounded-lg bg-accent-gold-dim border border-accent-gold/20">';
-        html += '    📦 Сначала раскройте предмет — основу вашего продукта';
-        html += '  </div>';
+    html += '<div class="bk-dossier">';
+    html += '  <div class="bk-dossier-head">';
+    html += '    <div class="bk-dossier-title">🃏 Ваше досье <span>открыто ' + openedCount + ' из ' + BUNKER_CARD_TYPES.length + '</span></div>';
+    html += '    <div class="bk-dossier-legend"><span>🔒 видите только вы</span><span>👁 видят все</span></div>';
+    html += '  </div>';
+    if (!itemAlreadyRevealed && canPickNow) {
+        html += '  <div class="bk-dossier-tip">📦 Первым откройте предмет — это основа вашего продукта</div>';
     }
-
-    html += '  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">';
-
+    html += '  <div class="bk-cards">';
     for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
         var ct = BUNKER_CARD_TYPES[ci];
-        if (ct.key === 'historicalFact') continue; // рендерится отдельно ниже
         var cardValue = myCards[ct.key] || '???';
-        var isRevealed = myRevealed[ct.key];
-
-        if (isRevealed) {
-            // ═══ Уже раскрыта — полупрозрачная, с галочкой ═══
-            html += '<div class="rounded-xl p-3 ' + ct.bg + ' ' + ct.border + ' border opacity-50 text-center relative" data-my-slot="' + ct.key + '">';
-            html += '  <div class="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-accent-green/20 flex items-center justify-center"><span class="text-[0.5rem] text-accent-green">✓</span></div>';
-            html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
-            html += '  <div class="text-xs font-bold ' + ct.color + ' leading-snug">' + escapeHtml(cardValue) + '</div>';
-            html += '</div>';
-
-        } else if (isMyTurn && !bunker.hasRevealedThisTurn) {
-            // ═══ Мой ход + ещё не раскрыл в этом ходу ═══
-            // Можно открыть если: это предмет, ИЛИ предмет уже раскрыт ранее
-            var canReveal = ct.key === 'item' || itemAlreadyRevealed;
-
-            if (canReveal) {
-                html += '<div class="bunker-reveal-btn rounded-xl p-3 ' + ct.gradient + ' border-2 border-white/20 cursor-pointer hover:scale-[1.03] hover:border-white/40 hover:shadow-lg transition-all text-center" data-card-key="' + ct.key + '" data-my-slot="' + ct.key + '">';
-                html += '  <div class="text-[0.65rem] font-bold text-white/85 uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
-                html += '  <div class="text-xs font-bold text-white leading-snug">' + escapeHtml(cardValue) + '</div>';
-                html += '  <div class="text-[0.55rem] text-white/50 mt-1">▲ нажмите</div>';
-                html += '</div>';
-            } else {
-                // Заблокировано — пока предмет не раскрыт
-                html += '<div class="rounded-xl p-3 bg-corp-graphite border border-corp-border text-center opacity-40 relative" data-my-slot="' + ct.key + '">';
-                html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
-                html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(cardValue) + '</div>';
-                html += '  <div class="text-[0.55rem] text-accent-gold mt-1">🔒 сначала предмет</div>';
-                html += '</div>';
-            }
-
-        } else {
-            // ═══ Не мой ход ИЛИ уже раскрыл в этом ходу ═══
-            html += '<div class="rounded-xl p-3 bg-corp-graphite border border-corp-border text-center" data-my-slot="' + ct.key + '">';
-            html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + ct.emoji + ' ' + ct.label + '</div>';
-            html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(cardValue) + '</div>';
-            html += '</div>';
-        }
+        var cardState = myRevealed[ct.key] ? 'open'
+            : (canPickNow ? ((ct.key === 'item' || itemAlreadyRevealed) ? 'can' : 'locked') : 'hidden');
+        html += bkCardHtml(ct, cardValue, cardState);
     }
     html += '  </div>';
-
-    // ═══ Исторический факт — полноширинная карточка ═══
-    (function() {
-        var hct = null;
-        for (var hci = 0; hci < BUNKER_CARD_TYPES.length; hci++) { if (BUNKER_CARD_TYPES[hci].key === 'historicalFact') { hct = BUNKER_CARD_TYPES[hci]; break; } }
-        if (!hct) return;
-        var hValue = myCards['historicalFact'] || '???';
-        var hRevealed = myRevealed['historicalFact'];
-        if (hRevealed) {
-            html += '<div class="mt-2 rounded-xl p-3 ' + hct.bg + ' ' + hct.border + ' border opacity-50 relative">';
-            html += '  <div class="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-accent-green/20 flex items-center justify-center"><span class="text-[0.5rem] text-accent-green">✓</span></div>';
-            html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + hct.emoji + ' ' + hct.label + '</div>';
-            html += '  <div class="text-xs font-bold ' + hct.color + ' leading-snug">' + escapeHtml(hValue) + '</div>';
-            html += '</div>';
-        } else if (isMyTurn && !bunker.hasRevealedThisTurn && itemAlreadyRevealed) {
-            html += '<div class="bunker-reveal-btn mt-2 rounded-xl p-3 ' + hct.gradient + ' border-2 border-white/20 cursor-pointer hover:scale-[1.01] hover:border-white/40 hover:shadow-lg transition-all" data-card-key="historicalFact">';
-            html += '  <div class="text-[0.65rem] font-bold text-white/85 uppercase tracking-widest mb-1">' + hct.emoji + ' ' + hct.label + '</div>';
-            html += '  <div class="text-xs font-bold text-white leading-snug">' + escapeHtml(hValue) + '</div>';
-            html += '  <div class="text-[0.55rem] text-white/50 mt-1">▲ нажмите</div>';
-            html += '</div>';
-        } else if (isMyTurn && !bunker.hasRevealedThisTurn && !itemAlreadyRevealed) {
-            html += '<div class="mt-2 rounded-xl p-3 bg-corp-graphite border border-corp-border opacity-40 relative">';
-            html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + hct.emoji + ' ' + hct.label + '</div>';
-            html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(hValue) + '</div>';
-            html += '  <div class="text-[0.55rem] text-accent-gold mt-1">🔒 сначала предмет</div>';
-            html += '</div>';
-        } else {
-            html += '<div class="mt-2 rounded-xl p-3 bg-corp-graphite border border-corp-border">';
-            html += '  <div class="text-[0.65rem] font-bold text-corp-dim uppercase tracking-widest mb-1">' + hct.emoji + ' ' + hct.label + '</div>';
-            html += '  <div class="text-xs font-bold text-corp-light leading-snug">' + escapeHtml(hValue) + '</div>';
-            html += '</div>';
-        }
-    })();
 
     // ═══════ ДОПОЛНИТЕЛЬНЫЕ КАРТЫ (от «Двойной порции» и др.) ═══════
     var myExtraCards = state.myExtraCards || {};
@@ -312,8 +269,17 @@ export function renderBunkerReveal(container) {
             var arrow = container.querySelector('#problem-arrow');
             if (body) {
                 body.classList.toggle('hidden');
-                if (arrow) arrow.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+                problemOpen = !body.classList.contains('hidden');
+                if (arrow) arrow.style.transform = problemOpen ? 'rotate(180deg)' : '';
             }
+        });
+    }
+    var btnMore = container.querySelector('#btn-problem-more');
+    if (btnMore) {
+        btnMore.addEventListener('click', function () {
+            problemFull = true;
+            var body = container.querySelector('#problem-body');
+            if (body) body.classList.add('bk-disaster-full');
         });
     }
 
@@ -1131,9 +1097,12 @@ export function renderBunkerVoteResult(container) {
     html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen text-center">';
 
     if (result.result === 'eliminated') {
-        html += '<div class="text-6xl mb-4">💀</div>';
-        html += '<h2 class="text-2xl font-black text-accent-red mb-2">Игрок выбывает!</h2>';
-        html += '<div class="text-xl font-black text-accent-gold mb-6">' + escapeHtml(result.eliminatedNickname || '???') + '</div>';
+        html += '<div class="bk-out">';
+        html += '  <div class="bk-out-door">🚪</div>';
+        html += '  <div class="bk-out-label">Покидает бункер</div>';
+        html += '  <div class="bk-out-name">' + escapeHtml(result.eliminatedNickname || '???') + '</div>';
+        html += '  <div class="bk-out-sub">Дверь закрылась. Вот что он пытался спасти:</div>';
+        html += '</div>';
 
         // Все карты кикнутого — КРУПНО
         if (result.eliminatedCards) {
@@ -1179,13 +1148,18 @@ export function renderBunkerVoteResult(container) {
             html += '</div>';
         }
 
-        html += '<div class="flex items-center justify-center gap-6 text-sm text-corp-muted mb-4">';
-        html += '  <span>Осталось: <span class="text-accent-blue font-bold">' + (result.remainingPlayers || '?') + '</span></span>';
-        html += '  <span>Нужно: <span class="text-accent-green font-bold">' + (state.bunker.survivorsCount || '?') + '</span></span>';
+        var left = result.remainingPlayers || 0, need = state.bunker.survivorsCount || 0;
+        html += '<div class="bk-seats-line">';
+        html += '  <span>👥 Претендентов: <b>' + (left || '?') + '</b></span>';
+        html += '  <span>🛏 Мест: <b>' + (need || '?') + '</b></span>';
+        html += '  <span>' + (left > need ? '🚪 Выгнать ещё: <b>' + (left - need) + '</b>' : '✅ <b>Бункер укомплектован</b>') + '</span>';
         html += '</div>';
     } else {
-        html += '<div class="text-6xl mb-4">✅</div>';
-        html += '<h2 class="text-xl font-black text-corp-white mb-2">Продолжаем без кика</h2>';
+        html += '<div class="bk-out bk-out-safe">';
+        html += '  <div class="bk-out-door">🤝</div>';
+        html += '  <div class="bk-out-label">Сегодня никто не выбыл</div>';
+        html += '  <div class="bk-out-name">Все остаются</div>';
+        html += '</div>';
         html += '<p class="text-sm text-corp-muted mb-6">' + escapeHtml(result.message || '') + '</p>';
     }
 
@@ -1223,7 +1197,8 @@ export function renderBunkerVoteResult(container) {
         html += '<div class="text-xs text-corp-dim mb-4">Пропустили голосование: ' + result.skipCount + '</div>';
     }
 
-    html += '<div class="text-sm text-corp-muted animate-pulse">Переход к следующему раунду...</div>';
+    var bunkerFull = result.result === 'eliminated' && result.remainingPlayers && result.survivorsCount && result.remainingPlayers <= result.survivorsCount;
+    html += '<div class="text-sm text-corp-muted animate-pulse">' + (bunkerFull ? 'Двери закрываются — сейчас узнаем, кто выжил…' : 'Переход к следующему раунду...') + '</div>';
 
     html += '</div>';
     container.innerHTML = html;

@@ -6,6 +6,12 @@ import { playSound } from '../components/sound.js';
 import { BUNKER_CARD_TYPES } from './bunker-game.js';
 import { buildSurvey, setupSurvey } from './gameover.js';
 
+function voteAvatarHue(id) {
+    var h = 0, str = String(id || '');
+    for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
+    return h;
+}
+
 // ═══════════════════════════════════════════
 // ЭКРАН: Голосование за кик (bunkerVote)
 // ═══════════════════════════════════════════
@@ -26,9 +32,10 @@ export function renderBunkerVote(container) {
     // Header
     html += '<div class="flex items-start justify-between mb-6">';
     html += '<div class="text-center flex-1">';
-    html += '  <h2 class="text-2xl font-black text-accent-red mb-2">🗳 Голосование</h2>';
-    html += '  <p class="text-sm text-corp-muted">Кого исключить из бункера? Или пропустите голосование.</p>';
-    html += '  <p class="text-xs text-corp-dim mt-1">Осталось кикнуть: <span class="text-accent-red font-bold">' + (bunker.remainingKicks || '?') + '</span></p>';
+    html += '  <div class="bk-vote-kicker">🗳 Голосование</div>';
+    html += '  <h2 class="bk-vote-title">Кого не пустим в бункер?</h2>';
+    html += '  <p class="text-sm text-corp-muted">Выберите одного — или оставьте всех. Голос тайный.</p>';
+    html += '  <div class="bk-vote-kicks">🚪 Осталось выгнать: <b>' + (bunker.remainingKicks || '?') + '</b></div>';
     html += '</div>';
     html += '<button id="btn-exit-vote" class="flex-shrink-0 ml-2 px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕ Выйти</button>';
     html += '</div>';
@@ -67,11 +74,12 @@ export function renderBunkerVote(container) {
         html += '<div class="space-y-3 mb-6">';
 
         // Кнопка пропуска
-        html += '<div class="corp-card p-4 cursor-pointer hover:border-accent-green/40 transition-colors" data-bunker-vote="__skip__" data-voteable>';
-        html += '  <div class="flex items-center justify-between">';
-        html += '    <div>';
-        html += '      <div class="text-sm font-bold text-accent-green">✅ Пропустить голосование</div>';
-        html += '      <div class="text-xs text-corp-dim">Продолжить игру без кика</div>';
+        html += '<div class="bk-vote-card bk-vote-skip" data-bunker-vote="__skip__" data-voteable>';
+        html += '  <div class="flex items-center justify-between gap-3">';
+        html += '    <div class="flex items-center gap-3">';
+        html += '      <span class="bk-vote-avatar bk-vote-avatar-skip">🤝</span>';
+        html += '      <div><div class="text-sm font-black text-accent-green">Оставить всех</div>';
+        html += '      <div class="text-xs text-corp-dim">Пропустить голосование в этом раунде</div></div>';
         html += '    </div>';
         html += '    <div class="vote-indicator w-8 h-8 rounded-full border-2 border-corp-border flex items-center justify-center text-xs font-bold transition-all flex-shrink-0" data-vote-target="__skip__"></div>';
         html += '  </div>';
@@ -82,16 +90,16 @@ export function renderBunkerVote(container) {
             var p = activePlayers[i];
             var isSelf = p.id === myId;
 
-            html += '<div class="corp-card p-4';
-            if (isSelf) html += ' opacity-30';
-            else html += ' cursor-pointer hover:border-accent-red/30 transition-colors';
-            html += '" data-bunker-vote="' + p.id + '"';
+            html += '<div class="bk-vote-card' + (isSelf ? ' bk-vote-self' : '') + '" data-bunker-vote="' + p.id + '"';
             if (!isSelf) html += ' data-voteable';
             html += '>';
 
-            html += '<div class="flex items-center justify-between mb-2">';
-            html += '  <div class="text-sm font-bold text-accent-gold">' + escapeHtml(p.nickname);
-            if (isSelf) html += ' <span class="text-corp-muted text-xs font-normal">(Вы)</span>';
+            var vh = voteAvatarHue(p.id);
+            html += '<div class="flex items-center justify-between gap-3 mb-2">';
+            html += '  <div class="flex items-center gap-3 min-w-0">';
+            html += '    <span class="bk-vote-avatar" style="background:linear-gradient(135deg,hsl(' + vh + ',55%,32%),hsl(' + ((vh + 40) % 360) + ',55%,22%));color:hsl(' + vh + ',85%,82%)">' + escapeHtml((p.nickname || '?').trim().charAt(0).toUpperCase()) + '</span>';
+            html += '    <div class="min-w-0"><div class="text-base font-black text-corp-white truncate">' + escapeHtml(p.nickname) + '</div>';
+            html += '    <div class="text-[0.7rem] ' + (isSelf ? 'text-accent-blue' : 'text-corp-dim') + '">' + (isSelf ? 'это вы — за себя голосовать нельзя' : 'нажмите, чтобы выгнать') + '</div></div>';
             html += '  </div>';
             html += '  <div class="flex items-center gap-2 flex-shrink-0">';
             if (isHost && !isSelf) {
@@ -220,15 +228,13 @@ export function renderBunkerVote(container) {
                 for (var k = 0; k < indicators.length; k++) {
                     var ind = indicators[k];
                     var target = ind.getAttribute('data-vote-target');
-                    var parentCard = ind.closest('.corp-card');
+                    var parentCard = ind.closest('[data-bunker-vote]');
                     if (target === selectedVote) {
-                        ind.classList.add('bg-accent-blue', 'border-accent-blue', 'text-white');
-                        ind.textContent = '✓';
-                        if (parentCard) parentCard.classList.add('border-accent-blue/30');
+                        ind.textContent = target === '__skip__' ? '✓' : '✕';
+                        if (parentCard) parentCard.classList.add('bk-vote-selected');
                     } else {
-                        ind.classList.remove('bg-accent-blue', 'border-accent-blue', 'text-white');
                         ind.textContent = '';
-                        if (parentCard) parentCard.classList.remove('border-accent-blue/30');
+                        if (parentCard) parentCard.classList.remove('bk-vote-selected');
                     }
                 }
             });

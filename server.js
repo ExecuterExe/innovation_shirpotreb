@@ -80,27 +80,32 @@ app.get('/api/stats', (req, res) => {
 });
 
 // REST-эндпоинт для случайных комбинаций на welcome-экране
-app.get('/api/random-combo', (req, res) => {
-    // Берём случайный предмет
+// Случайный продукт: прилагательное и особенность склоняются по роду предмета
+function randomCombo() {
     const itemObj = ITEMS[Math.floor(Math.random() * ITEMS.length)];
     const gender = itemObj.gender;
     const item = itemObj.word;
-
-    // Берём случайное прилагательное и склоняем
-    const adjRaw = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-    const adjective = declineAdjective(adjRaw, gender);
-
-    // Берём случайную особенность и склоняем
-    const featRaw = FEATURES[Math.floor(Math.random() * FEATURES.length)];
-    const feature = declineFeature(featRaw, gender);
-
-    res.json({
+    const adjective = declineAdjective(ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)], gender);
+    const feature = declineFeature(FEATURES[Math.floor(Math.random() * FEATURES.length)], gender);
+    return {
         text: adjective + ' ' + item + ', ' + feature.toLowerCase(),
         // По частям — для живых карт на главной странице
         adjective: adjective,
         item: item,
         feature: feature,
-    });
+    };
+}
+
+app.get('/api/random-combo', (req, res) => {
+    res.json(randomCombo());
+});
+
+// Пачка продуктов — для бегущей строки «биржи стартапов» на главной
+app.get('/api/random-combos', (req, res) => {
+    const n = Math.min(12, Math.max(1, parseInt(req.query.n, 10) || 8));
+    const list = [];
+    for (let i = 0; i < n; i++) list.push(randomCombo());
+    res.json(list);
 });
 
 app.get('/api/solo-cards', (req, res) => {
@@ -1231,7 +1236,6 @@ const ADDITIONS = [
     "НАУКИ",
     "ДЕФИЦИТА",
     "ОСАДКОВ",
-    "ДВИЖЕНИЯ",
     "БЕССОВЕСТНОСТИ",
     "ОГРАНИЧЕНИЙ",
     "ОБЛУЧЕНИЯ",
@@ -1269,7 +1273,6 @@ const ADDITIONS = [
     "НЕУКЛЮЖЕСТИ",
     "ТЕМНОТЫ",
     "ЗАЦИКЛЕННОСТИ",
-    "ПОРЯДКА",
     "ЗАКОНА",
     "ПРЕСТУПНОСТИ",
     "РАССЛЕДОВАНИЙ",
@@ -2484,6 +2487,10 @@ function createRoom(hostId, settings) {
             usePackaging: !!settings.usePackaging,
             bunkerMode: !!settings.bunkerMode,
             bunkerActionCards: settings.bunkerActionCards !== false,
+            // Перед игрой каждый собирает продукт: 1 карта из 3 на каждую категорию
+            bunkerDraft: settings.bunkerDraft !== false,
+            bunkerDraftTime: normalizeDraftTime(settings.bunkerDraftTime),
+            bunkerSurvivors: normalizeSurvivors(settings.bunkerSurvivors),
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
             // Хост только ведёт партию: без карт, капитала и голосов
@@ -2930,6 +2937,10 @@ function handlePlayerTimeout(room, playerId) {
     });
 
     switch (room.state) {
+        case 'bunkerDraft':
+            checkBunkerDraftDone(room);
+            break;
+
         case 'preparation':
             player.isReady = true;
             checkAllReady(room);
@@ -3019,7 +3030,9 @@ function sendCurrentStateToPlayer(room, player, ws) {
         presentationOrder: getPresentationOrderPublic(room),
     }));
 
-    if (roomState === 'bunkerReveal' || roomState === 'bunkerVote' || roomState === 'bunkerTieVote') {
+    if (roomState === 'bunkerDraft') {
+        ws.send(JSON.stringify(Object.assign(bunkerDraftMessage(room, player), { restored: true })));
+    } else if (roomState === 'bunkerReveal' || roomState === 'bunkerVote' || roomState === 'bunkerTieVote') {
         // Восстанавливаем значения раскрытых карт из данных на сервере
         var revealedCardValues = {};
         room.players.forEach(function(p, pid) {
@@ -3969,7 +3982,7 @@ function getPublicRoomInfo(room) {
     if (room.state === 'lobby') {
         stateLabel = 'В лобби';
         stateType = 'lobby';
-    } else if (['bunkerReveal', 'bunkerVote', 'bunkerTieVote'].includes(room.state)) {
+    } else if (['bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote'].includes(room.state)) {
         stateLabel = '🏠 Бункер идёт';
         stateType = 'active';
     } else if (room.state === 'bunkerGameOver') {
@@ -4151,6 +4164,35 @@ wss.on('connection', (ws) => {
             }
 
             // ==================== БУНКЕР: ГОЛОСОВАНИЕ ====================
+            case 'bunkerDraftPick': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'bunkerDraft') return;
+                const player = room.players.get(info.playerId);
+                if (!player || !player.bunkerDraft) return;
+                const d = player.bunkerDraft;
+                const key = String(msg.cardKey || '');
+                const pos = parseInt(msg.option, 10);
+                if (BUNKER_DRAFT_ORDER.indexOf(key) === -1) return;
+                if (!(pos >= 0 && pos < d.options[key].length)) return;
+                // Прилагательное и особенность склоняются по роду предмета — без предмета их не выбрать
+                if ((key === 'adjective' || key === 'feature') && d.picks.item === undefined) return;
+                d.picks[key] = pos;
+                sendToPlayer(room, player.id, bunkerDraftMessage(room, player, 'bunkerDraftState'));
+                broadcastBunkerDraftProgress(room);
+                checkBunkerDraftDone(room);
+                break;
+            }
+            case 'bunkerDraftFinish': {
+                // Хост запускает партию, не дожидаясь всех: недобранное выберется случайно
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'bunkerDraft' || room.hostId !== info.playerId) return;
+                finishBunkerDraft(room);
+                break;
+            }
             case 'bunkerVote': {
                 const info = playerRooms.get(ws);
                 if (!info) return;
@@ -4685,6 +4727,9 @@ wss.on('connection', (ws) => {
                 if (s.usePackaging !== undefined) room.settings.usePackaging = !!s.usePackaging;
                 if (s.bunkerMode !== undefined) room.settings.bunkerMode = !!s.bunkerMode;
                 if (s.bunkerActionCards !== undefined) room.settings.bunkerActionCards = !!s.bunkerActionCards;
+                if (s.bunkerDraft !== undefined) room.settings.bunkerDraft = !!s.bunkerDraft;
+                if (s.bunkerDraftTime !== undefined) room.settings.bunkerDraftTime = normalizeDraftTime(s.bunkerDraftTime);
+                if (s.bunkerSurvivors !== undefined) room.settings.bunkerSurvivors = normalizeSurvivors(s.bunkerSurvivors);
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
                 if (s.chatTTS !== undefined) room.settings.chatTTS = !!s.chatTTS;
@@ -4809,6 +4854,19 @@ wss.on('connection', (ws) => {
                     clearTimer(room);
                     startPresentations(room);
                 }
+                break;
+            }
+            case 'playerUnready': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'preparation') return;
+                const player = room.players.get(info.playerId);
+                if (!player || !player.isReady) return;
+                player.isReady = false;
+                let readyCountU = 0;
+                room.players.forEach(p => { if (p.isReady) readyCountU++; });
+                broadcastToRoom(room, { type: 'readyProgress', ready: readyCountU, total: room.players.size, readyIds: getReadyIds(room) });
                 break;
             }
             case 'tiebreakerReady': {
@@ -5493,6 +5551,18 @@ function getSurvivorsCount(n) {
     return Math.max(2, Math.floor((n + 2) / 2));
 }
 
+// Сколько мест в бункере: хост задаёт число (0 = авто по формуле).
+// Выжить должно меньше, чем пришло, — иначе выгонять некого.
+function normalizeSurvivors(v) {
+    var n = parseInt(v, 10);
+    return n >= 1 && n <= 17 ? n : 0;
+}
+function resolveSurvivorsCount(room, totalPlayers) {
+    var wanted = normalizeSurvivors(room.settings && room.settings.bunkerSurvivors);
+    var count = wanted || getSurvivorsCount(totalPlayers);
+    return Math.max(1, Math.min(count, totalPlayers - 1));
+}
+
 function getBunkerCardKeys() {
     return ['adjective', 'item', 'modifier', 'feature', 'gift', 'hiddenDefect', 'packaging', 'review', 'historicalFact'];
 }
@@ -5544,39 +5614,10 @@ const BUNKER_ACTION_CARDS = [
 ];
 
 function drawBunkerCard(room, cardKey, itemGender) {
-    var g = itemGender || 'm';
-    switch (cardKey) {
-        case 'adjective':
-            if (room.decks.adjectives.length === 0) room.decks.adjectives = shuffle([...Array(ADJECTIVES.length).keys()]);
-            return { value: declineAdjective(ADJECTIVES[room.decks.adjectives.pop()], g) };
-        case 'item': {
-            if (room.decks.items.length === 0) room.decks.items = shuffle([...Array(ITEMS.length).keys()]);
-            var itemObj = ITEMS[room.decks.items.pop()];
-            return { value: itemObj.word, gender: itemObj.gender };
-        }
-        case 'modifier':
-            if (room.decks.additions.length === 0) room.decks.additions = shuffle([...Array(ADDITIONS.length).keys()]);
-            return { value: ADDITIONS[room.decks.additions.pop()] };
-        case 'feature':
-            if (room.decks.features.length === 0) room.decks.features = shuffle([...Array(FEATURES.length).keys()]);
-            return { value: declineFeature(FEATURES[room.decks.features.pop()], g) };
-        case 'gift':
-            if (room.decks.gifts.length === 0) room.decks.gifts = shuffle([...Array(GIFTS.length).keys()]);
-            return { value: GIFTS[room.decks.gifts.pop()] };
-        case 'hiddenDefect':
-            if (room.decks.hiddenDefects.length === 0) room.decks.hiddenDefects = shuffle([...Array(HIDDEN_DEFECTS.length).keys()]);
-            return { value: HIDDEN_DEFECTS[room.decks.hiddenDefects.pop()] };
-        case 'packaging':
-            if (room.decks.packaging.length === 0) room.decks.packaging = shuffle([...Array(PACKAGING.length).keys()]);
-            return { value: PACKAGING[room.decks.packaging.pop()] };
-        case 'review':
-            if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
-            return { value: REVIEWS[room.decks.reviews.pop()] };
-        case 'historicalFact':
-            if (!room.decks.historicalFacts || room.decks.historicalFacts.length === 0) room.decks.historicalFacts = shuffle([...Array(HISTORICAL_FACTS.length).keys()]);
-            return { value: HISTORICAL_FACTS[room.decks.historicalFacts.pop()] };
-        default: return null;
-    }
+    if (!bunkerDeckSource(cardKey)) return null;
+    var idx = drawBunkerIndexes(room, cardKey, 1)[0];
+    if (cardKey === 'item') return { value: ITEMS[idx].word, gender: ITEMS[idx].gender };
+    return { value: bunkerCardText(cardKey, idx, itemGender || 'm') };
 }
 
 function handleBunkerActionCard(room, player, msg) {
@@ -5883,63 +5924,211 @@ function handleBunkerActionCard(room, player, msg) {
     }
 }
 
-function startBunkerGame(room) {
-    var playerIds = [];
-    room.players.forEach(p => {
-        p.eliminated = false;
-        playerIds.push(p.id);
+// ═══════════════════════════════════════════
+// БУНКЕР: СБОРКА ПРОДУКТА — перед игрой каждый выбирает 1 карту из 3 в каждой категории.
+// Порядок начинается с предмета: от его рода зависят прилагательное и «который/ая/ое» в особенности.
+// ═══════════════════════════════════════════
+var BUNKER_DRAFT_ORDER = ['item', 'adjective', 'modifier', 'feature', 'gift', 'hiddenDefect', 'packaging', 'review', 'historicalFact'];
+var BUNKER_DRAFT_OPTIONS = 3;
+var BUNKER_DRAFT_TIMES = [60, 90, 120, 180, 240];
+
+function normalizeDraftTime(v) {
+    var n = parseInt(v, 10);
+    return BUNKER_DRAFT_TIMES.indexOf(n) !== -1 ? n : 120;
+}
+
+// Категория → колода комнаты и список карт
+function bunkerDeckSource(key) {
+    switch (key) {
+        case 'item': return { deck: 'items', list: ITEMS };
+        case 'adjective': return { deck: 'adjectives', list: ADJECTIVES };
+        case 'feature': return { deck: 'features', list: FEATURES };
+        case 'modifier': return { deck: 'additions', list: ADDITIONS };
+        case 'gift': return { deck: 'gifts', list: GIFTS };
+        case 'hiddenDefect': return { deck: 'hiddenDefects', list: HIDDEN_DEFECTS };
+        case 'packaging': return { deck: 'packaging', list: PACKAGING };
+        case 'review': return { deck: 'reviews', list: REVIEWS };
+        case 'historicalFact': return { deck: 'historicalFacts', list: HISTORICAL_FACTS };
+    }
+    return null;
+}
+
+// Слово карты без склонения — по нему проверяем повторы
+function bunkerBaseText(key, idx) {
+    var v = bunkerDeckSource(key).list[idx];
+    return String(typeof v === 'string' ? v : v.word).trim().toUpperCase();
+}
+
+// n карт из колоды комнаты. В одной партии «Бункера» слово в категории не повторяется ни у кого:
+// ни в вариантах на сборке продукта, ни в розданных картах, ни в картах действий посреди игры.
+// Реестр room.bunkerUsedWords заводится в startBunkerGame; колода общая с прошлыми партиями
+// и перетасовывается, когда кончается, — поэтому одной колоды для уникальности мало.
+function drawBunkerIndexes(room, key, n) {
+    var src = bunkerDeckSource(key);
+    if (!room.bunkerUsedWords) room.bunkerUsedWords = {};
+    var used = room.bunkerUsedWords[key] || (room.bunkerUsedWords[key] = {});
+    var out = [];
+    var guard = 0;
+    while (out.length < n && guard++ < src.list.length * 3) {
+        if (!room.decks[src.deck] || room.decks[src.deck].length === 0) {
+            room.decks[src.deck] = shuffle([...Array(src.list.length).keys()]);
+        }
+        var idx = room.decks[src.deck].pop();
+        var word = bunkerBaseText(key, idx);
+        if (used[word]) continue;
+        used[word] = true;
+        out.push(idx);
+    }
+    // Колода исчерпана целиком (на практике не бывает: самой маленькой хватает на 18 игроков) —
+    // лучше повтор, чем пустая карта
+    while (out.length < n) out.push(Math.floor(Math.random() * src.list.length));
+    return out;
+}
+
+// Текст карты с учётом рода предмета
+function bunkerCardText(key, idx, gender) {
+    var src = bunkerDeckSource(key);
+    if (key === 'item') return src.list[idx].word;
+    if (key === 'adjective') return declineAdjective(src.list[idx], gender);
+    if (key === 'feature') return declineFeature(src.list[idx], gender);
+    return src.list[idx];
+}
+
+// Старая раздача: всё случайно (выбор карт выключен)
+function dealRandomBunkerCards(room, p) {
+    var cards = {};
+    var itemIdx = drawBunkerIndexes(room, 'item', 1)[0];
+    var gender = ITEMS[itemIdx].gender;
+    p.itemGender = gender;
+    getBunkerCardKeys().forEach(key => {
+        var idx = key === 'item' ? itemIdx : drawBunkerIndexes(room, key, 1)[0];
+        cards[key] = bunkerCardText(key, idx, gender);
     });
+    p.cards = cards;
+}
+
+function isBunkerDraftDone(p) {
+    if (!p.bunkerDraft) return true;
+    return BUNKER_DRAFT_ORDER.every(k => p.bunkerDraft.picks[k] !== undefined);
+}
+
+// Что видит игрок: варианты уже склонены по выбранному предмету
+function bunkerDraftView(p) {
+    var d = p.bunkerDraft;
+    if (!d) return { options: {}, picks: {} };
+    var gender = d.picks.item !== undefined ? ITEMS[d.options.item[d.picks.item]].gender : null;
+    var options = {};
+    BUNKER_DRAFT_ORDER.forEach(key => {
+        options[key] = d.options[key].map(idx => {
+            if ((key === 'adjective' || key === 'feature') && !gender) return null; // сначала предмет
+            return bunkerCardText(key, idx, gender);
+        });
+    });
+    return { options: options, picks: Object.assign({}, d.picks) };
+}
+
+function getBunkerDraftDoneIds(room) {
+    var ids = [];
+    room.players.forEach(p => { if (isBunkerDraftDone(p)) ids.push(p.id); });
+    return ids;
+}
+
+function bunkerDraftMessage(room, p, type) {
+    var view = p ? bunkerDraftView(p) : { options: {}, picks: {} };
+    return {
+        type: type || 'bunkerDraftStart',
+        globalProblem: room.bunkerDraftProblem,
+        order: BUNKER_DRAFT_ORDER,
+        options: view.options,
+        picks: view.picks,
+        doneIds: getBunkerDraftDoneIds(room),
+        total: room.players.size,
+        duration: room.settings.bunkerDraftTime || 120,
+        players: getPlayersPublicInfo(room),
+        chatHistory: room.bunkerChat || [],
+        chatEnabled: !!(room.settings && room.settings.bunkerChat),
+    };
+}
+
+function broadcastBunkerDraftProgress(room) {
+    broadcastToRoom(room, {
+        type: 'bunkerDraftProgress',
+        doneIds: getBunkerDraftDoneIds(room),
+        total: room.players.size,
+    });
+}
+
+function startBunkerDraft(room) {
+    room.bunkerDraftProblem = GLOBAL_PROBLEMS[Math.floor(Math.random() * GLOBAL_PROBLEMS.length)];
+    room.bunkerDraftFinishing = false;
+    room.bunkerChat = [];
+    room.players.forEach(p => {
+        var options = {};
+        BUNKER_DRAFT_ORDER.forEach(key => { options[key] = drawBunkerIndexes(room, key, BUNKER_DRAFT_OPTIONS); });
+        p.bunkerDraft = { options: options, picks: {} };
+        p.cards = null;
+    });
+    room.state = 'bunkerDraft';
+    room.players.forEach(p => sendToPlayer(room, p.id, bunkerDraftMessage(room, p)));
+    sendToSpectators(room, bunkerDraftMessage(room, null));
+    sendChatMsg(room, 'system', 'Сборка продукта: выберите по одной карте из трёх. Катастрофа: ' + room.bunkerDraftProblem);
+    startTimer(room, room.settings.bunkerDraftTime || 120, () => finishBunkerDraft(room));
+}
+
+// Все, кто в игре, собрали продукт → начинаем (с короткой паузой, чтобы последний выбор успел мелькнуть)
+function checkBunkerDraftDone(room) {
+    if (room.state !== 'bunkerDraft' || room.bunkerDraftFinishing) return;
+    var waiting = 0;
+    room.players.forEach(p => {
+        if (p.eliminated || p.connected === false) return; // отвалившихся не ждём — доберут случайно
+        if (!isBunkerDraftDone(p)) waiting++;
+    });
+    if (waiting > 0) return;
+    room.bunkerDraftFinishing = true;
+    clearTimer(room);
+    setTimeout(() => finishBunkerDraft(room), 1200);
+}
+
+function finishBunkerDraft(room) {
+    if (room.state !== 'bunkerDraft') return;
+    clearTimer(room);
+    room.players.forEach(p => {
+        if (!p.bunkerDraft) { dealRandomBunkerCards(room, p); p.draftAutoPicked = 9; return; }
+        var d = p.bunkerDraft;
+        var auto = 0;
+        BUNKER_DRAFT_ORDER.forEach(key => {
+            if (d.picks[key] === undefined) { d.picks[key] = Math.floor(Math.random() * d.options[key].length); auto++; }
+        });
+        var gender = ITEMS[d.options.item[d.picks.item]].gender;
+        p.itemGender = gender;
+        var cards = {};
+        getBunkerCardKeys().forEach(key => { cards[key] = bunkerCardText(key, d.options[key][d.picks[key]], gender); });
+        p.cards = cards;
+        p.draftAutoPicked = auto;
+        p.bunkerDraft = null;
+    });
+    launchBunkerGame(room, room.bunkerDraftProblem);
+}
+
+function startBunkerGame(room) {
+    room.players.forEach(p => { p.eliminated = false; p.draftAutoPicked = 0; });
+    room.bunkerUsedWords = {}; // новая партия — слова прошлой снова можно выдавать
+    if (room.settings.bunkerDraft !== false) {
+        startBunkerDraft(room);
+        return;
+    }
+    room.players.forEach(p => dealRandomBunkerCards(room, p));
+    launchBunkerGame(room, null);
+}
+
+function launchBunkerGame(room, presetProblem) {
+    var playerIds = [];
+    room.players.forEach(p => { playerIds.push(p.id); });
 
     var totalPlayers = playerIds.length;
-    var survivorsCount = getSurvivorsCount(totalPlayers);
+    var survivorsCount = resolveSurvivorsCount(room, totalPlayers);
 
-    // Раздаём ВСЕ 9 карт каждому
     room.players.forEach(p => {
-        if (room.decks.items.length === 0) room.decks.items = shuffle([...Array(ITEMS.length).keys()]);
-        if (room.decks.adjectives.length === 0) room.decks.adjectives = shuffle([...Array(ADJECTIVES.length).keys()]);
-        if (room.decks.features.length === 0) room.decks.features = shuffle([...Array(FEATURES.length).keys()]);
-
-        var itemIndex = room.decks.items.pop();
-        var itemObj = ITEMS[itemIndex];
-        var gender = itemObj.gender;
-        p.itemGender = gender;
-
-        var adjIndex = room.decks.adjectives.pop();
-        var adjWord = declineAdjective(ADJECTIVES[adjIndex], gender);
-
-        var featIndex = room.decks.features.pop();
-        var featWord = declineFeature(FEATURES[featIndex], gender);
-
-        if (room.decks.additions.length === 0) room.decks.additions = shuffle([...Array(ADDITIONS.length).keys()]);
-        var modIdx = room.decks.additions.pop();
-
-        if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
-        var revIdx = room.decks.reviews.pop();
-
-        if (room.decks.gifts.length === 0) room.decks.gifts = shuffle([...Array(GIFTS.length).keys()]);
-        var giftIdx = room.decks.gifts.pop();
-
-        if (room.decks.hiddenDefects.length === 0) room.decks.hiddenDefects = shuffle([...Array(HIDDEN_DEFECTS.length).keys()]);
-        var hdIdx = room.decks.hiddenDefects.pop();
-
-        if (room.decks.packaging.length === 0) room.decks.packaging = shuffle([...Array(PACKAGING.length).keys()]);
-        var pkgIdx = room.decks.packaging.pop();
-
-        if (!room.decks.historicalFacts || room.decks.historicalFacts.length === 0) room.decks.historicalFacts = shuffle([...Array(HISTORICAL_FACTS.length).keys()]);
-        var histIdx = room.decks.historicalFacts.pop();
-
-        p.cards = {
-            adjective: adjWord,
-            item: itemObj.word,
-            modifier: ADDITIONS[modIdx],
-            feature: featWord,
-            gift: GIFTS[giftIdx],
-            hiddenDefect: HIDDEN_DEFECTS[hdIdx],
-            packaging: PACKAGING[pkgIdx],
-            review: REVIEWS[revIdx],
-            historicalFact: HISTORICAL_FACTS[histIdx],
-        };
-
         p.capital = 0;
         p.attractedInvestments = 0;
         p.actionCards = [];
@@ -5958,8 +6147,8 @@ function startBunkerGame(room) {
         });
     }
 
-    // Глобальная проблема
-    var problem = GLOBAL_PROBLEMS[Math.floor(Math.random() * GLOBAL_PROBLEMS.length)];
+    // Глобальная проблема (при выборе карт она уже была показана на сборке продукта)
+    var problem = presetProblem || GLOBAL_PROBLEMS[Math.floor(Math.random() * GLOBAL_PROBLEMS.length)];
 
     // Порядок ходов
     var revealOrder = shuffle(playerIds);
@@ -5973,7 +6162,7 @@ function startBunkerGame(room) {
         });
     });
 
-    room.bunkerChat = [];
+    if (!presetProblem) room.bunkerChat = [];
     room.bunkerGameStartTime = Date.now();
 
     room.bunker = {
@@ -5982,7 +6171,8 @@ function startBunkerGame(room) {
         revealOrder: revealOrder,
         currentTurnIndex: 0,
         currentRound: 0,
-        eliminatedPlayers: [],
+        // Кто отвалился во время сборки продукта и не вернулся — сразу вне игры
+        eliminatedPlayers: playerIds.filter(id => room.players.get(id).eliminated),
         revealedCards: revealedCards,
         votes: new Map(),
         tiedPlayers: [],
@@ -6016,11 +6206,13 @@ function startBunkerGame(room) {
             currentRound: 1,
             survivorsCount: survivorsCount,
             totalPlayers: totalPlayers,
-            eliminatedPlayers: [],
+            eliminatedPlayers: room.bunker.eliminatedPlayers,
             players: getPlayersPublicInfo(room),
             hostMode: !!room.settings.bunkerHostMode,
             chatHistory: room.bunkerChat || [],
             chatEnabled: !!(room.settings && room.settings.bunkerChat),
+            autoPicked: p.draftAutoPicked || 0,
+            drafted: !!presetProblem,
         });
     });
     sendToSpectators(room, {
@@ -6037,7 +6229,7 @@ function startBunkerGame(room) {
         currentRound: 1,
         survivorsCount: survivorsCount,
         totalPlayers: totalPlayers,
-        eliminatedPlayers: [],
+        eliminatedPlayers: room.bunker.eliminatedPlayers,
         players: getPlayersPublicInfo(room),
         hostMode: !!room.settings.bunkerHostMode,
         chatHistory: room.bunkerChat || [],
@@ -6070,6 +6262,16 @@ var REGULAR_ACTIVE_STATES = ['cardInput', 'preparation', 'presentation', 'invest
 // осталось 1 или меньше — продолжать нечего, завершаем партию и показываем итоги.
 function maybeEndGameForLowPlayerCount(room, leavingPlayerId) {
     if (!room) return false;
+
+    if (room.state === 'bunkerDraft') {
+        // Остался один — выбирать не с кем: доигрываем выбор случайно и дальше как обычно
+        if (room.players.size <= 1) {
+            finishBunkerDraft(room);
+            return maybeEndGameForLowPlayerCount(room, leavingPlayerId);
+        }
+        checkBunkerDraftDone(room);
+        return false;
+    }
 
     if (BUNKER_ACTIVE_STATES.includes(room.state)) {
         // Игрок, покинувший комнату посреди бункера, считается выбывшим —
@@ -6501,6 +6703,7 @@ function eliminateFromBunker(room, eliminatedId, voteCounts) {
         eliminatedCards: allCards,
         voteCounts: voteCounts,
         revealedCards: room.bunker.revealedCards,
+        eliminatedPlayers: room.bunker.eliminatedPlayers,
         remainingPlayers: activePlayers.length,
         survivorsCount: room.bunker.survivorsCount,
         players: getPlayersPublicInfo(room),

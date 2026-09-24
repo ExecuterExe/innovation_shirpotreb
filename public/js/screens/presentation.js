@@ -64,7 +64,7 @@ export function renderPresentation(container) {
     html += '<div class="max-w-5xl mx-auto px-4 py-6 min-h-screen">';
 
     // ═══════ HUD ═══════
-    html += '<div class="corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-6">';
+    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-6">';
     html += '  <div>';
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
     html += '    <div class="text-2xl font-black text-corp-white">' + state.currentRound;
@@ -72,7 +72,7 @@ export function renderPresentation(container) {
     html += '    </div>';
     html += '  </div>';
 
-    html += '  <div class="flex-1 max-w-md mx-6">';
+    html += '  <div class="classic-hud-mid flex-1 max-w-md mx-6">';
     html += '    <div class="flex justify-between text-xs font-bold text-corp-muted mb-1.5">';
     var hudLabel = (inQuestions ? '🙋 ВОПРОСЫ · ' : '') + 'ПИТЧ ' + (state.presenterIndex + 1) + ' / ' + state.totalPresenters;
     html += '      <span>' + hudLabel + '</span>';
@@ -182,6 +182,20 @@ export function renderPresentation(container) {
     html += renderCardGrid(presCards, 'presentation');
 
     html += '</div>'; // end stage
+
+    // ═══════ КТО СЛЕДУЮЩИЙ ═══════
+    var order = state.presentationOrder || [];
+    var nextP = order[(state.presenterIndex || 0) + 1];
+    if (nextP) {
+        var nextIsMe = nextP.id === state.playerId;
+        html += '<div class="up-next' + (nextIsMe ? ' up-next-me' : '') + '">';
+        html += nextIsMe
+            ? '🔔 <b>Вы следующий</b> — приготовьтесь к выходу'
+            : 'Следующий: <b>' + escapeHtml(nextP.nickname) + '</b>';
+        html += '</div>';
+    } else if (order.length) {
+        html += '<div class="up-next">🏁 Последний питч раунда — дальше инвестиции</div>';
+    }
 
     // ═══════ PREVIOUS PRESENTATIONS ═══════
     if (prevs.length > 0) {
@@ -402,7 +416,7 @@ function renderCardGrid(cards, mode) {
     }
 
     var html = '';
-    html += '<div class="flex flex-wrap items-center justify-center gap-4 lg:gap-6 mt-6">';
+    html += '<div class="game-card-grid flex flex-wrap items-center justify-center gap-4 lg:gap-6 mt-6">';
 
     for (var i = 0; i < cards.length; i++) {
         var card = cards[i];
@@ -416,15 +430,15 @@ function renderCardGrid(cards, mode) {
 
         html += '<div class="game-card-container ' + sizeClass + '">';
         html += '  <div class="animate-card-deal" style="animation-delay: ' + delay + '; animation-fill-mode: backwards;">';
-        html += '    <div class="relative ' + heightClass + ' rounded-3xl overflow-hidden ' + card.gradient + ' shadow-2xl ' + card.shadow + ' transition-transform duration-300 hover:scale-[1.03] hover:-translate-y-1' + (card.hit ? ' card-swan-hit' : '') + '">';
+        html += '    <div class="game-card-face relative ' + heightClass + ' rounded-3xl overflow-hidden ' + card.gradient + ' shadow-2xl ' + card.shadow + ' transition-transform duration-300 hover:scale-[1.03] hover:-translate-y-1' + (card.hit ? ' card-swan-hit' : '') + '">';
 
         // Badge bar
-        html += '      <div class="absolute top-0 left-0 right-0 h-12 bg-black/25 flex items-center px-5">';
+        html += '      <div class="gc-badge absolute top-0 left-0 right-0 h-12 bg-black/25 flex items-center px-5">';
         html += '        <span class="text-[0.65rem] font-black uppercase tracking-[0.12em] text-white/70">' + card.label + '</span>';
         html += '      </div>';
 
         // Text
-        html += '      <div class="absolute inset-0 flex items-center justify-center px-6 text-center">';
+        html += '      <div class="gc-text absolute inset-0 flex items-center justify-center px-6 text-center">';
         html += '        <span class="' + finalTextClass + ' leading-tight text-white drop-shadow-lg">' + escapeHtml(card.value) + '</span>';
         html += '      </div>';
 
