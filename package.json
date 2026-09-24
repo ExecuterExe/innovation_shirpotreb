@@ -1,7 +1,7 @@
 {
     "name": "innovative-consumer-goods",
     "version": "2.0.0",
-    "description": "🚀 Инновационный Ширпотреб — онлайн-игра агрессивного маркетинга",
+    "description": "🚀 ВПАРИТЬ — сделай бред инвестицией. Онлайн-игра агрессивного маркетинга",
     "main": "server.js",
     "scripts": {
         "start": "node server.js"

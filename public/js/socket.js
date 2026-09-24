@@ -6,6 +6,7 @@ import { speakSequence, stopSpeaking } from './components/speech.js';
 import { appendChatMsg, renderBunkerChat, removeChatMsgFromDom } from './components/bunker-chat.js';
 import { setPendingReveal } from './screens/bunker-game.js';
 import { resetWelcomeButtons } from './screens/welcome.js';
+import { updateQuestionHandsUI } from './screens/presentation.js';
 
 var ws = null;
 var reconnectAttempts = 0;
@@ -357,6 +358,15 @@ function handleMessage(msg) {
 
         case 'presentationPhase':
             handlePresentation(msg);
+            break;
+
+        case 'questionsPhase':
+            handleQuestionsPhase(msg);
+            break;
+
+        case 'questionHands':
+            setState({ questionHands: msg.hands || [] });
+            if (state.phase === 'presentation') updateQuestionHandsUI();
             break;
 
         case 'investingPhase':
@@ -722,6 +732,9 @@ function handlePresentation(msg) {
         currentRound: msg.round || state.currentRound,
         totalRounds: msg.totalRounds || state.totalRounds,
         blackSwan: msg.blackSwan || null,
+        presentationStage: 'pitch',
+        questionHands: [],
+        questionsTime: msg.questionsTime !== undefined ? msg.questionsTime : state.questionsTime,
     });
 
     navigate('presentation');
@@ -733,6 +746,24 @@ function handlePresentation(msg) {
     } else {
         playSound('join');
     }
+}
+
+function handleQuestionsPhase(msg) {
+    // Фаза вопросов всегда идёт после показа выступающего; без него рисовать нечего
+    if (!state.currentPresenter) return;
+    setState({
+        presentationStage: 'questions',
+        questionHands: msg.hands || [],
+        questionsTime: msg.questionsTime,
+        presenterIndex: msg.presenterIndex !== undefined ? msg.presenterIndex : state.presenterIndex,
+        blackSwan: null,
+    });
+    navigate('presentation');
+    // При переподключении таймер не придёт отдельным сообщением — запускаем остаток сами
+    if (msg.remaining > 0) {
+        setTimeout(function () { startTimer(msg.remaining); }, 50);
+    }
+    playSound(state.currentPresenter.id === state.playerId ? 'start' : 'join');
 }
 
 function handleInvesting(msg) {

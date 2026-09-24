@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ИННОВАЦИОННЫЙ ШИРПОТРЕБ</title>
+    <title>ВПАРИТЬ — сделай бред инвестицией</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -25,6 +25,7 @@
                             'white': '#f5f5f0',
                         },
                         'accent': {
+                            'brand': '#ffc72c',
                             'blue': '#00b4ff',
                             'blue-dim': 'rgba(0, 180, 255, 0.12)',
                             'blue-glow': 'rgba(0, 180, 255, 0.4)',
@@ -83,6 +84,23 @@
         rel="stylesheet">
 
     <link rel="stylesheet" href="css/style.css">
+
+    <!-- Яндекс.Метрика. Заведите счётчик на metrika.yandex.ru, вставьте его номер
+         в YM_ID — и появятся посещаемость, источники трафика, устройства и Вебвизор.
+         Пока YM_ID пустой, код не грузится и ничего не отправляется. -->
+    <script>
+        (function () {
+            var YM_ID = ''; // ← сюда номер счётчика, например 98765432
+            if (!YM_ID) return;
+            (function (m, e, t, r, i, k, a) {
+                m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+                m[i].l = 1 * new Date();
+                k = e.createElement(t), a = e.getElementsByTagName(t)[0];
+                k.async = 1; k.src = r; a.parentNode.insertBefore(k, a)
+            })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js', 'ym');
+            ym(YM_ID, 'init', { clickmap: true, trackLinks: true, accurateTrackBounce: true, webvisor: true });
+        })();
+    </script>
 </head>
 
 <body class="bg-corp-black text-corp-text font-body min-h-screen overflow-x-hidden antialiased">

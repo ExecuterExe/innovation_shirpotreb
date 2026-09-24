@@ -4,6 +4,7 @@ import { renderBunkerChat } from '../components/bunker-chat.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { BUNKER_CARD_TYPES } from './bunker-game.js';
+import { buildSurvey, setupSurvey } from './gameover.js';
 
 // ═══════════════════════════════════════════
 // ЭКРАН: Голосование за кик (bunkerVote)
@@ -596,6 +597,9 @@ export function renderBunkerGameOver(container) {
     html += '  </div>'; // end prompt container
     html += '</div>'; // end AI section
 
+    // Мини-опрос — тот же замер, что и в классическом режиме
+    html += buildSurvey();
+
     // Кнопки
     html += '<div class="flex flex-col items-center gap-4">';
     if (isHost) {
@@ -608,6 +612,8 @@ export function renderBunkerGameOver(container) {
 
     html += '</div>';
     container.innerHTML = html;
+
+    setupSurvey(container, 'bunker');
 
     // ═══════ LISTENERS ═══════
 
@@ -717,7 +723,7 @@ function fallbackCopy(textarea, statusEl) {
 function generateBunkerAIPrompt(bunker, survivors, eliminated) {
     var lines = [];
 
-    lines.push('=== 🏠 ИННОВАЦИОННЫЙ ШИРПОТРЕБ — РЕЖИМ «БУНКЕР» ===');
+    lines.push('=== 🏠 ВПАРИТЬ — РЕЖИМ «БУНКЕР» ===');
     lines.push('');
     lines.push('Ты — драматичный и остроумный рассказчик постапокалиптического мира.');
     lines.push('Перед тобой результаты игры, где участники пытались попасть в бункер,');
@@ -1027,7 +1033,7 @@ function formatPlayerCompact(player) {
 function generateBunkerAIPromptImpact(bunker, survivors, eliminated) {
     var lines = [];
 
-    lines.push('=== 🔬 ИННОВАЦИОННЫЙ ШИРПОТРЕБ — ЭКСПЕРТИЗА ВОЗДЕЙСТВИЯ ===');
+    lines.push('=== 🔬 ВПАРИТЬ — ЭКСПЕРТИЗА ВОЗДЕЙСТВИЯ ===');
     lines.push('');
     lines.push('Ты — ведущий аналитик Комиссии по оценке последствий глобальной катастрофы.');
     lines.push('Твоя работа — не рассказывать истории, а РАЗБИРАТЬ МЕХАНИЗМЫ.');

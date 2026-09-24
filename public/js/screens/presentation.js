@@ -26,6 +26,11 @@ export function renderPresentation(container) {
     var prevs = state.previousPresentations || [];
     var streamer = state.settings && state.settings.streamerMode;
     var anonymized = !!(state.settings && state.settings.streamerMode && state.settings.anonymizeParticipants);
+    // Стадия выступающего: 'pitch' — питч, 'questions' — вопросы к нему (если включены в настройках)
+    var inQuestions = state.presentationStage === 'questions';
+    var questionsTime = state.questionsTime !== undefined ? state.questionsTime
+        : ((state.settings && state.settings.questionsTime) || 0);
+    var isSpectator = !!state.isSpectator;
 
     // Отправляем текст при переходе из подготовки
     if (isMe && state.pitchText) {
@@ -64,10 +69,17 @@ export function renderPresentation(container) {
 
     html += '  <div class="flex-1 max-w-md mx-6">';
     html += '    <div class="flex justify-between text-xs font-bold text-corp-muted mb-1.5">';
-    html += '      <span>ПИТЧ ' + (state.presenterIndex + 1) + ' / ' + state.totalPresenters + '</span>';
-    html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
-    html += '    </div>';
-    html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
+    var hudLabel = (inQuestions ? '🙋 ВОПРОСЫ · ' : '') + 'ПИТЧ ' + (state.presenterIndex + 1) + ' / ' + state.totalPresenters;
+    html += '      <span>' + hudLabel + '</span>';
+    if (inQuestions && questionsTime < 0) {
+        html += '      <span class="font-mono text-corp-muted">без таймера</span>';
+        html += '    </div>';
+        html += '    <div class="timer-bar"><div class="timer-bar-fill" style="width:100%;opacity:0.3"></div></div>';
+    } else {
+        html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
+        html += '    </div>';
+        html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
+    }
     html += '  </div>';
 
     html += '  <div class="text-right">';
@@ -113,7 +125,7 @@ export function renderPresentation(container) {
     html += '<div class="corp-card-elevated p-8 md:p-10 text-center mb-6' + stageExtra + '">';
 
     // Presenter name
-    html += '  <div class="text-xs text-corp-muted font-bold uppercase tracking-[0.15em] mb-2">Сейчас выступает</div>';
+    html += '  <div class="text-xs text-corp-muted font-bold uppercase tracking-[0.15em] mb-2">' + (inQuestions ? 'Вопросы к' : 'Сейчас выступает') + '</div>';
     html += '  <h2 class="font-display text-4xl md:text-5xl font-black text-accent-gold mb-6" style="text-shadow: 0 0 40px rgba(255,215,0,0.15);">';
     html += escapeHtml(pres.nickname);
     html += '  </h2>';
@@ -122,7 +134,20 @@ export function renderPresentation(container) {
     if (isMe && !anonymized) {
         html += '<div class="inline-flex items-center gap-2.5 bg-accent-blue text-white px-6 py-2.5 rounded-full text-sm font-black uppercase tracking-wider mb-8 animate-glow-pulse">';
         html += '  <span class="w-2.5 h-2.5 rounded-full bg-white/80 animate-ping"></span>';
-        html += '  🎤 ЭТО ВЫ! ВЫСТУПАЙТЕ!';
+        html += inQuestions ? '  🙋 ОТВЕЧАЙТЕ НА ВОПРОСЫ' : '  🎤 ЭТО ВЫ! ВЫСТУПАЙТЕ!';
+        html += '</div>';
+    }
+
+    // ═══════ ВОПРОСЫ ПОСЛЕ ПИТЧА ═══════
+    if (inQuestions) {
+        html += '<div class="max-w-xl mx-auto mb-6">';
+        html += '  <p class="text-sm text-corp-dim mb-4">' + (isMe
+            ? 'Слушатели задают 1–3 вопроса. Отвечайте коротко и уверенно — так же, как на защите.'
+            : 'Задайте 1–3 каверзных вопроса. Нет вопросов — ведущий сразу переходит дальше.') + '</p>';
+        html += '  <div id="q-hands">' + buildHandsHtml(state.questionHands || []) + '</div>';
+        if (!isMe && !isSpectator) {
+            html += '  <button id="btn-raise-hand" class="' + raiseButtonClass(isHandRaised()) + '">' + raiseButtonLabel(isHandRaised()) + '</button>';
+        }
         html += '</div>';
     }
 
@@ -186,21 +211,25 @@ export function renderPresentation(container) {
     }
 
     // ═══════ CONTROLS ═══════
-    // ═══════ CONTROLS ═══════
     if (isHost) {
         html += '<div class="flex flex-wrap items-center justify-center gap-4 mt-8">';
 
         // Кнопка озвучки
-        if (state.settings && state.settings.useSpeech) {
+        if (state.settings && state.settings.useSpeech && !inQuestions) {
             html += '<button id="btn-speak" class="btn-neon px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">';
             html += '🔊 Озвучить';
             html += '</button>';
         }
 
         html += '<button id="btn-next-pres" class="btn-neon-solid px-10 py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">';
-        html += '⏭ Следующий выступающий';
+        html += (!inQuestions && questionsTime) ? '🙋 К вопросам' : '⏭ Следующий выступающий';
         html += '</button>';
 
+        html += '</div>';
+    } else if (isMe && inQuestions) {
+        // Выступающий сам может закончить вопросы, если ведущий отвлёкся
+        html += '<div class="flex justify-center mt-8">';
+        html += '<button id="btn-end-questions" class="btn-neon px-10 py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">✅ Вопросы закончились</button>';
         html += '</div>';
     }
     html += '</div>'; // end main container
@@ -222,9 +251,28 @@ export function renderPresentation(container) {
     });
 
     container.querySelector('#btn-next-pres')?.addEventListener('click', function () {
-        console.log('[presentation] Next presenter clicked');
-        sendMsg({ type: 'nextPresenter' });
+        var btn = container.querySelector('#btn-next-pres');
+        if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
+        // Передаём, какой экран видел ведущий: сервер проигнорирует повторный или устаревший клик
+        sendMsg({ type: 'nextPresenter', stage: inQuestions ? 'questions' : 'pitch', presenterIndex: state.presenterIndex });
     });
+
+    container.querySelector('#btn-end-questions')?.addEventListener('click', function () {
+        var btn = container.querySelector('#btn-end-questions');
+        if (btn) { btn.disabled = true; btn.classList.add('opacity-60'); }
+        sendMsg({ type: 'endQuestions', presenterIndex: state.presenterIndex });
+    });
+
+    var raiseBtn = container.querySelector('#btn-raise-hand');
+    if (raiseBtn) {
+        raiseBtn.addEventListener('click', function () {
+            var raised = isHandRaised();
+            raiseBtn.disabled = true;
+            sendMsg({ type: 'raiseHand', up: !raised });
+            // Защита от частых нажатий; актуальное состояние придёт от сервера
+            setTimeout(function () { raiseBtn.disabled = false; }, 400);
+        });
+    }
 
     container.querySelector('#btn-speak')?.addEventListener('click', function () {
         var btn = container.querySelector('#btn-speak');
@@ -248,6 +296,55 @@ export function renderPresentation(container) {
     });
 }
 
+
+// ═══════════════════════════════════════════════════════
+// ВОПРОСЫ: поднятые руки
+// ═══════════════════════════════════════════════════════
+
+function isHandRaised() {
+    var hands = state.questionHands || [];
+    for (var i = 0; i < hands.length; i++) {
+        if (hands[i].id === state.playerId) return true;
+    }
+    return false;
+}
+
+function buildHandsHtml(hands) {
+    if (!hands || hands.length === 0) {
+        return '<div class="text-sm text-corp-muted">✋ Пока никто не поднял руку</div>';
+    }
+    var html = '<div class="text-xs font-black text-accent-brand uppercase tracking-widest mb-3">✋ Есть вопрос: ' + hands.length + '</div>';
+    html += '<div class="flex flex-wrap justify-center gap-2">';
+    for (var i = 0; i < hands.length; i++) {
+        html += '<span class="px-3 py-1.5 rounded-xl text-sm font-bold bg-accent-gold-dim border border-accent-gold/25 text-corp-light">';
+        html += '<span class="text-accent-brand">' + (i + 1) + '.</span> ' + escapeHtml(hands[i].nickname);
+        html += '</span>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function raiseButtonLabel(raised) {
+    return raised ? '✋ Опустить руку' : '✋ У меня есть вопрос';
+}
+
+function raiseButtonClass(raised) {
+    return 'mt-4 px-8 py-3.5 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer transition-all '
+        + (raised ? 'bg-accent-gold-dim border border-accent-gold/40 text-accent-brand' : 'btn-neon');
+}
+
+// Обновляет список рук и кнопку, не перерисовывая экран (иначе остановится таймер)
+export function updateQuestionHandsUI(root) {
+    var scope = root || document;
+    var box = scope.querySelector('#q-hands');
+    if (box) box.innerHTML = buildHandsHtml(state.questionHands || []);
+    var btn = scope.querySelector('#btn-raise-hand');
+    if (btn) {
+        var raised = isHandRaised();
+        btn.textContent = raiseButtonLabel(raised);
+        btn.className = raiseButtonClass(raised);
+    }
+}
 
 // ═══════════════════════════════════════════════════════
 // УНИВЕРСАЛЬНЫЙ РЕНДЕР КАРТ

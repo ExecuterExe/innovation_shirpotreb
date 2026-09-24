@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   ИННОВАЦИОННЫЙ ШИРПОТРЕБ v3.1 — ДИЗАЙН-СИСТЕМА
+   ВПАРИТЬ v3.2 — ДИЗАЙН-СИСТЕМА
    Тема: Satirical Corporate Dark — синий тинт + золото
    ═══════════════════════════════════════════════════════════ */
 
@@ -172,12 +172,13 @@ body {
 .btn-neon:active { transform: translateY(0); box-shadow: 0 0 10px rgba(0, 180, 255, 0.3); }
 
 /* NEON SOLID — главная CTA */
+/* Главное действие — фирменный жёлтый «жетон», тёмный текст для контраста */
 .btn-neon-solid {
-    background: linear-gradient(135deg, #00c6ff 0%, #0085ef 100%);
-    color: #ffffff;
+    background: linear-gradient(135deg, #ffd54a 0%, #ffc72c 100%);
+    color: #15151e;
     border: none;
     font-weight: 800;
-    box-shadow: 0 0 0 1px rgba(0, 180, 255, 0.25), 0 4px 20px rgba(0, 120, 255, 0.3);
+    box-shadow: 0 0 0 1px rgba(255, 199, 44, 0.3), 0 4px 20px rgba(255, 170, 0, 0.25);
     transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
     cursor: pointer;
     font-family: inherit;
@@ -189,7 +190,7 @@ body {
     position: absolute;
     top: 0; left: -120%;
     width: 60%; height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
     animation: btnShimmer 4s ease 0.5s infinite;
 }
 @keyframes btnShimmer {
@@ -197,9 +198,9 @@ body {
     40%, 100% { left: 200%; }
 }
 .btn-neon-solid:hover {
-    box-shadow: 0 0 0 1px rgba(0, 180, 255, 0.4), 0 6px 30px rgba(0, 150, 255, 0.45), 0 0 60px rgba(0, 120, 255, 0.15);
+    box-shadow: 0 0 0 1px rgba(255, 199, 44, 0.5), 0 6px 30px rgba(255, 170, 0, 0.4), 0 0 60px rgba(255, 199, 44, 0.15);
     transform: translateY(-2px);
-    background: linear-gradient(135deg, #10d0ff 0%, #0090ff 100%);
+    background: linear-gradient(135deg, #ffdf6e 0%, #ffcf3f 100%);
 }
 .btn-neon-solid:active { transform: translateY(0); }
 .btn-neon-solid:disabled { opacity: 0.45; transform: none !important; animation: none; }
@@ -334,7 +335,9 @@ body {
     box-shadow: 0 0 12px rgba(0, 180, 255, 0.15);
 }
 .stepper-input {
-    width: 60px;
+    width: 72px;
+    -moz-appearance: textfield;
+    appearance: textfield;
     text-align: center;
     padding: 8px;
     background: rgba(0,0,0,0.35);
@@ -347,6 +350,10 @@ body {
     transition: border-color 0.25s;
 }
 .stepper-input:focus { border-color: rgba(0, 180, 255, 0.4); }
+/* Встроенные стрелки браузера съедали место под третью цифру (120 → «12»),
+   а рядом и так есть кнопки − и + */
+.stepper-input::-webkit-outer-spin-button,
+.stepper-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* ─── HERO ENTRANCE (welcome screen) ─── */
 
@@ -384,7 +391,7 @@ body {
 }
 .hero-rocket:hover {
     transform: scale(1.1) rotate(-6deg);
-    filter: drop-shadow(0 0 55px rgba(0,180,255,0.55)) drop-shadow(0 0 100px rgba(0,180,255,0.2));
+    filter: drop-shadow(0 0 55px rgba(255,199,44,0.55)) drop-shadow(0 0 100px rgba(255,199,44,0.2));
 }
 
 /* ─── TEXT UTILITIES ─── */

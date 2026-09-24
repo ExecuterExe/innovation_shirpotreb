@@ -8,17 +8,18 @@ export function renderWelcome(container) {
     var html = '';
     html += '<div class="flex flex-col items-center justify-center min-h-screen px-6 py-12">';
 
-    // Logo
-    html += '<div class="hero-reveal-1 mb-5 animate-float">';
-    html += '<div class="hero-rocket text-7xl md:text-8xl select-none" style="filter: drop-shadow(0 0 40px rgba(0,180,255,0.35)) drop-shadow(0 0 80px rgba(0,180,255,0.12));">🚀</div>';
+    // Logo. Появление и парение — на разных элементах: обе анимации задают
+    // свойство animation, и на одном элементе парение перебивало появление,
+    // из-за чего ракета навсегда оставалась прозрачной.
+    html += '<div class="hero-reveal-1 mb-5">';
+    html += '<div class="animate-float">';
+    html += '<div class="hero-rocket text-7xl md:text-8xl select-none" style="filter: drop-shadow(0 0 40px rgba(255,199,44,0.35)) drop-shadow(0 0 80px rgba(255,199,44,0.12));">🚀</div>';
+    html += '</div>';
     html += '</div>';
 
-    // Title — градиент синий→голубой
-    html += '<h1 class="hero-reveal-2 font-display font-black text-3xl md:text-5xl text-center tracking-tight leading-none mb-1" style="text-wrap:balance">';
-    html += '<span class="text-gradient-blue">ИННОВАЦИОННЫЙ</span>';
-    html += '<br>';
-    html += '<span class="text-corp-white" style="letter-spacing:-0.01em">ШИРПОТРЕБ</span>';
-    html += '</h1>';
+    // Название и слоган — как в презентации: белое имя, жёлтый слоган
+    html += '<h1 class="hero-reveal-2 font-display font-black text-5xl md:text-7xl text-center text-corp-white tracking-tight leading-none mb-2" style="letter-spacing:-0.02em">ВПАРИТЬ</h1>';
+    html += '<p class="hero-reveal-3 font-display font-black text-lg md:text-2xl text-center text-accent-brand mb-2">Сделай бред инвестицией</p>';
 
     // Подзаголовок
     html += '<p class="hero-reveal-3 text-xs font-bold text-corp-muted uppercase tracking-[0.18em] mb-6">Питчинг · Инвестиции · Хаос</p>';
@@ -105,6 +106,25 @@ export function renderWelcome(container) {
     html += '</div>';
     html += '</div>';
 
+    // Fake door: замеряем, есть ли вообще спрос на платную «преподавательскую» версию.
+    // Кнопка ведёт не в продукт, а в форму ожидания — клики и оставленные почты
+    // и есть данные о готовности платить.
+    html += '<div class="w-full max-w-md mt-5">';
+    html += '<button id="btn-teacher" class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-[0.7rem] font-black uppercase tracking-wider cursor-pointer ';
+    html += 'bg-accent-green-dim border border-accent-green/25 text-accent-green hover:bg-accent-green/15 hover:border-accent-green/45 transition-all">';
+    html += '  <span>📊</span>';
+    html += '  <span>Для преподавателей и тренеров</span>';
+    html += '</button>';
+    html += '<div id="teacher-panel" class="hidden corp-card p-5 mt-3 space-y-3 text-left">';
+    html += '  <div class="text-sm font-black text-corp-white">Режим ведущего</div>';
+    html += '  <p class="text-xs text-corp-dim leading-relaxed">Сценарий занятия на 60–90 минут, критерии разбора питчей и отчёт по группе: кто сколько инвестиций привлёк и как рос от игры к игре. Сейчас в разработке — оставьте почту, позовём первыми.</p>';
+    html += '  <input type="email" id="teacher-email" class="input-corp text-sm" placeholder="Почта" maxlength="120" autocomplete="email">';
+    html += '  <input type="text" id="teacher-role" class="input-corp text-sm" placeholder="Кто вы? (преподаватель, HR, тренер…)" maxlength="60" autocomplete="off">';
+    html += '  <button id="btn-teacher-send" class="btn-neon w-full py-3 rounded-2xl text-xs font-black uppercase tracking-wider cursor-pointer">Записаться</button>';
+    html += '  <div id="teacher-result" class="hidden text-xs font-bold text-accent-green text-center"></div>';
+    html += '</div>';
+    html += '</div>';
+
     // Footer
     html += '<div class="flex flex-wrap items-center justify-center gap-5 mt-8">';
     html += '<a href="https://t.me/innovative_shirpotreb" target="_blank" class="flex items-center gap-1.5 text-[0.65rem] font-semibold text-corp-muted hover:text-accent-blue transition-colors uppercase tracking-wider">⚡ Telegram</a>';
@@ -130,9 +150,12 @@ export function renderWelcome(container) {
     var btnSolo = container.querySelector('#btn-solo');
     if (btnSolo) {
         btnSolo.addEventListener('click', function () {
+            trackClick('solo_opened');
             navigate('soloSettings');
         });
     }
+
+    setupTeacherFakeDoor(container);
     var nicknameInput = container.querySelector('#w-nickname');
     var codeInput = container.querySelector('#w-room-code');
     var btnRules = container.querySelector('#btn-rules');
@@ -519,6 +542,18 @@ function buildRulesContent() {
     html += '</div>';
     html += '</div>';
 
+    // Questions after pitch
+    html += '<div>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🙋 Вопросы после питча</h3>';
+    html += '<p class="text-sm text-corp-dim leading-relaxed">';
+    html += 'Опциональная фаза! После каждого питча слушатели могут задать ';
+    html += '<span class="text-accent-brand font-bold">1–3 каверзных вопроса</span>. ';
+    html += 'Кто хочет спросить — поднимает руку кнопкой, все видят очередь. ';
+    html += 'Вопросов нет — ведущий сразу переходит дальше. ';
+    html += 'Время задаётся в настройках: 30, 60, 90 секунд или без таймера.';
+    html += '</p>';
+    html += '</div>';
+
     // Streamer mode
     html += '<div>';
     html += '<h3 class="text-lg font-black text-accent-blue mb-3">🎬 Стримерский режим</h3>';
@@ -667,6 +702,69 @@ function buildRule(dot, title, desc) {
 }
 
 // ═══════ ACTIONS ═══════
+
+// ═══════════════════════════════════════════
+// FAKE DOOR — замер спроса на платную версию
+// ═══════════════════════════════════════════
+
+export function trackClick(name) {
+    try {
+        fetch('/api/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name }),
+        }).catch(function () { });
+    } catch (e) { /* аналитика никогда не должна ломать игру */ }
+}
+
+function setupTeacherFakeDoor(container) {
+    var btn = container.querySelector('#btn-teacher');
+    var panel = container.querySelector('#teacher-panel');
+    var send = container.querySelector('#btn-teacher-send');
+    var result = container.querySelector('#teacher-result');
+    if (!btn || !panel || !send) return;
+
+    var counted = false;
+    btn.addEventListener('click', function () {
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden') && !counted) {
+            counted = true;
+            trackClick('fakedoor_click');
+        }
+    });
+
+    send.addEventListener('click', function () {
+        var email = (container.querySelector('#teacher-email') || {}).value || '';
+        var role = (container.querySelector('#teacher-role') || {}).value || '';
+        email = email.trim();
+        if (email.indexOf('@') === -1) {
+            showNotification('Введите почту', 'error');
+            return;
+        }
+        send.disabled = true;
+        send.textContent = 'Отправляем...';
+        fetch('/api/lead', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, role: role.trim(), source: 'welcome' }),
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data && data.ok) {
+                    panel.querySelectorAll('input, #btn-teacher-send').forEach(function (el) { el.classList.add('hidden'); });
+                    result.classList.remove('hidden');
+                    result.textContent = '✓ Записали. Напишем, когда будет готово.';
+                } else {
+                    throw new Error('bad response');
+                }
+            })
+            .catch(function () {
+                send.disabled = false;
+                send.textContent = 'Записаться';
+                showNotification('Не получилось отправить. Попробуйте позже.', 'error');
+            });
+    });
+}
 
 function setButtonPending(btn, pendingText) {
     if (!btn || btn.disabled) return;

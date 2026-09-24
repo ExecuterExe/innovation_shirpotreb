@@ -231,7 +231,7 @@ function init() {
         }
     });
 
-    console.log('🚀 Инновационный Ширпотреб v3.0');
+    console.log('🚀 ВПАРИТЬ v3.0');
     // Клиентский AFK — пинг при активности
     var activityEvents = ['click', 'keydown', 'touchstart', 'mousemove'];
     var lastActivity = Date.now();

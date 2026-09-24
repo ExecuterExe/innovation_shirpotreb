@@ -191,6 +191,21 @@ export function updateSettingsPanel(container) {
     html += buildSetting('🎤 Питч',            'present', 'set-present',  60, 300, s.presentTime || 120, 15);
     html += buildSetting('📈 Инвестирование',  'invest',  'set-invest',   30, 120, s.investTime || 60,   10);
     html += '</div>';
+
+    // Вопросы после питча — необязательная фаза, по умолчанию выключена
+    var qt = parseInt(s.questionsTime, 10);
+    if ([0, -1, 30, 60, 90].indexOf(qt) === -1) qt = 0;
+    html += '<div class="mt-3">';
+    html += '<div class="text-sm font-bold text-corp-light mb-2 px-1">🙋 Вопросы после питча</div>';
+    html += '<div class="grid grid-cols-5 gap-1.5">';
+    html += buildRadioCard('0',  'questions-radio', qt === 0,  '🚫', 'Выкл',        '', 'muted');
+    html += buildRadioCard('-1', 'questions-radio', qt === -1, '♾️', 'Без таймера', '', 'gold');
+    html += buildRadioCard('30', 'questions-radio', qt === 30, '⏱', '30 сек',      '', 'gold');
+    html += buildRadioCard('60', 'questions-radio', qt === 60, '⏱', '60 сек',      '', 'gold');
+    html += buildRadioCard('90', 'questions-radio', qt === 90, '⏱', '90 сек',      '', 'gold');
+    html += '</div>';
+    html += '<div class="text-[0.6rem] text-corp-dim mt-1.5 px-1">Слушатели поднимают руку, ведущий переходит дальше кнопкой. «Без таймера» — пока ведущий не нажмёт «Дальше».</div>';
+    html += '</div>';
     html += buildSectionDivider('Видимость комнаты');
     var isPrivate = !!s.roomPrivate;
     html += '<div class="space-y-2">';
@@ -648,6 +663,14 @@ function attachSettingsListeners(container) {
         })(sourceRadios[r]);
     }
 
+    // Вопросы после питча
+    var questionRadios = container.querySelectorAll('.questions-radio');
+    for (var qr = 0; qr < questionRadios.length; qr++) {
+        questionRadios[qr].addEventListener('change', function () {
+            pushSettings(container);
+        });
+    }
+
     // Modifier radios
     var modRadios = container.querySelectorAll('.modifier-radio');
     for (var m = 0; m < modRadios.length; m++) {
@@ -718,6 +741,7 @@ function handleStep(field, dir, container) {
 function pushSettings(container) {
     var cardSourceEl = container.querySelector('input[name="card-source"]:checked');
     var modifierEl = container.querySelector('input[name="modifier"]:checked');
+    var questionsEl = container.querySelector('input[name="questions"]:checked');
 
     var rawMaxPlayers = parseInt(container.querySelector('#set-max-players')?.value);
     var fallbackMaxPlayers = parseInt(state.settings && state.settings.maxPlayers) || 8;
@@ -740,6 +764,7 @@ function pushSettings(container) {
         prepTime: parseInt(container.querySelector('#set-prep')?.value) || 60,
         presentTime: parseInt(container.querySelector('#set-present')?.value) || 120,
         investTime: parseInt(container.querySelector('#set-invest')?.value) || 60,
+        questionsTime: questionsEl ? parseInt(questionsEl.value, 10) : 0,
         cardSource: cardSourceEl ? cardSourceEl.value : 'database',
         blackSwan: container.querySelector('#set-blackswan')?.checked || false,
         modifier: modifierEl ? modifierEl.value : 'none',

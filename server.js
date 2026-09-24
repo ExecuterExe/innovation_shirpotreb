@@ -3,10 +3,18 @@ const http = require('http');
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const analytics = require('./analytics');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+analytics.init();
+app.use(express.json({ limit: '16kb' }));
+
+// Ключ для просмотра статистики. Задайте STATS_KEY в окружении на сервере,
+// иначе /api/stats будет отдавать 403 и цифры останутся только в файлах.
+const STATS_KEY = process.env.STATS_KEY || '';
 
 app.use(express.static(path.join(__dirname, 'public'), {
     etag: false,
@@ -19,6 +27,57 @@ app.use(express.static(path.join(__dirname, 'public'), {
         }
     }
 }));
+
+// ── Аналитика: приём данных и отчёт ────────────────────────────────────
+
+// Fake door: клик по «Режим преподавателя» и оставленная почта.
+// Это и есть замер готовности платить — намного честнее, чем спрашивать
+// «а вы бы заплатили?», потому что человек тратит действие, а не мнение.
+app.post('/api/lead', (req, res) => {
+    const body = req.body || {};
+    const email = String(body.email || '').trim().slice(0, 120);
+    const role = String(body.role || '').trim().slice(0, 60);
+    const comment = String(body.comment || '').trim().slice(0, 500);
+    if (!email || email.indexOf('@') === -1) {
+        return res.status(400).json({ ok: false, error: 'Нужна почта' });
+    }
+    analytics.saveLead({ email, role, comment, source: String(body.source || 'welcome').slice(0, 40) });
+    res.json({ ok: true });
+});
+
+// Точечные клики с фронта. Белый список, чтобы эндпоинт нельзя было
+// использовать как помойку для произвольных счётчиков.
+const CLIENT_EVENTS = ['fakedoor_click', 'rules_opened', 'solo_opened'];
+app.post('/api/event', (req, res) => {
+    const name = String((req.body || {}).name || '');
+    if (CLIENT_EVENTS.indexOf(name) === -1) return res.status(400).json({ ok: false });
+    analytics.bump(name);
+    res.json({ ok: true });
+});
+
+// Мини-опрос после игры — прямая проверка гипотезы «игра придаёт уверенности».
+app.post('/api/survey', (req, res) => {
+    const body = req.body || {};
+    const confidence = parseInt(body.confidence, 10);
+    if (!(confidence >= 1 && confidence <= 10)) {
+        return res.status(400).json({ ok: false, error: 'Нужна оценка 1–10' });
+    }
+    analytics.saveSurvey({
+        confidence,
+        wasScary: !!body.wasScary,
+        firstTime: !!body.firstTime,
+        mode: String(body.mode || '').slice(0, 20),
+    });
+    res.json({ ok: true });
+});
+
+// Отчёт. Открывать так: /api/stats?key=ВАШ_КЛЮЧ
+app.get('/api/stats', (req, res) => {
+    if (!STATS_KEY || req.query.key !== STATS_KEY) {
+        return res.status(403).json({ error: 'Нужен правильный ?key=' });
+    }
+    res.json(analytics.getStats());
+});
 
 // REST-эндпоинт для случайных комбинаций на welcome-экране
 app.get('/api/random-combo', (req, res) => {
@@ -113,6 +172,7 @@ app.get('/api/solo-cards', (req, res) => {
         event = EVENTS[Math.floor(Math.random() * EVENTS.length)];
     }
 
+    analytics.bump('solo_generated');
     res.json({ cards, event });
 });
 // =====================================================================
@@ -138,7 +198,6 @@ const ADJECTIVES = [
     "КРЕДИТНЫЙ",
     "КВАДРАТНЫЙ",
     "ЭЛЕКТРИЧЕСКИЙ",
-    "ОДНОРАЗОВЫЙ",
     "ХЛЕБНЫЙ",
     "СОЛЕНЫЙ",
     "ГОЛОСОВОЙ",
@@ -204,7 +263,6 @@ const ADJECTIVES = [
     "ГОЛОДНЫЙ",
     "ГРУСТНЫЙ",
     "ДОБРЫЙ",
-    "НАКАЧАННЫЙ",
     "СТАРИННЫЙ",
     "СПОРТИВНЫЙ",
     "СЛЕПОЙ",
@@ -287,7 +345,7 @@ const ADJECTIVES = [
     "БЕРЕМЕННЫЙ",
     "ИПОТЕЧНЫЙ",
     "СКОРОСТНОЙ",
-    "УЛЬТРАЗВУКОВОЕ",
+    "УЛЬТРАЗВУКОВОЙ",
     "ПРИВОРОТНЫЙ",
     "ИЛЛЮЗОРНЫЙ",
     "СОЕВЫЙ",
@@ -2273,16 +2331,10 @@ const GLOBAL_PROBLEMS = [
 // =====================================================================
 
 // Исключения для прилагательных, которые нельзя склонять простым отсечением 2 букв
+// Притяжательные прилагательные склоняются не по общему правилу:
+// ДРАКОНИЙ → ДРАКОНЬЯ, ДРАКОНЬЕ (а не «драконая», «драконее»).
 const ADJ_EXCEPTIONS = {
-    // Слова на -ОЙ: мужской "ОЙ" -> женский "АЯ", средний "ОЕ"
-    // Определяем по окончанию, специальная обработка не нужна —
-    // -ОЙ: убираем 2 -> добавляем АЯ/ОЕ — работает правильно
-    // ЖИВОЙ -> ЖИВ + АЯ = ЖИВАЯ ✓, ЖИВ + ОЕ = ЖИВОЕ ✓
-    // ЗОЛОТОЙ -> ЗОЛОТ + АЯ = ЗОЛОТАЯ ✓
-
-    // Проблемные: БЕСЯЧИЙ -> БЕСЯЧ + АЯ = БЕСЯЧАЯ (нужно БЕСЯЧАЯ — ок, хотя грамматически лучше "бесячая")
-    // СИНИЙ -> СИН + АЯ = СИНАЯ (неправильно, нужно СИНЯЯ) — но у нас нет таких слов
-    // Все наши слова на -ЫЙ, -ОЙ, -ИЙ склоняются нормально при отсечении 2 букв
+    'ДРАКОНИЙ': { f: 'ДРАКОНЬЯ', n: 'ДРАКОНЬЕ' },
 };
 
 /**
@@ -2290,29 +2342,30 @@ const ADJ_EXCEPTIONS = {
  * @param {string} adj - прилагательное в мужском роде (напр. "СТЕКЛЯННЫЙ")
  * @param {string} gender - "m", "f", "n"
  * @returns {string} - склонённое прилагательное
+ *
+ * Правила для окончания -ИЙ зависят от последней буквы основы:
+ *   К, Г, Х    → -АЯ / -ОЕ   (ЭЛЕКТРИЧЕСКИЙ → ЭЛЕКТРИЧЕСКАЯ, ЭЛЕКТРИЧЕСКОЕ)
+ *   Ж, Ш, Ч, Щ → -АЯ / -ЕЕ   (БЛЕСТЯЩИЙ → БЛЕСТЯЩАЯ, БЛЕСТЯЩЕЕ)
+ *   остальные  → -ЯЯ / -ЕЕ   (СИНИЙ → СИНЯЯ, СИНЕЕ)
+ * Окончания -ЫЙ и -ОЙ → -АЯ / -ОЕ.
  */
 function declineAdjective(adj, gender) {
-    if (gender === 'm') return adj;
+    if (gender !== 'f' && gender !== 'n') return adj;
 
-    // Убираем последние 2 буквы
+    var exception = ADJ_EXCEPTIONS[adj];
+    if (exception) return exception[gender];
+
     var stem = adj.slice(0, -2);
     var ending = adj.slice(-2).toUpperCase();
+    var female = gender === 'f';
 
-    if (gender === 'f') {
-        // Мужской ЫЙ/ОЙ/ИЙ -> женский АЯ/АЯ/АЯ
-        return stem + 'АЯ';
+    if (ending === 'ИЙ') {
+        var last = stem.slice(-1).toUpperCase();
+        if ('КГХ'.indexOf(last) !== -1) return stem + (female ? 'АЯ' : 'ОЕ');
+        if ('ЖШЧЩ'.indexOf(last) !== -1) return stem + (female ? 'АЯ' : 'ЕЕ');
+        return stem + (female ? 'ЯЯ' : 'ЕЕ');
     }
-    if (gender === 'n') {
-        // Мужской ЫЙ/ОЙ/ИЙ -> средний ОЕ/ОЕ/ОЕ (для -ИЙ лучше ЕЕ, но упрощаем)
-        // СИНИЙ -> СИНЕЕ, но ЖИВОЙ -> ЖИВОЕ, КРАСНЫЙ -> КРАСНОЕ
-        // Определяем по предпоследней букве основы
-        if (ending === 'ИЙ') {
-            return stem + 'ЕЕ';
-        }
-        return stem + 'ОЕ';
-    }
-
-    return adj;
+    return stem + (female ? 'АЯ' : 'ОЕ');
 }
 
 /**
@@ -2388,6 +2441,17 @@ function mapToObj(map) {
     return obj;
 }
 
+// Фаза вопросов после питча. 0 — выключена, -1 — без таймера (ведущий сам жмёт «Дальше»),
+// иначе — длительность в секундах. По умолчанию выключена: вопросы — необязательная механика.
+const QUESTIONS_TIME_OPTIONS = [0, -1, 30, 60, 90];
+// «Без таймера» всё равно ограничен скрытой страховкой: если ведущий отвалился,
+// игра не должна зависнуть навсегда.
+const QUESTIONS_SAFETY_LIMIT = 300;
+function normalizeQuestionsTime(value) {
+    var n = parseInt(value, 10);
+    return QUESTIONS_TIME_OPTIONS.indexOf(n) !== -1 ? n : 0;
+}
+
 function createRoom(hostId, settings) {
     let code;
     do { code = generateRoomCode(); } while (rooms.has(code));
@@ -2403,6 +2467,7 @@ function createRoom(hostId, settings) {
             prepTime: Math.min(600, Math.max(10, parseInt(settings.prepTime) || 120)),
             presentTime: Math.min(600, Math.max(10, parseInt(settings.presentTime) || 120)),
             investTime: Math.min(600, Math.max(10, parseInt(settings.investTime) || 60)),
+            questionsTime: normalizeQuestionsTime(settings.questionsTime),
             cardSource: (settings.cardSource === 'players') ? 'players' : 'database',
             cardInputTime: 30,
             useReviews: !!settings.useReviews,
@@ -2454,6 +2519,8 @@ function createRoom(hostId, settings) {
         currentEvent: null,
         presentationOrder: [],
         currentPresenterIndex: 0,
+        presentationStage: 'pitch',   // 'pitch' | 'questions'
+        questionHands: [],            // кто поднял руку в фазе вопросов (по порядку)
         investments: new Map(),
         timer: null,
         timerEnd: null,
@@ -2849,7 +2916,22 @@ function sendCurrentStateToPlayer(room, player, ws) {
             event: room.currentEvent,
             round: room.currentRound,
             totalRounds: room.totalRounds,
+            stage: 'pitch',
+            questionsTime: room.settings.questionsTime || 0,
         }));
+        if (room.presentationStage === 'questions' && presPlayer) {
+            var qTime = room.settings.questionsTime;
+            var qRemaining = (qTime > 0 && room.timerEnd) ? Math.max(0, Math.ceil((room.timerEnd - Date.now()) / 1000)) : 0;
+            ws.send(JSON.stringify({
+                type: 'questionsPhase',
+                presenterId: presPlayer.id,
+                nickname: getDisplayNickname(room, presPlayer.id),
+                presenterIndex: room.currentPresenterIndex,
+                questionsTime: qTime,
+                hands: getQuestionHandsPublic(room),
+                remaining: qRemaining,
+            }));
+        }
     } else {
         ws.send(JSON.stringify({
             type: 'reconnectSuccess',
@@ -3025,6 +3107,8 @@ function showCurrentPresenter(room) {
 
     const presenterId = room.presentationOrder[room.currentPresenterIndex];
     const presenter = room.players.get(presenterId);
+    room.presentationStage = 'pitch';
+    room.questionHands = [];
 
     // ═══════ ЧЁРНЫЙ ЛЕБЕДЬ ═══════
     var blackSwanResult = null;
@@ -3070,15 +3154,68 @@ function showCurrentPresenter(room) {
         totalRounds: room.totalRounds,
         streamerMode: room.settings.streamerMode,
         blackSwan: blackSwanResult,
+        stage: 'pitch',
+        questionsTime: room.settings.questionsTime || 0,
     });
 
     startTimer(room, room.settings.presentTime, () => {
-        nextPresenter(room);
+        advancePresentation(room);
     });
+}
+
+// Конец питча: если вопросы включены — переходим к ним, иначе к следующему выступающему
+function advancePresentation(room) {
+    if (room.state !== 'presentation') return;
+    if (room.presentationStage === 'pitch' && room.settings.questionsTime) {
+        startQuestions(room);
+        return;
+    }
+    nextPresenter(room);
+}
+
+function getQuestionHandsPublic(room) {
+    return (room.questionHands || [])
+        .filter(id => room.players.has(id))
+        .map(id => ({ id, nickname: getDisplayNickname(room, id) }));
+}
+
+function startQuestions(room) {
+    clearTimer(room);
+    room.presentationStage = 'questions';
+    room.questionHands = [];
+    const presenterId = room.presentationOrder[room.currentPresenterIndex];
+    const questionsTime = room.settings.questionsTime;
+
+    broadcastToRoom(room, {
+        type: 'questionsPhase',
+        presenterId,
+        nickname: getDisplayNickname(room, presenterId),
+        presenterIndex: room.currentPresenterIndex,
+        questionsTime,
+        hands: [],
+    });
+    analytics.bump('questions_phase');
+
+    if (questionsTime > 0) {
+        startTimer(room, questionsTime, () => nextPresenter(room));
+    } else {
+        // Без видимого таймера: только скрытая страховка от зависания
+        room.timerEnd = Date.now() + QUESTIONS_SAFETY_LIMIT * 1000;
+        room.timer = setTimeout(() => {
+            room.timer = null;
+            nextPresenter(room);
+        }, QUESTIONS_SAFETY_LIMIT * 1000);
+    }
 }
 
 function nextPresenter(room) {
     clearTimer(room);
+    if (room.presentationStage === 'questions') {
+        // Сколько рук поднимали — прямой замер того, задают ли вопросы вообще
+        analytics.track('questions_done', { code: room.code, hands: (room.questionHands || []).length });
+    }
+    room.presentationStage = 'pitch';
+    room.questionHands = [];
     room.currentPresenterIndex++;
     showCurrentPresenter(room);
 }
@@ -3529,13 +3666,47 @@ function showFinalResults(room) {
         bestEntrepreneur: bestEntrepreneur ? { nickname: bestEntrepreneur.nickname, attracted: bestEntrepreneur.attractedInvestments } : null,
         roundHistory: room.roundHistory,
     });
+
+    recordFinishedGame(room, 'classic', {
+        players: players.map(p => ({
+            nickname: p.nickname,
+            capital: p.capital,
+            attracted: p.attractedInvestments,
+        })),
+        roundHistory: room.roundHistory,
+    });
+}
+
+// Партия доиграна до конца — фиксируем факт и сохраняем результат целиком.
+// Привлечённые инвестиции — это и есть оценка питча живой аудиторией: люди
+// голосовали ограниченным ресурсом. Из этих файлов потом собирается прогресс
+// игрока и отчёт по группе.
+function recordFinishedGame(room, mode, payload) {
+    if (room.analyticsRecorded) return;
+    room.analyticsRecorded = true;
+
+    const durationSec = room.startedAt ? Math.round((Date.now() - room.startedAt) / 1000) : null;
+    analytics.track('game_finished', {
+        code: room.code,
+        mode,
+        players: room.players.size,
+        durationSec,
+    });
+    analytics.saveGame(Object.assign({
+        code: room.code,
+        mode,
+        finishedAt: new Date().toISOString(),
+        durationSec,
+        playerCount: room.players.size,
+        settings: room.settings,
+    }, payload));
 }
 
 // =====================================================================
 // СПИСОК ОТКРЫТЫХ КОМНАТ
 // =====================================================================
 
-const TAG_PRIORITY = ['bunker', 'blackSwan', 'events', 'streamer', 'pseudo', 'absurdGen', 'modifier', 'review', 'audience', 'defects', 'packaging', 'chat'];
+const TAG_PRIORITY = ['bunker', 'blackSwan', 'events', 'streamer', 'pseudo', 'absurdGen', 'modifier', 'review', 'audience', 'defects', 'packaging', 'chat', 'questions'];
 
 function getPublicRoomInfo(room) {
     var s = room.settings || {};
@@ -3556,6 +3727,7 @@ function getPublicRoomInfo(room) {
     if (s.useHiddenDefects)        tags.push({ key: 'defects',   label: '⚠️ Дефект',          tier: 'minor' });
     if (s.usePackaging)            tags.push({ key: 'packaging', label: '📦 Упаковка',        tier: 'minor' });
     if (s.bunkerChat)              tags.push({ key: 'chat',      label: '💬 Чат в игре',      tier: 'minor' });
+    if (s.questionsTime)           tags.push({ key: 'questions', label: '🙋 Вопросы',         tier: 'minor' });
 
     var stateLabel, stateType;
     if (room.state === 'lobby') {
@@ -3622,6 +3794,9 @@ function broadcastRoomsList() {
 
 wss.on('connection', (ws) => {
     const playerId = uuidv4();
+    // Клиент открывает сокет сразу при загрузке страницы, так что это
+    // приблизительный счётчик визитов (переподключения тоже считаются).
+    analytics.bump('visit');
     console.log(`[+] Player connected: ${playerId.substring(0, 8)}`);
 
     ws.isAlive = true;
@@ -3682,6 +3857,7 @@ wss.on('connection', (ws) => {
                 ws.send(JSON.stringify({ type: 'roomCreated', roomCode: room.code, playerId }));
                 broadcastToRoom(room, getLobbyState(room));
                 broadcastRoomsList();
+                analytics.track('rooms_created', { code: room.code, bunker: !!room.settings.bunkerMode });
                 console.log(`[ROOM] ${room.code} created by "${nickname}"`);
                 break;
             }
@@ -4198,6 +4374,7 @@ wss.on('connection', (ws) => {
                 ws.send(JSON.stringify({ type: 'roomJoined', roomCode: room.code, playerId }));
                 broadcastToRoom(room, getLobbyState(room));
                 broadcastRoomsList();
+                analytics.bump('player_joined');
                 console.log(`[JOIN] "${nickname}" joined ${code}`);
                 break;
             }
@@ -4246,6 +4423,7 @@ wss.on('connection', (ws) => {
                 if (s.useReviews !== undefined) room.settings.useReviews = !!s.useReviews;
                 if (s.useSpeech !== undefined) room.settings.useSpeech = !!s.useSpeech;
                 if (s.investTime !== undefined) room.settings.investTime = Math.min(600, Math.max(10, parseInt(s.investTime) || 60));
+                if (s.questionsTime !== undefined) room.settings.questionsTime = normalizeQuestionsTime(s.questionsTime);
                 if (s.pseudoMode !== undefined) room.settings.pseudoMode = !!s.pseudoMode;
                 if (s.modifier !== undefined) {
                     var mod = s.modifier;
@@ -4293,6 +4471,19 @@ wss.on('connection', (ws) => {
                     return;
                 }
                 console.log(`[GAME] Starting in room ${room.code} with ${room.players.size} players`);
+
+                room.startedAt = Date.now();
+                // Комната переиспользуется по кнопке «Играть ещё», поэтому флаг
+                // «результат уже записан» нужно сбрасывать на каждой новой партии.
+                room.analyticsRecorded = false;
+                analytics.track('game_started', {
+                    code: room.code,
+                    mode: room.settings.bunkerMode ? 'bunker' : 'classic',
+                    players: room.players.size,
+                    rounds: room.settings.rounds,
+                    cardSource: room.settings.cardSource,
+                    streamer: !!room.settings.streamerMode,
+                });
 
                 if (room.settings.bunkerMode) {
                     startBunkerGame(room);
@@ -4397,6 +4588,44 @@ wss.on('connection', (ws) => {
                 if (!room || room.state !== 'presentation') return;
                 // Только хост может переключать выступающих
                 if (info.playerId !== room.hostId) return;
+                // Клиент сообщает, какой экран видел ведущий. Устаревшую команду игнорируем:
+                // иначе двойной клик или клик одновременно с таймером пропускали игрока целиком.
+                if (msg.presenterIndex !== undefined && msg.presenterIndex !== room.currentPresenterIndex) return;
+                if (msg.stage !== undefined && msg.stage !== room.presentationStage) return;
+                advancePresentation(room);
+                break;
+            }
+
+            // ==================== ВОПРОСЫ ПОСЛЕ ПИТЧА ====================
+            case 'raiseHand': {
+                const info = playerRooms.get(ws);
+                if (!info || info.isSpectator) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'presentation' || room.presentationStage !== 'questions') return;
+                const player = room.players.get(info.playerId);
+                if (!player || player.eliminated) return;
+                // Выступающий сам себе вопросы не задаёт
+                if (room.presentationOrder[room.currentPresenterIndex] === info.playerId) return;
+
+                const hands = room.questionHands;
+                const idx = hands.indexOf(info.playerId);
+                if (msg.up && idx === -1) hands.push(info.playerId);
+                else if (!msg.up && idx !== -1) hands.splice(idx, 1);
+                else return;
+
+                broadcastToRoom(room, { type: 'questionHands', hands: getQuestionHandsPublic(room) });
+                break;
+            }
+
+            case 'endQuestions': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'presentation' || room.presentationStage !== 'questions') return;
+                // Завершить вопросы может ведущий или сам выступающий
+                const presenterId = room.presentationOrder[room.currentPresenterIndex];
+                if (info.playerId !== room.hostId && info.playerId !== presenterId) return;
+                if (msg.presenterIndex !== undefined && msg.presenterIndex !== room.currentPresenterIndex) return;
                 nextPresenter(room);
                 break;
             }
@@ -4875,6 +5104,19 @@ function destroyRoom(room, reason) {
             ws.send(JSON.stringify({ type: 'roomsList', rooms: getPublicRoomsList() }));
         }
     });
+
+    // Комната умерла посреди партии — значит игру бросили. Это важнее, чем кажется:
+    // доля брошенных партий показывает, где именно людям становится скучно.
+    if (room.startedAt && !room.analyticsRecorded) {
+        analytics.track('game_abandoned', {
+            code: room.code,
+            reason,
+            state: room.state,
+            round: room.currentRound,
+            players: room.players.size,
+        });
+        room.analyticsRecorded = true;
+    }
 
     rooms.delete(room.code);
     console.log(`[ROOM] ${room.code} deleted (${reason})`);
@@ -6116,13 +6358,19 @@ function endBunkerGame(room) {
         allPlayers: allPlayersData,
         players: getPlayersPublicInfo(room),
     });
+
+    recordFinishedGame(room, 'bunker', {
+        globalProblem: room.bunker.globalProblem,
+        survivors: activePlayers.length,
+        players: allPlayersData.map(p => ({ nickname: p.nickname, survived: p.survived })),
+    });
 }
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log('');
     console.log('  🚀 ═══════════════════════════════════════════');
-    console.log('  🚀  ИННОВАЦИОННЫЙ ШИРПОТРЕБ v2.0');
+    console.log('  🚀  ВПАРИТЬ v2.0');
     console.log('  🚀  Сервер запущен на порту ' + PORT);
     console.log('  🚀  Откройте: http://localhost:' + PORT);
     console.log('  🚀 ═══════════════════════════════════════════');

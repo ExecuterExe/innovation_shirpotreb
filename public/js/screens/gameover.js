@@ -79,6 +79,10 @@ export function renderGameOver(container) {
     html += '</div>';
     html += '</div>'; // end scoreboard
 
+    // Мини-опрос. Это единственное место, где можно поймать эффект игры
+    // по горячим следам — через пять минут человек уже закроет вкладку.
+    html += buildSurvey();
+
     // Controls
     html += '<div class="flex flex-col items-center gap-4">';
     if (isHost) {
@@ -98,6 +102,8 @@ export function renderGameOver(container) {
 
     container.innerHTML = html;
 
+    setupSurvey(container, 'classic');
+
     // Confetti
     launchConfetti();
 
@@ -115,6 +121,85 @@ export function renderGameOver(container) {
         btnExit.addEventListener('click', function () {
             leaveRoom();
         });
+    }
+}
+
+// ═══════════════════════════════════════════
+// МИНИ-ОПРОС — замер эффекта игры
+// ═══════════════════════════════════════════
+
+export function buildSurvey() {
+    var html = '';
+    html += '<div id="survey-box" class="corp-card max-w-lg mx-auto p-6 mb-8 text-left space-y-4">';
+    html += '  <div class="text-sm font-black text-corp-white text-center">Два вопроса — 10 секунд</div>';
+
+    html += '  <div>';
+    html += '    <div class="text-xs text-corp-dim mb-2">Насколько увереннее ты выступал к концу игры, чем в начале?</div>';
+    html += '    <div id="survey-scale" class="grid grid-cols-10 gap-1">';
+    for (var i = 1; i <= 10; i++) {
+        html += '<button data-val="' + i + '" class="survey-dot py-2 rounded-lg text-[0.65rem] font-bold bg-white/[0.04] border border-white/[0.07] text-corp-dim hover:border-accent-blue/50 hover:text-accent-blue transition-all cursor-pointer">' + i + '</button>';
+    }
+    html += '    </div>';
+    html += '    <div class="flex justify-between text-[0.6rem] text-corp-muted mt-1"><span>совсем нет</span><span>намного</span></div>';
+    html += '  </div>';
+
+    html += '  <div>';
+    html += '    <div class="text-xs text-corp-dim mb-2">Было страшно выступать?</div>';
+    html += '    <div class="flex gap-2">';
+    html += '      <button data-scary="1" class="survey-scary flex-1 py-2.5 rounded-xl text-xs font-bold bg-white/[0.04] border border-white/[0.07] text-corp-dim hover:border-accent-red/50 transition-all cursor-pointer">Да, волновался</button>';
+    html += '      <button data-scary="0" class="survey-scary flex-1 py-2.5 rounded-xl text-xs font-bold bg-white/[0.04] border border-white/[0.07] text-corp-dim hover:border-accent-green/50 transition-all cursor-pointer">Нет, норм</button>';
+    html += '    </div>';
+    html += '  </div>';
+
+    html += '  <div id="survey-thanks" class="hidden text-center text-sm font-bold text-accent-green">✓ Спасибо! Это правда помогает.</div>';
+    html += '</div>';
+    return html;
+}
+
+export function setupSurvey(container, mode) {
+    var box = container.querySelector('#survey-box');
+    if (!box) return;
+
+    // Один ответ на игру — иначе человек накликает десяток и данные поплывут.
+    try {
+        if (sessionStorage.getItem('surveyDone') === '1') { box.classList.add('hidden'); return; }
+    } catch (e) { /* приватный режим — просто покажем опрос */ }
+
+    var answer = { confidence: null, wasScary: null, mode: mode || 'classic' };
+
+    box.querySelectorAll('.survey-dot').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            answer.confidence = parseInt(btn.dataset.val, 10);
+            box.querySelectorAll('.survey-dot').forEach(function (b) {
+                b.classList.remove('border-accent-blue', 'text-accent-blue', 'bg-accent-blue-dim');
+            });
+            btn.classList.add('border-accent-blue', 'text-accent-blue', 'bg-accent-blue-dim');
+            maybeSend();
+        });
+    });
+
+    box.querySelectorAll('.survey-scary').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            answer.wasScary = btn.dataset.scary === '1';
+            box.querySelectorAll('.survey-scary').forEach(function (b) {
+                b.classList.remove('border-accent-blue', 'text-accent-blue');
+            });
+            btn.classList.add('border-accent-blue', 'text-accent-blue');
+            maybeSend();
+        });
+    });
+
+    function maybeSend() {
+        if (answer.confidence === null || answer.wasScary === null) return;
+        try { sessionStorage.setItem('surveyDone', '1'); } catch (e) { }
+        fetch('/api/survey', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(answer),
+        }).catch(function () { });
+        var thanks = box.querySelector('#survey-thanks');
+        if (thanks) thanks.classList.remove('hidden');
+        setTimeout(function () { box.classList.add('opacity-50'); }, 400);
     }
 }
 

@@ -125,7 +125,7 @@ export function renderSoloSettings(container) {
     html += '</div>';
 
     // Launch
-    html += '<button id="btn-solo-launch" class="btn-neon-solid w-full py-5 rounded-2xl text-lg font-black uppercase tracking-wide cursor-pointer" style="box-shadow: 0 0 30px rgba(0,180,255,0.2);">';
+    html += '<button id="btn-solo-launch" class="btn-neon-solid w-full py-5 rounded-2xl text-lg font-black uppercase tracking-wide cursor-pointer" style="box-shadow: 0 0 30px rgba(255,199,44,0.2);">';
     html += '  🎲 Сгенерировать продукт!';
     html += '</button>';
 
