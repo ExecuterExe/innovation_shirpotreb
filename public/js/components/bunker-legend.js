@@ -25,8 +25,8 @@ var LEGEND_ITEMS = [
 ];
 
 export function renderBunkerLegend(container) {
-    var existing = container.querySelector('#bunker-legend-panel');
-    if (existing) return; // уже отрисована
+    var existing = document.getElementById('bunker-legend-panel');
+    if (existing && (container.contains(existing) || document.getElementById('rail-extra'))) return; // уже отрисована
 
     var isCollapsed = LEGEND_COLLAPSED;
 
@@ -59,18 +59,22 @@ export function renderBunkerLegend(container) {
 
     html += '</div>';
 
+    // На широком экране памятка встаёт под колонкой участников, на узком — как раньше
+    var railSlot = document.getElementById('rail-extra');
     var layout = container.querySelector('.bunker-layout');
-    if (layout) {
+    if (railSlot && window.innerWidth >= 1024) {
+        railSlot.innerHTML = html;
+    } else if (layout) {
         layout.insertAdjacentHTML('beforeend', html);
     } else {
         container.insertAdjacentHTML('beforeend', html);
     }
 
-    var toggleBtn = container.querySelector('#btn-legend-toggle');
+    var toggleBtn = document.getElementById('btn-legend-toggle');
     if (toggleBtn) {
         toggleBtn.addEventListener('click', function () {
             LEGEND_COLLAPSED = !LEGEND_COLLAPSED;
-            var panel = container.querySelector('#bunker-legend-panel');
+            var panel = document.getElementById('bunker-legend-panel');
             if (panel) panel.remove();
             renderBunkerLegend(container);
         });

@@ -267,8 +267,11 @@ export function renderBunkerReveal(container) {
     html += '</div>';
     } // end if (!isSpectator) for player cards section
 
-    // ═══════ СЕТКА ИГРОКОВ ═══════
+    // Участники — в колонке слева (components/players-rail.js). Сетка внизу
+    // остаётся только на узких экранах, где колонка превращается в ленту.
+    html += '<div class="rail-fallback-grid">';
     html += renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCards, revealOrder, currentPlayerId);
+    html += '</div>';
 
     // ═══════ КАРТЫ ДЕЙСТВИЯ ═══════
     var actionCards = isSpectator ? [] : (state.myActionCards || []);
@@ -1101,7 +1104,14 @@ function truncateText(text, maxLen) {
     return text.substring(0, maxLen - 2) + '..';
 }
 
-function getBunkerRevealedValue(playerId, cardKey) {
+// Для колонки участников: окно со всеми раскрытыми картами игрока
+export function openBunkerPlayerDetail(playerId) {
+    var host = document.querySelector('#app .game-main') || document.body;
+    var bunker = state.bunker || {};
+    showPlayerDetailModal(host, playerId, state.players || [], bunker.revealedCards || {}, state.playerId, state.myCards || {});
+}
+
+export function getBunkerRevealedValue(playerId, cardKey) {
     var vals = state.bunker.revealedCardValues || {};
     if (vals[playerId] && vals[playerId][cardKey]) {
         return vals[playerId][cardKey];

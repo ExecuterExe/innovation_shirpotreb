@@ -1,6 +1,8 @@
 import { state, escapeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { CARD_TYPES } from './presentation.js';
+import { countUp, burst } from '../components/fx.js';
+import { reactionEmoji } from '../components/reactions.js';
 
 export function renderResults(container) {
     var winners = state.roundWinners || [];
@@ -29,7 +31,7 @@ export function renderResults(container) {
         html += '<div class="flex items-center justify-between gap-4 flex-wrap">';
         html += '<div>';
         html += '<div class="text-[0.65rem] font-black uppercase tracking-[0.12em] text-corp-muted mb-1">MVP раунда</div>';
-        html += '<div class="text-2xl font-black text-accent-gold">👑 ' + escapeHtml(mvp.nickname) + '</div>';
+        html += '<div class="text-2xl font-black text-accent-gold"><span class="crown-drop">👑</span> ' + escapeHtml(mvp.nickname) + '</div>';
         if (bestInvestor && bestInvestor.totalSpent > 0) {
             html += '<div class="text-xs text-corp-light mt-2">Инвест-движ раунда: <span class="font-black text-accent-blue">' + escapeHtml(bestInvestor.nickname) + '</span></div>';
         }
@@ -70,6 +72,8 @@ export function renderResults(container) {
     }
     html += '</div>';
     html += '</div>';
+
+    html += crowdFavoriteHtml(state.roundCrowdFavorite, 'раунда');
 
     // ═══════ WINNER RECAP ═══════
     if (winners.length > 0) {
@@ -202,6 +206,10 @@ export function renderResults(container) {
     html += '</div>';
 
     container.innerHTML = html;
+    // Цифры в топах набегают, вокруг MVP — конфетти, когда корона уже упала
+    countUp(container);
+    var mvpCard = container.querySelector('.mvp-reveal');
+    if (mvpCard) setTimeout(function () { burst(mvpCard, { count: 22, spread: 220, lift: 60 }); }, 900);
 
     // ═══════ LISTENERS ═══════
     var btnExitGame = container.querySelector('#btn-exit-game');
@@ -241,12 +249,42 @@ function buildTopCard(sortedPlayers, title, field, valueClass) {
         html += '<div class="text-sm font-semibold text-corp-light">' + medal + ' ' + escapeHtml(p.nickname);
         if (isMe) html += ' <span class="text-accent-blue text-xs">(Вы)</span>';
         html += '</div>';
-        html += '<div class="font-mono font-black text-sm ' + valueClass + '">' + (p[field] || 0) + '</div>';
+        html += '<div class="font-mono font-black text-sm ' + valueClass + '" data-countup="' + (p[field] || 0) + '">' + (p[field] || 0) + '</div>';
         html += '</div>';
     }
     html += '</div>';
     html += '</div>';
     return html;
+}
+
+// «Любимец зала» — кто собрал больше всего реакций во время своего выступления
+export function crowdFavoriteHtml(fav, scope) {
+    if (!fav) return '';
+    var chips = '';
+    var entries = Object.keys(fav.byEmotion || {}).filter(function (k) { return k !== 'tomato'; })
+        .map(function (k) { return [k, fav.byEmotion[k]]; })
+        .sort(function (a, b) { return b[1] - a[1]; });
+    for (var i = 0; i < Math.min(entries.length, 4); i++) {
+        chips += '<span class="crowd-meter-chip">' + reactionEmoji(entries[i][0]) + '<b>' + entries[i][1] + '</b></span>';
+    }
+    var html = '';
+    html += '<div class="crowd-fav-card mb-8">';
+    html += '  <div class="crowd-fav-emoji">' + (reactionEmoji(fav.topEmotion) || '🎭') + '</div>';
+    html += '  <div class="flex-1 min-w-0">';
+    html += '    <div class="text-[0.65rem] font-black uppercase tracking-[0.14em] text-corp-muted mb-1">🎭 Любимец зала ' + scope + '</div>';
+    html += '    <div class="text-xl font-black text-corp-white truncate">' + escapeHtml(fav.nickname) + '</div>';
+    html += '    <div class="text-xs text-corp-dim mt-0.5">' + fav.count + ' ' + pluralReactions(fav.count) + ' от зала во время выступления</div>';
+    html += '  </div>';
+    html += '  <div class="flex flex-wrap gap-1.5 justify-end">' + chips + '</div>';
+    html += '</div>';
+    return html;
+}
+
+function pluralReactions(n) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return 'реакция';
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'реакции';
+    return 'реакций';
 }
 
 function isWinnerTarget(targetId, winners) {

@@ -1,4 +1,4 @@
-import { state, setState, navigate, startTimer } from './app.js';
+import { state, setState, navigate, startTimer, escapeHtml } from './app.js';
 import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
 import { updatePlayersList, updateStartButton, updateSettingsPanel, updateRoomHeader } from './screens/lobby.js';
@@ -7,6 +7,9 @@ import { appendChatMsg, renderBunkerChat, removeChatMsgFromDom } from './compone
 import { setPendingReveal } from './screens/bunker-game.js';
 import { resetWelcomeButtons } from './screens/welcome.js';
 import { updateQuestionHandsUI } from './screens/presentation.js';
+import { showStageOverlay } from './components/stage-overlay.js';
+import { showIncomingReaction } from './components/reactions.js';
+import { updateRail } from './components/players-rail.js';
 
 var ws = null;
 var reconnectAttempts = 0;
@@ -194,110 +197,7 @@ function renderRoomsBrowser(rooms) {
     });
 }
 
-// ═══════════════════════════════════════════
-// ЭМОЦИИ
-// ═══════════════════════════════════════════
-
-var EMOTIONS = {
-    laugh:     { emoji: '😂', label: 'Смеётся' },
-    angry:     { emoji: '😡', label: 'Злится' },
-    scared:    { emoji: '😱', label: 'Пугается' },
-    love:      { emoji: '😍', label: 'Восхищается' },
-    think:     { emoji: '🤔', label: 'Думает' },
-    mindblown: { emoji: '🤯', label: 'Голова взрывается' },
-};
-
-function showEmotionBubble(playerId, emotion) {
-    var em = EMOTIONS[emotion];
-    if (!em) return;
-    var card = document.querySelector('[data-player-id="' + playerId + '"]');
-    if (!card) return;
-
-    var existing = card.querySelector('.emotion-bubble');
-    if (existing) existing.remove();
-
-    var bubble = document.createElement('div');
-    bubble.className = 'emotion-bubble';
-    bubble.innerHTML = '<span class="emotion-bubble-emoji">' + em.emoji + '</span><span class="emotion-bubble-label">' + em.label + '</span>';
-    card.style.position = 'relative';
-    card.appendChild(bubble);
-
-    requestAnimationFrame(function () {
-        bubble.classList.add('emotion-bubble-in');
-    });
-
-    var fadeTimer = setTimeout(function () {
-        bubble.classList.add('emotion-bubble-out');
-        setTimeout(function () { if (bubble.parentNode) bubble.remove(); }, 400);
-    }, 3000);
-    bubble._fadeTimer = fadeTimer;
-}
-
-var emotionMenuEl = null;
-
-function closeEmotionMenu() {
-    if (emotionMenuEl) {
-        emotionMenuEl.remove();
-        emotionMenuEl = null;
-    }
-}
-
-function openEmotionMenu(x, y) {
-    closeEmotionMenu();
-    var menu = document.createElement('div');
-    menu.id = 'emotion-menu';
-    menu.className = 'emotion-menu';
-    menu.style.left = x + 'px';
-    menu.style.top = y + 'px';
-
-    var title = document.createElement('div');
-    title.className = 'emotion-menu-title';
-    title.textContent = 'Эмоция';
-    menu.appendChild(title);
-
-    var grid = document.createElement('div');
-    grid.className = 'emotion-menu-grid';
-
-    Object.keys(EMOTIONS).forEach(function (key) {
-        var em = EMOTIONS[key];
-        var btn = document.createElement('button');
-        btn.className = 'emotion-btn';
-        btn.innerHTML = '<span class="emotion-btn-emoji">' + em.emoji + '</span><span class="emotion-btn-label">' + em.label + '</span>';
-        btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            sendMsg({ type: 'playerEmotion', emotion: key });
-            closeEmotionMenu();
-        });
-        grid.appendChild(btn);
-    });
-
-    menu.appendChild(grid);
-    document.body.appendChild(menu);
-    emotionMenuEl = menu;
-
-    // position correction if out of viewport
-    var rect = menu.getBoundingClientRect();
-    if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + 'px';
-    if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + 'px';
-}
-
-document.addEventListener('contextmenu', function (e) {
-    var anchor = e.target.closest('[data-emotion-self="1"]');
-    if (anchor) {
-        e.preventDefault();
-        openEmotionMenu(e.clientX, e.clientY);
-    } else {
-        closeEmotionMenu();
-    }
-});
-
-document.addEventListener('click', function () {
-    closeEmotionMenu();
-});
-
-document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeEmotionMenu();
-});
+// Реакции зала — components/reactions.js; колонка участников — components/players-rail.js
 
 function handleMessage(msg) {
     console.log('[MSG]', msg.type);
@@ -341,7 +241,13 @@ function handleMessage(msg) {
             break;
 
         case 'gameStarted':
-            showNotification('Игра начинается!', 'success');
+            // Новая партия: состав от сервера, порядок выступлений прошлой партии больше не действует
+            setState({ players: msg.players || state.players, presentationOrder: [], readyIds: [], votedIds: [] });
+            showStageOverlay({
+                logo: true,
+                title: 'ПОЕХАЛИ<span class="stage-accent">!</span>',
+                subtitle: 'Раунд 1 из ' + (msg.totalRounds || state.totalRounds) + ' · сейчас раздадим карты',
+            });
             playSound('start');
             break;
 
@@ -375,17 +281,23 @@ function handleMessage(msg) {
 
         case 'investmentAccepted':
             setState({ investmentConfirmed: true, lastInvestmentTotal: msg.total || 0 });
-            // Перерисовываем только если мы на экране инвестирования
+            // Перерисовываем только если мы на экране инвестирования.
+            // navigate() останавливает таймер — продолжаем его с того же места.
             if (state.phase === 'investing') {
+                var invLeft = state.timerRemaining;
                 navigate('investing');
+                if (invLeft > 0) startTimer(invLeft);
             }
-            showNotification('Инвестиции приняты! Вложено: ' + msg.total, 'success');
-            playSound('success');
+            if (!msg.restored) {
+                showNotification('Инвестиции приняты! Вложено: ' + msg.total, 'success');
+                playSound('success');
+            }
             break;
 
         case 'investmentProgress':
             var prog = document.querySelector('#invest-progress');
             if (prog) prog.textContent = 'Подтвердили: ' + msg.voted + ' / ' + msg.total;
+            if (msg.votedIds) { setState({ votedIds: msg.votedIds }); updateRail(); }
             break;
 
         case 'roundResults':
@@ -394,9 +306,6 @@ function handleMessage(msg) {
 
         case 'roundResultsTied':
             handleTied(msg);
-            break;
-
-        case 'tiebreakerStart':
             break;
 
         case 'tiebreakerPresentation':
@@ -408,8 +317,16 @@ function handleMessage(msg) {
             break;
 
         case 'tieInvestmentAccepted':
-            showNotification('Голос принят!', 'success');
-            playSound('success');
+            setState({ tieVoted: true });
+            if (state.phase === 'tiebreaker_voting') {
+                var tvLeft = state.timerRemaining;
+                navigate('tiebreaker_voting');
+                if (tvLeft > 0) startTimer(tvLeft);
+            }
+            if (!msg.restored) {
+                showNotification('Голос принят!', 'success');
+                playSound('success');
+            }
             break;
 
         case 'tieVoteProgress':
@@ -427,6 +344,7 @@ function handleMessage(msg) {
                     + 'Готовы: <span class="text-accent-blue font-black">' + msg.ready + '</span> / ' + msg.total
                     + '</div>';
             }
+            if (msg.readyIds) { setState({ readyIds: msg.readyIds }); updateRail(); }
             break;
 
         case 'tiebreakerStart':
@@ -492,8 +410,18 @@ function handleMessage(msg) {
             navigate('welcome');
             break;
 
+        case 'roomSettings':
+            // Приходит при возвращении в игру: настройки, кто хост, порядок выступлений
+            var rsUpdate = {};
+            if (msg.settings) rsUpdate.settings = msg.settings;
+            if (msg.hostId) rsUpdate.isHost = msg.hostId === state.playerId;
+            if (msg.presentationOrder && msg.presentationOrder.length) rsUpdate.presentationOrder = msg.presentationOrder;
+            setState(rsUpdate);
+            break;
+
         case 'spectatorsUpdate':
             setState({ spectators: msg.spectators || [] });
+            updateRail();
             break;
 
         case 'hostObserving':
@@ -507,7 +435,14 @@ function handleMessage(msg) {
             showNotification(msg.hostId === state.playerId
                 ? '👑 Ведущий ушёл — теперь управляете игрой вы'
                 : '👑 Новый ведущий: ' + msg.nickname, 'info');
-            refreshCurrentScreen();
+            // Перерисовываем любой экран партии: у нового хоста должны появиться кнопки
+            // «Дальше», «Следующий раунд», «Играть ещё» — где бы партия ни находилась
+            if (state.phase !== 'welcome' && state.phase !== 'lobby') {
+                var hcLeft = state.timerRemaining;
+                navigate(state.phase);
+                if (hcLeft > 0) startTimer(hcLeft);
+            }
+            if (msg.hostId === state.playerId) playSound('success');
             break;
 
         case 'chatBroadcast':
@@ -519,7 +454,7 @@ function handleMessage(msg) {
             break;
 
         case 'playerEmotion':
-            showEmotionBubble(msg.playerId, msg.emotion);
+            showIncomingReaction(msg);
             break;
 
         case 'kicked':
@@ -589,20 +524,14 @@ function handleMessage(msg) {
             playSound('success');
             break;
 
-        case 'readyProgress':
-            var readyEl = document.querySelector('#ready-progress');
-            if (readyEl) {
-                if (msg.ready > 0) {
-                    readyEl.innerHTML = '<div class="inline-flex items-center gap-2">'
-                        + '<span class="text-accent-blue">✓</span> '
-                        + 'Готовы: <span class="text-accent-blue font-black">' + msg.ready + '</span> / ' + msg.total
-                        + '</div>';
-                }
-            }
-
         // ═══════ БУНКЕР ═══════
 
         case 'bunkerStart':
+            showStageOverlay({
+                logo: true,
+                title: 'В БУНКЕР<span class="stage-accent">!</span>',
+                subtitle: 'Места хватит не всем',
+            });
             handleBunkerStart(msg);
             break;
 
@@ -718,6 +647,14 @@ function handleLobbyUpdate(msg) {
 }
 
 function handleRoundStart(msg) {
+    // Заставка только при настоящем переходе между раундами, не при переподключении
+    if (state.phase === 'results' && msg.round > 1) {
+        showStageOverlay({
+            title: 'РАУНД <span class="stage-accent">' + msg.round + '</span>',
+            subtitle: (msg.round === msg.totalRounds ? 'Последний раунд' : 'из ' + msg.totalRounds) + ' · новые карты',
+            duration: 1400,
+        });
+    }
     var capital = state.myCapital;
     for (var i = 0; i < msg.players.length; i++) {
         if (msg.players[i].id === state.playerId) {
@@ -734,7 +671,10 @@ function handleRoundStart(msg) {
         myCapital: capital,
         presentationOrder: msg.presentationOrder,
         pitchText: '',
-        investmentConfirmed: false
+        investmentConfirmed: false,
+        readyIds: msg.readyIds || [],
+        // Состав партии — от сервера: без ведущего-наблюдателя, с актуальным капиталом
+        players: msg.players || state.players,
     });
 
     navigate('preparation');
@@ -742,6 +682,16 @@ function handleRoundStart(msg) {
 }
 
 function handlePresentation(msg) {
+    if (msg.blackSwan && msg.blackSwan.cardKey) {
+        showStageOverlay({
+            tone: 'danger',
+            emoji: '🦢',
+            title: 'ЧЁРНЫЙ ЛЕБЕДЬ',
+            subtitle: escapeHtml(msg.blackSwan.label || 'Карта') + ' меняется прямо сейчас',
+            duration: 1400,
+        });
+        playSound('warning');
+    }
     setState({
         currentPresenter: msg.currentPresenter,
         presenterIndex: msg.presenterIndex,
@@ -753,6 +703,10 @@ function handlePresentation(msg) {
         blackSwan: msg.blackSwan || null,
         presentationStage: 'pitch',
         questionHands: [],
+        // При переподключении сервер присылает уже накопленный счёт зала
+        crowdTally: msg.crowdTally || null,
+        players: msg.players || state.players,
+        presentationOrder: msg.presentationOrder || state.presentationOrder,
         questionsTime: msg.questionsTime !== undefined ? msg.questionsTime : state.questionsTime,
     });
 
@@ -807,6 +761,7 @@ function handleInvesting(msg) {
         players: msg.players,
         investmentConfirmed: false,
         lastInvestmentTotal: 0,
+        votedIds: [],
         currentRound: msg.round || state.currentRound,
         totalRounds: msg.totalRounds || state.totalRounds
     });
@@ -831,6 +786,7 @@ function handleRoundResults(msg) {
         investmentDetails: msg.investmentDetails,
         luckyInvestors: msg.luckyInvestors,
         roundBestInvestor: msg.roundBestInvestor || null,
+        roundCrowdFavorite: msg.crowdFavorite || null,
         isLastRound: msg.isLastRound,
         currentRound: msg.round
     });
@@ -840,14 +796,18 @@ function handleRoundResults(msg) {
 }
 
 function handleTied(msg) {
-    setState({
+    var upd = {
         tiedPlayers: msg.tiedPlayers,
         investmentDetails: msg.investmentDetails,
-        players: msg.players
-    });
+        players: msg.players,
+        tbReadySent: !!msg.youAreReady,
+    };
+    // После перезагрузки своих карт в памяти нет — сервер присылает их вместе с ничьей
+    if (msg.yourCards) upd.myCards = msg.yourCards;
+    setState(upd);
 
     navigate('tied');
-    playSound('warning');
+    if (!msg.restored) playSound('warning');
 }
 
 function handleTiebreakerPresentation(msg) {
@@ -864,18 +824,20 @@ function handleTiebreakerPresentation(msg) {
 function handleTiebreakerVoting(msg) {
     setState({
         tiedPlayers: msg.tiedPlayers,
-        players: msg.players
+        players: msg.players,
+        tieVoted: false, // при переподключении сервер следом пришлёт tieInvestmentAccepted
     });
 
     navigate('tiebreaker_voting');
-    playSound('invest');
+    if (!msg.restored) playSound('invest');
 }
 
 function handleGameOver(msg) {
     setState({
         players: msg.players,
         bestInvestor: msg.bestInvestor,
-        bestEntrepreneur: msg.bestEntrepreneur
+        bestEntrepreneur: msg.bestEntrepreneur,
+        gameCrowdFavorite: msg.crowdFavorite || null,
     });
 
     navigate('gameOver');

@@ -1,6 +1,8 @@
 import { sendMsg } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { navigate } from '../app.js';
+import { logoSvg } from '../components/logo.js';
+import { playSound } from '../components/sound.js';
 
 var startupInterval = null;
 
@@ -8,12 +10,11 @@ export function renderWelcome(container) {
     var html = '';
     html += '<div class="flex flex-col items-center justify-center min-h-screen px-6 py-12">';
 
-    // Logo. Появление и парение — на разных элементах: обе анимации задают
-    // свойство animation, и на одном элементе парение перебивало появление,
-    // из-за чего ракета навсегда оставалась прозрачной.
-    html += '<div class="hero-reveal-1 mb-5">';
+    // Логотип. Появление и парение — на разных элементах: обе анимации задают
+    // свойство animation, и на одном элементе парение перебивало бы появление.
+    html += '<div class="hero-reveal-1 mb-4">';
     html += '<div class="animate-float">';
-    html += '<div class="hero-rocket text-7xl md:text-8xl select-none" style="filter: drop-shadow(0 0 40px rgba(255,199,44,0.35)) drop-shadow(0 0 80px rgba(255,199,44,0.12));">🚀</div>';
+    html += '<div id="hero-logo" class="hero-logo select-none" title="Впарь!">' + logoSvg({ size: 190, animated: true }) + '</div>';
     html += '</div>';
     html += '</div>';
 
@@ -66,7 +67,7 @@ export function renderWelcome(container) {
 
     // Create
     html += '<button id="btn-create" class="btn-neon-solid w-full py-4 rounded-2xl text-sm font-black tracking-wider uppercase cursor-pointer">';
-    html += '🚀 Создать комнату';
+    html += '📣 Создать комнату';
     html += '</button>';
 
     // Solo
@@ -145,6 +146,17 @@ export function renderWelcome(container) {
     container.innerHTML = html;
 
     // ═══════ LISTENERS ═══════
+    // Пасхалка: по клику мегафон «кричит» ещё раз
+    var heroLogo = container.querySelector('#hero-logo');
+    if (heroLogo) heroLogo.addEventListener('click', function () {
+        var svg = heroLogo.querySelector('svg');
+        if (!svg) return;
+        svg.classList.remove('vp-logo-shout');
+        void svg.getBoundingClientRect(); // перезапуск анимации
+        svg.classList.add('vp-logo-shout');
+        playSound('invest');
+    });
+
     var btnCreate = container.querySelector('#btn-create');
     var btnJoin = container.querySelector('#btn-join');
     var btnSolo = container.querySelector('#btn-solo');
@@ -312,7 +324,7 @@ function buildRulesContent() {
 
     // Intro
     html += '<div>';
-    html += '<h3 class="text-lg font-black text-accent-blue mb-3">🚀 Что это за игра?</h3>';
+    html += '<h3 class="text-lg font-black text-accent-blue mb-3">📣 Что это за игра?</h3>';
     html += '<p class="text-sm text-corp-light leading-relaxed">';
     html += 'Добро пожаловать в мир <span class="text-accent-gold font-bold">агрессивного маркетинга</span>! ';
     html += 'Каждый игрок получает набор случайных карт и должен собрать из них «инновационный продукт», ';
@@ -798,7 +810,7 @@ function doCreateRoom(container) {
         input.focus();
         return;
     }
-    setButtonPending(container.querySelector('#btn-create'), '🚀 Создаём...');
+    setButtonPending(container.querySelector('#btn-create'), '📣 Создаём...');
     sendMsg({ type: 'createRoom', nickname: nickname, settings: {} });
 }
 

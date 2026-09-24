@@ -1,5 +1,6 @@
 import { state, escapeHtml, observerHudHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
+import { buildCrowdMeterHtml } from '../components/reactions.js';
 
 // ═══════════════════════════════════════════
 // Конфиг типов карт — легко расширяется
@@ -51,7 +52,11 @@ export function renderPresentation(container) {
     for (var pt = 0; pt < CARD_TYPES.length; pt++) {
         var ptype = CARD_TYPES[pt];
         if (pres.cards[ptype.key]) {
-            presCards.push({ label: ptype.label, value: pres.cards[ptype.key], gradient: ptype.gradient, shadow: ptype.shadow });
+            presCards.push({
+                label: ptype.label, value: pres.cards[ptype.key], gradient: ptype.gradient, shadow: ptype.shadow,
+                // Карта, которую только что подменил «Чёрный лебедь», вздрагивает
+                hit: !inQuestions && !!(state.blackSwan && state.blackSwan.cardKey === ptype.key),
+            });
         }
     }
 
@@ -130,9 +135,13 @@ export function renderPresentation(container) {
 
     // Presenter name
     html += '  <div class="text-xs text-corp-muted font-bold uppercase tracking-[0.15em] mb-2">' + (inQuestions ? 'Вопросы к' : 'Сейчас выступает') + '</div>';
-    html += '  <h2 class="font-display text-4xl md:text-5xl font-black text-accent-gold mb-6" style="text-shadow: 0 0 40px rgba(255,215,0,0.15);">';
+    // Выход на сцену — только для нового выступающего, не при переходе к вопросам
+    html += '  <h2 class="font-display text-4xl md:text-5xl font-black text-accent-gold mb-6' + (inQuestions ? '' : ' presenter-pop') + '" style="text-shadow: 0 0 40px rgba(255,215,0,0.15);">';
     html += escapeHtml(pres.nickname);
     html += '  </h2>';
+
+    // Живой счётчик реакций зала этому выступающему
+    html += buildCrowdMeterHtml(state.crowdTally);
 
     // "It's you!" badge
     if (isMe && !anonymized) {
@@ -317,7 +326,7 @@ function buildHandsHtml(hands) {
     if (!hands || hands.length === 0) {
         return '<div class="text-sm text-corp-muted">✋ Пока никто не поднял руку</div>';
     }
-    var html = '<div class="text-xs font-black text-accent-brand uppercase tracking-widest mb-3">✋ Есть вопрос: ' + hands.length + '</div>';
+    var html = '<div class="text-xs font-black text-accent-brand uppercase tracking-widest mb-3"><span class="hand-wave">✋</span> Есть вопрос: ' + hands.length + '</div>';
     html += '<div class="flex flex-wrap justify-center gap-2">';
     for (var i = 0; i < hands.length; i++) {
         html += '<span class="px-3 py-1.5 rounded-xl text-sm font-bold bg-accent-gold-dim border border-accent-gold/25 text-corp-light">';
@@ -407,7 +416,7 @@ function renderCardGrid(cards, mode) {
 
         html += '<div class="game-card-container ' + sizeClass + '">';
         html += '  <div class="animate-card-deal" style="animation-delay: ' + delay + '; animation-fill-mode: backwards;">';
-        html += '    <div class="relative ' + heightClass + ' rounded-3xl overflow-hidden ' + card.gradient + ' shadow-2xl ' + card.shadow + ' transition-transform duration-300 hover:scale-[1.03] hover:-translate-y-1">';
+        html += '    <div class="relative ' + heightClass + ' rounded-3xl overflow-hidden ' + card.gradient + ' shadow-2xl ' + card.shadow + ' transition-transform duration-300 hover:scale-[1.03] hover:-translate-y-1' + (card.hit ? ' card-swan-hit' : '') + '">';
 
         // Badge bar
         html += '      <div class="absolute top-0 left-0 right-0 h-12 bg-black/25 flex items-center px-5">';

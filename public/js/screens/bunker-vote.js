@@ -380,7 +380,7 @@ export function renderBunkerTieVote(container) {
     html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen">';
 
     html += '<div class="text-center mb-6">';
-    html += '  <h2 class="text-xl font-black text-accent-red mb-2">⚔️ Ничья! Переголосование</h2>';
+    html += '  <h2 class="text-xl font-black text-accent-red mb-2"><span class="clash-shake">⚔️ Ничья! Переголосование</span></h2>';
     html += '  <p class="text-xs text-corp-muted">Выберите одного из кандидатов</p>';
     html += '</div>';
 

@@ -2,11 +2,15 @@ import { state, escapeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { renderBunkerChat } from '../components/bunker-chat.js';
+import { logoSvg } from '../components/logo.js';
+import { buildReactionBarHtml, bindReactionButtons } from '../components/reactions.js';
 
 var MAX_PLAYERS_MIN = 3;
 var MAX_PLAYERS_MAX = 18;
 var SETTINGS_TAB = 'params';
 var IS_CODE_HIDDEN = false;
+var seenPlayers = { room: null, ids: {} };
+var codeAnimatedFor = null;
 
 // Вкладки: 'params' | 'modes' | 'bunker'
 
@@ -47,6 +51,11 @@ export function updatePlayersList(container) {
     var countEl = container.querySelector('#players-count');
     if (countEl) countEl.textContent = countPlayingSeats() + (hostObserves ? ' + ведущий' : '');
 
+    // Кого уже показывали — новенькие въезжают с подсветкой
+    if (seenPlayers.room !== state.roomCode) seenPlayers = { room: state.roomCode, ids: {} };
+    var seen = seenPlayers.ids;
+    var nextSeen = {};
+
     var html = '';
     var seat = 0;
     for (var i = 0; i < players.length; i++) {
@@ -59,8 +68,10 @@ export function updatePlayersList(container) {
         var hue1 = i * 45 + 120;
         var hue2 = i * 45 + 160;
         var hue3 = i * 45 + 140;
+        var isNew = !seen[p.id];
+        nextSeen[p.id] = true;
 
-        html += '<div class="corp-card px-5 py-4 flex items-center gap-4 emotion-anchor';
+        html += '<div class="corp-card px-5 py-4 flex items-center gap-4 emotion-anchor' + (isNew ? ' player-row-enter' : '');
         if (observing) html += ' border-accent-gold/25';
         else if (isMe) html += ' border-accent-blue/20';
         html += '" data-player-id="' + p.id + '"' + (isMe ? ' data-emotion-self="1"' : '') + '>';
@@ -114,6 +125,7 @@ export function updatePlayersList(container) {
     }
 
     list.innerHTML = html;
+    seenPlayers.ids = nextSeen;
 
     var kickBtns = container.querySelectorAll('.kick-player-btn');
     for (var kb = 0; kb < kickBtns.length; kb++) {
@@ -142,7 +154,7 @@ export function updateStartButton(container) {
     if (isHost && canStart) {
         var isBunker = state.settings && state.settings.bunkerMode;
         var btnText = isBunker ? 'Начать выживание' : 'Начать питчинг';
-        var btnEmoji = isBunker ? '🏠' : '🚀';
+        var btnEmoji = isBunker ? '🏠' : '📣';
         html = '<button id="btn-start" class="btn-neon-solid w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">' + btnEmoji + ' ' + btnText + '</button>';
     } else if (isHost) {
         html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
@@ -420,10 +432,13 @@ export function renderLobby(container) {
     html += '<div class="max-w-6xl mx-auto px-4 py-8 min-h-screen">';
 
     // Back
-    html += '<button id="btn-back" class="flex items-center gap-2 text-corp-muted hover:text-accent-red text-sm font-bold mb-6 transition-colors group cursor-pointer">';
+    html += '<div class="flex items-center justify-between mb-6">';
+    html += '<button id="btn-back" class="flex items-center gap-2 text-corp-muted hover:text-accent-red text-sm font-bold transition-colors group cursor-pointer">';
     html += '<span class="group-hover:-translate-x-1 transition-transform">←</span>';
     html += '<span>Выйти</span>';
     html += '</button>';
+    html += '<div class="flex items-center gap-2 select-none opacity-90">' + logoSvg({ size: 44 }) + '<span class="font-display font-black text-sm tracking-wide text-corp-white">ВПАРИТЬ</span></div>';
+    html += '</div>';
 
     html += '<div class="flex flex-col lg:flex-row gap-8">';
 
@@ -438,6 +453,13 @@ export function renderLobby(container) {
     html += '<span class="font-mono text-4xl md:text-5xl font-black text-accent-blue tracking-[0.2em]" style="text-shadow: 0 0 20px rgba(0,180,255,0.3);">';
     if (IS_CODE_HIDDEN && state.isHost) {
         html += '•••••';
+    } else if (codeAnimatedFor !== state.roomCode) {
+        // Первый показ кода — буквы выпадают по одной, как на табло
+        var codeStr = state.roomCode || '';
+        for (var ci = 0; ci < codeStr.length; ci++) {
+            html += '<span class="code-char" style="animation-delay:' + (0.15 + ci * 0.08).toFixed(2) + 's">' + escapeHtml(codeStr[ci]) + '</span>';
+        }
+        codeAnimatedFor = state.roomCode;
     } else {
         html += escapeHtml(state.roomCode || '');
     }
@@ -454,6 +476,12 @@ export function renderLobby(container) {
     html += '<div>';
     html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Участники · <span id="players-count">' + (state.players || []).length + '</span></div>';
     html += '<div class="space-y-2" id="players-list"></div>';
+    html += '</div>';
+
+    // Реакции — пока ждём старта, можно пошуметь
+    html += '<div class="rail-panel rail-react lobby-react">';
+    html += '  <div class="rail-head"><span>Реакции</span><span class="rail-hint">клавиши 1–8</span></div>';
+    html += buildReactionBarHtml();
     html += '</div>';
 
     // Start area
@@ -477,6 +505,7 @@ export function renderLobby(container) {
     container.innerHTML = html;
 
     // Fill dynamic parts
+    bindReactionButtons(container);
     updatePlayersList(container);
     updateStartButton(container);
     if (isHost) updateSettingsPanel(container);

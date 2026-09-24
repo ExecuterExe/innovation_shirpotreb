@@ -27,7 +27,7 @@ export function renderTied(container) {
 
     // Header
     html += '<div class="text-center mb-6">';
-    html += '<h2 class="font-display text-4xl font-black text-accent-red mb-3" style="text-shadow: 0 0 30px rgba(255,59,59,0.3);">⚔️ НИЧЬЯ!</h2>';
+    html += '<h2 class="font-display text-4xl font-black text-accent-red mb-3" style="text-shadow: 0 0 30px rgba(255,59,59,0.3);"><span class="clash-shake">⚔️ НИЧЬЯ!</span></h2>';
     html += '<p class="text-sm text-corp-muted mb-2">Несколько игроков набрали одинаковое количество инвестиций</p>';
     html += '<p class="text-xs text-corp-muted">Подготовьтесь к дополнительным выступлениям</p>';
     html += '</div>';
@@ -104,16 +104,17 @@ export function renderTied(container) {
             html += '</div>';
         }
 
-        // Кнопка отправить
+        // Кнопка отправить (если уже отправлено — например, после перезагрузки — сразу в состоянии «готово»)
+        var tbSent = !!state.tbReadySent;
         html += '<div class="mt-4 flex items-center justify-between">';
         html += '<div id="tb-send-status" class="text-xs text-corp-muted"></div>';
-        html += '<button id="btn-tb-ready" class="btn-neon-solid px-8 py-3 rounded-xl text-sm font-black uppercase tracking-wider cursor-pointer">';
-        html += '✓ Отправить и подтвердить готовность';
+        html += '<button id="btn-tb-ready" class="btn-neon-solid px-8 py-3 rounded-xl text-sm font-black uppercase tracking-wider cursor-pointer' + (tbSent ? ' opacity-50' : '') + '"' + (tbSent ? ' disabled' : '') + '>';
+        html += tbSent ? '✓ Отправлено!' : '✓ Отправить и подтвердить готовность';
         html += '</button>';
         html += '</div>';
 
         // Confirmed banner
-        html += '<div id="tb-confirmed" class="hidden mt-4 text-center py-3 rounded-xl bg-accent-green-dim border border-accent-green/20">';
+        html += '<div id="tb-confirmed" class="' + (tbSent ? '' : 'hidden ') + 'mt-4 text-center py-3 rounded-xl bg-accent-green-dim border border-accent-green/20">';
         html += '<span class="text-accent-green text-sm font-bold">✓ Питч отправлен! Ожидание соперника...</span>';
         html += '</div>';
 
@@ -153,6 +154,7 @@ export function renderTied(container) {
 
             // Отправляем текст + готовность одним сообщением
             sendMsg({ type: 'tiebreakerReady', text: text });
+            state.tbReadySent = true;
 
             // UI
             btnReady.textContent = '✓ Отправлено!';
@@ -269,7 +271,8 @@ export function renderTiebreaker(container) {
 
 export function renderTiebreakerVoting(container) {
     var tied = state.tiedPlayers || [];
-    var isSpectator = !!state.isSpectator;
+    // Уже проголосовавший (в том числе до перезагрузки страницы) голосует как зритель
+    var isSpectator = !!state.isSpectator || !!state.tieVoted;
 
     var html = '';
     html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen relative">';
@@ -279,7 +282,11 @@ export function renderTiebreakerVoting(container) {
     html += '<h2 class="text-xl font-black text-corp-white mb-1">🗳 Переголосование</h2>';
     html += '<p class="text-xs text-corp-muted">' + (isSpectator ? 'Игроки выбирают, чей продукт лучше' : 'Выберите, чей продукт лучше (нажмите на карточку)') + '</p>';
     html += '</div>';
-    if (isSpectator) html += observerNoticeHtml('Голосуют только игроки. Результат появится, когда все проголосуют или выйдет время.');
+    if (state.tieVoted && !state.isSpectator) {
+        html += '<div class="corp-card border-accent-green/25 bg-accent-green-dim px-6 py-4 mb-6 text-center text-accent-green font-bold">✓ Ваш голос принят — ждём остальных</div>';
+    } else if (isSpectator) {
+        html += observerNoticeHtml('Голосуют только игроки. Результат появится, когда все проголосуют или выйдет время.');
+    }
 
     // Timer
     html += '<div class="text-center mb-6">';

@@ -3,6 +3,7 @@ import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { CARD_TYPES } from './presentation.js';
+import { coinBurst } from '../components/fx.js';
 
 export function renderInvesting(container) {
     var presentations = (state.presentations || []).filter(function (p) { return p.id !== state.playerId; });
@@ -275,11 +276,18 @@ export function renderInvesting(container) {
         if (value > maxForThis) value = maxForThis;
         if (value < 0) value = 0;
 
+        var changed = investments[targetId] !== value;
         investments[targetId] = value;
 
         // Update display
         var displays = container.querySelectorAll('.invest-display[data-target="' + targetId + '"]');
-        for (var d = 0; d < displays.length; d++) displays[d].textContent = value;
+        for (var d = 0; d < displays.length; d++) {
+            displays[d].textContent = value;
+            if (changed) bump(displays[d]);
+            // Проект, в который уже вложились, подсвечивается
+            var projectCard = displays[d].closest('.corp-card');
+            if (projectCard) projectCard.classList.toggle('invest-active', value > 0);
+        }
 
         var sliders = container.querySelectorAll('input.invest-slider[data-target="' + targetId + '"]');
         for (var s = 0; s < sliders.length; s++) sliders[s].value = value;
@@ -333,7 +341,11 @@ export function renderInvesting(container) {
                     if (keys[k] !== id) {
                         investments[keys[k]] = 0;
                         var displays = container.querySelectorAll('.invest-display[data-target="' + keys[k] + '"]');
-                        for (var d = 0; d < displays.length; d++) displays[d].textContent = '0';
+                        for (var d = 0; d < displays.length; d++) {
+                            displays[d].textContent = '0';
+                            var otherCard = displays[d].closest('.corp-card');
+                            if (otherCard) otherCard.classList.remove('invest-active');
+                        }
                         var sliders = container.querySelectorAll('input.invest-slider[data-target="' + keys[k] + '"]');
                         for (var s = 0; s < sliders.length; s++) sliders[s].value = 0;
                     }
@@ -376,9 +388,17 @@ export function renderInvesting(container) {
             console.log('[invest] Confirming investments:', investArray);
             sendMsg({ type: 'submitInvestment', investments: investArray });
             playSound('invest');
+            if (total > 0) coinBurst(btnConfirm);
         });
     }
 
+}
+
+// Число коротко «подпрыгивает» — видно, что нажатие сработало
+function bump(el) {
+    el.classList.remove('num-bump');
+    void el.offsetWidth; // перезапуск анимации
+    el.classList.add('num-bump');
 }
 
 // Ведущий без карт и зрители: видят проекты и прогресс, но не вкладывают

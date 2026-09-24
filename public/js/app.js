@@ -12,6 +12,8 @@ import { renderGameOver } from './screens/gameover.js';
 import { renderCardInput } from './screens/card-input.js';
 import { renderTied, renderTiebreaker, renderTiebreakerVoting } from './screens/tiebreaker.js';
 import { initSpeech } from './components/speech.js';
+import { mountRail } from './components/players-rail.js';
+import { syncReactionFab } from './components/reactions.js';
 import { renderBunkerReveal, renderBunkerVoteResult } from './screens/bunker-game.js';
 import { renderBunkerVote, renderBunkerTieVote, renderBunkerGameOver } from './screens/bunker-vote.js';
 import { renderSoloSettings, renderSoloCards } from './screens/solo.js';
@@ -116,6 +118,24 @@ export function navigate(phase) {
     var wrapper = document.createElement('div');
     wrapper.className = 'screen-enter min-h-screen';
 
+    // Экраны партии — в оболочке с колонкой участников слева.
+    // Колонка не участвует в анимации смены экрана: меняется только основная часть.
+    var rail = null;
+    var outer = wrapper;
+    if (GAME_SHELL_PHASES.indexOf(phase) !== -1) {
+        outer = document.createElement('div');
+        outer.className = 'game-shell';
+        rail = document.createElement('aside');
+        rail.className = 'game-rail';
+        rail.id = 'game-rail';
+        wrapper.className = 'game-main screen-enter min-h-screen';
+        outer.appendChild(rail);
+        outer.appendChild(wrapper);
+        // Колонку ставим до экрана: экрану «Бункера» нужно место под памятку (#rail-extra)
+        app.appendChild(outer);
+        mountRail(rail);
+    }
+
     switch (phase) {
         case 'welcome': renderWelcome(wrapper); break;
         case 'lobby': renderLobby(wrapper, true); break;
@@ -138,9 +158,16 @@ export function navigate(phase) {
         default: renderWelcome(wrapper);
     }
 
-    app.appendChild(wrapper);
+    if (!rail) app.appendChild(outer);
+    syncReactionFab();
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+var GAME_SHELL_PHASES = [
+    'cardInput', 'preparation', 'presentation', 'investing', 'results',
+    'tied', 'tiebreaker', 'tiebreaker_voting', 'gameOver',
+    'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver',
+];
 
 // ==================== TIMER ====================
 
@@ -171,6 +198,7 @@ export function stopTimer() {
         clearInterval(state.timerInterval);
         state.timerInterval = null;
     }
+    document.body.classList.remove('timer-critical');
 }
 
 function updateTimerUI() {
@@ -183,6 +211,10 @@ function updateTimerUI() {
 
     var isWarning = remaining <= 15 && remaining > 5;
     var isCritical = remaining <= 5;
+
+    // Последние секунды — края экрана пульсируют красным (только если таймер виден на экране)
+    var timerVisible = document.querySelector('[data-timer-text], [data-timer-bar]');
+    document.body.classList.toggle('timer-critical', !!timerVisible && isCritical && remaining > 0);
 
     var bars = document.querySelectorAll('[data-timer-bar]');
     for (var i = 0; i < bars.length; i++) {

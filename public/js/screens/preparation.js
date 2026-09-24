@@ -49,9 +49,9 @@ export function renderPreparation(container) {
 
     // Event
     if (event) {
-        html += '<div class="corp-card border-accent-blue/30 bg-accent-blue-dim p-5 mb-8">';
+        html += '<div class="corp-card border-accent-blue/30 bg-accent-blue-dim p-5 mb-8 event-flip">';
         html += '  <div class="flex gap-4">';
-        html += '    <span class="text-3xl flex-shrink-0">⚡</span>';
+        html += '    <span class="text-3xl flex-shrink-0 event-zap">⚡</span>';
         html += '    <div>';
         html += '      <div class="text-[0.6rem] font-black text-accent-blue uppercase tracking-widest mb-1">Событие раунда</div>';
         html += '      <div class="text-corp-light leading-relaxed">' + escapeHtml(event) + '</div>';
@@ -153,6 +153,7 @@ export function renderPreparation(container) {
                 sendMsg({ type: 'updatePitchText', text: textarea.value });
             }
             sendMsg({ type: 'playerReady' });
+            btnReady.classList.add('ready-pop');
             btnReady.textContent = '✓ Отправлено!';
             btnReady.disabled = true;
             btnReady.classList.add('opacity-50');

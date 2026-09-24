@@ -1,5 +1,7 @@
 import { state, escapeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
+import { countUp, burst } from '../components/fx.js';
+import { crowdFavoriteHtml } from './results.js';
 
 export function renderGameOver(container) {
     var players = state.players || [];
@@ -13,7 +15,7 @@ export function renderGameOver(container) {
     html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen text-center">';
 
     // Trophy
-    html += '<div class="text-7xl mb-4 animate-float" style="filter: drop-shadow(0 0 30px rgba(255,215,0,0.3));">🏆</div>';
+    html += '<div class="text-7xl mb-4 animate-float" style="filter: drop-shadow(0 0 30px rgba(255,215,0,0.3));"><span id="final-trophy" class="trophy-in">🏆</span></div>';
     html += '<h1 class="font-display text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-accent-gold via-yellow-300 to-accent-gold mb-2">ФИНАЛ</h1>';
     html += '<p class="text-sm text-corp-muted mb-10">Игра завершена! Вот наши победители:</p>';
 
@@ -48,6 +50,8 @@ export function renderGameOver(container) {
 
     html += '</div>'; // end winner cards
 
+    html += '<div class="text-left">' + crowdFavoriteHtml(state.gameCrowdFavorite, 'игры') + '</div>';
+
     // Scoreboard
     html += '<div class="text-left mb-8">';
     html += '<h3 class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-4 text-center">📊 Финальная таблица</h3>';
@@ -72,8 +76,8 @@ export function renderGameOver(container) {
         if (isMe) html += ' <span class="text-accent-blue text-xs">(Вы)</span>';
         html += '</span>';
 
-        html += '<span class="text-center font-mono font-bold text-accent-green text-sm">' + p.capital + '</span>';
-        html += '<span class="text-center font-mono font-bold text-accent-gold text-sm">' + p.attractedInvestments + '</span>';
+        html += '<span class="text-center font-mono font-bold text-accent-green text-sm" data-countup="' + p.capital + '">' + p.capital + '</span>';
+        html += '<span class="text-center font-mono font-bold text-accent-gold text-sm" data-countup="' + p.attractedInvestments + '">' + p.attractedInvestments + '</span>';
         html += '</div>';
     }
     html += '</div>';
@@ -106,6 +110,12 @@ export function renderGameOver(container) {
 
     // Confetti
     launchConfetti();
+    countUp(container, 600);
+    // Когда кубок приземлился — вспышка вокруг него
+    setTimeout(function () {
+        var trophy = container.querySelector('#final-trophy');
+        if (trophy) burst(trophy, { count: 26, spread: 240, lift: 40 });
+    }, 900);
 
     // Listener
     var btnPlayAgain = container.querySelector('#btn-play-again');

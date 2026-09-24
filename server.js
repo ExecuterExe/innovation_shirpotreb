@@ -2619,27 +2619,42 @@ function detachObservingHost(room) {
         playerRooms.set(host.ws, { roomCode: room.code, playerId: host.id, isSpectator: true });
         try { host.ws.send(JSON.stringify({ type: 'hostObserving' })); } catch (e) { /* ignore */ }
     }
+    // Остальные увидят ведущего отдельной строкой в колонке участников
+    broadcastToRoom(room, { type: 'spectatorsUpdate', spectators: getSpectatorsPublicInfo(room) });
 }
 
 // Права хоста — первому игроку на связи (ведущий ушёл и не вернулся)
 function transferHost(room) {
+    // room.players — Map, порядок вставки = порядок входа в комнату.
+    // Сначала ищем того, кто на связи и ещё в игре; потом просто на связи.
+    var oldHostId = room.hostId;
+    var bunkerOut = (room.bunker && room.bunker.eliminatedPlayers) || [];
     var next = null;
     room.players.forEach(function (p) {
-        if (!next && p.connected && !p.eliminated) next = p;
+        if (!next && p.id !== oldHostId && p.connected && !p.eliminated && bunkerOut.indexOf(p.id) === -1) next = p;
     });
-    if (!next) next = room.players.values().next().value;
-    if (!next) return;
+    if (!next) room.players.forEach(function (p) {
+        if (!next && p.id !== oldHostId && p.connected) next = p;
+    });
+    if (!next) return false;
+    var old = room.players.get(oldHostId);
+    if (old) old.isHost = false;
     room.hostId = next.id;
     next.isHost = true;
+    console.log(`[HOST] Права хоста в ${room.code} перешли к "${next.nickname}"`);
     broadcastToRoom(room, {
         type: 'hostChanged',
         hostId: next.id,
         nickname: next.nickname,
         players: getPlayersPublicInfo(room),
     });
+    return true;
 }
 
-const HOST_OBSERVER_TIMEOUT = 60000; // ведущему минута на возврат — дальше без него игра встанет
+// Сколько ждём хоста после обрыва связи, прежде чем передать права следующему.
+// Дольше нельзя: у хоста кнопки «Дальше», и без него партия встаёт.
+const HOST_HANDOFF_MS = 30000;
+const HOST_OBSERVER_TIMEOUT = HOST_HANDOFF_MS;
 
 function handleObservingHostTimeout(room, hostId) {
     var spec = room.spectators && room.spectators.get(hostId);
@@ -2662,7 +2677,90 @@ function sendToSpectators(room, message) {
     });
 }
 
+// ═══════ РЕАКЦИИ ЗАЛА ═══════
+// Любой в комнате (игроки, зрители, ведущий) может реагировать эмодзи.
+// Реакции во время выступления копятся выступающему — из них «Любимец зала».
+// love и angry — от старой версии клиента, в новой панели их нет.
+const REACTIONS = ['laugh', 'fire', 'clap', 'mindblown', 'scared', 'think', 'money', 'tomato', 'love', 'angry'];
+const REACTION_BURST = 6;        // сколько реакций можно выпустить подряд
+const REACTION_REFILL_MS = 450;  // и как быстро копится следующая
+
+// Ведро токенов на каждое соединение: защищает комнату от спама реакциями
+function allowReaction(ws) {
+    var now = Date.now();
+    if (ws._reactTokens === undefined) { ws._reactTokens = REACTION_BURST; ws._reactAt = now; }
+    ws._reactTokens = Math.min(REACTION_BURST, ws._reactTokens + (now - ws._reactAt) / REACTION_REFILL_MS);
+    ws._reactAt = now;
+    if (ws._reactTokens < 1) return false;
+    ws._reactTokens -= 1;
+    return true;
+}
+
+// Очки зала: все реакции, кроме помидоров
+function crowdScore(tally) {
+    return tally ? tally.total - (tally.byEmotion.tomato || 0) : 0;
+}
+
+function topEmotion(byEmotion) {
+    var best = null;
+    Object.keys(byEmotion || {}).forEach(function (em) {
+        if (em === 'tomato') return;
+        if (!best || byEmotion[em] > byEmotion[best]) best = em;
+    });
+    return best;
+}
+
+function pickCrowdFavorite(room, tallies) {
+    var best = null;
+    Object.keys(tallies || {}).forEach(function (id) {
+        var score = crowdScore(tallies[id]);
+        if (score > 0 && (!best || score > best.score)) best = { id: id, score: score, tally: tallies[id] };
+    });
+    if (!best) return null;
+    var p = room.players.get(best.id);
+    return {
+        id: best.id,
+        nickname: p ? getDisplayNickname(room, best.id) : '???',
+        count: best.score,
+        topEmotion: topEmotion(best.tally.byEmotion),
+        byEmotion: best.tally.byEmotion,
+    };
+}
+
+function addTally(tallies, playerId, emotion, amount) {
+    var t = tallies[playerId] || (tallies[playerId] = { total: 0, byEmotion: {} });
+    t.total += amount || 1;
+    t.byEmotion[emotion] = (t.byEmotion[emotion] || 0) + (amount || 1);
+    return t;
+}
+
+function getPresentationOrderPublic(room) {
+    return (room.presentationOrder || []).map(function (id) {
+        return { id: id, nickname: getDisplayNickname(room, id) };
+    });
+}
+
+function getReadyIds(room) {
+    var ids = [];
+    room.players.forEach(function (p) { if (p.isReady) ids.push(p.id); });
+    return ids;
+}
+
+// Сообщения этапов, которые нужно уметь повторить игроку после перезагрузки страницы
+const PHASE_MESSAGES_BY_STATE = {
+    investing: 'investingPhase',
+    roundResults: 'roundResults',
+    tiebreaker_prep: 'roundResultsTied',
+    tiebreaker: 'tiebreakerPresentation',
+    tiebreaker_voting: 'tiebreakerVoting',
+    gameOver: 'gameOver',
+    cardInput: 'cardInputPhase',
+    bunkerGameOver: 'bunkerGameOver',
+};
+const REMEMBERED_PHASE_TYPES = Object.keys(PHASE_MESSAGES_BY_STATE).map(function (k) { return PHASE_MESSAGES_BY_STATE[k]; });
+
 function broadcastToRoom(room, message) {
+    if (REMEMBERED_PHASE_TYPES.indexOf(message.type) !== -1) room.lastPhaseMsg = message;
     const msg = JSON.stringify(message);
     room.players.forEach(player => {
         if (player.ws && player.ws.readyState === WebSocket.OPEN && player.connected) {
@@ -2808,6 +2906,7 @@ function handlePlayerTimeout(room, playerId) {
 
     console.log(`[TIMEOUT] "${player.nickname}" не вернулся — выбывает`);
     player.eliminated = true;
+    if (room.hostId === playerId) transferHost(room);
 
     // В «Бункере» отвалившегося нужно именно вывести из партии: пока он не попал
     // в bunker.eliminatedPlayers, он остаётся «живым» в сетке участников,
@@ -2907,6 +3006,15 @@ function handlePlayerTimeout(room, playerId) {
 function sendCurrentStateToPlayer(room, player, ws) {
     var roomState = room.state;
 
+    // После перезагрузки страницы клиент не знает настроек комнаты (они приходят в лобби),
+    // кто сейчас хост и порядок выступлений — а от них зависят экраны и кнопки
+    ws.send(JSON.stringify({
+        type: 'roomSettings',
+        settings: room.settings,
+        hostId: room.hostId,
+        presentationOrder: getPresentationOrderPublic(room),
+    }));
+
     if (roomState === 'bunkerReveal' || roomState === 'bunkerVote' || roomState === 'bunkerTieVote') {
         // Восстанавливаем значения раскрытых карт из данных на сервере
         var revealedCardValues = {};
@@ -2965,7 +3073,9 @@ function sendCurrentStateToPlayer(room, player, ws) {
             yourCards: player.cards,
             event: room.currentEvent,
             players: getPlayersPublicInfo(room),
-            presentationOrder: room.presentationOrder || [],
+            presentationOrder: getPresentationOrderPublic(room),
+            readyIds: getReadyIds(room),
+            streamerMode: room.settings.streamerMode,
         }));
     } else if (roomState === 'presentation') {
         var presId = room.presentationOrder[room.currentPresenterIndex];
@@ -2974,7 +3084,7 @@ function sendCurrentStateToPlayer(room, player, ws) {
             type: 'presentationPhase',
             currentPresenter: presPlayer ? {
                 id: presPlayer.id,
-                nickname: presPlayer.nickname,
+                nickname: getDisplayNickname(room, presPlayer.id),
                 cards: presPlayer.cards,
                 pitchText: presPlayer.pitchText,
             } : null,
@@ -2986,6 +3096,9 @@ function sendCurrentStateToPlayer(room, player, ws) {
             totalRounds: room.totalRounds,
             stage: 'pitch',
             questionsTime: room.settings.questionsTime || 0,
+            players: getPlayersPublicInfo(room),
+            presentationOrder: getPresentationOrderPublic(room),
+            crowdTally: presPlayer && room.crowdTally ? room.crowdTally[presPlayer.id] || null : null,
         }));
         if (room.presentationStage === 'questions' && presPlayer) {
             var qTime = room.settings.questionsTime;
@@ -3000,11 +3113,45 @@ function sendCurrentStateToPlayer(room, player, ws) {
                 remaining: qRemaining,
             }));
         }
+    } else if (PHASE_MESSAGES_BY_STATE[roomState] && room.lastPhaseMsg
+               && room.lastPhaseMsg.type === PHASE_MESSAGES_BY_STATE[roomState]) {
+        // Инвестиции, итоги, ничья, финал и т.д. — повторяем последнее сообщение этапа
+        // и добавляем личное: уже вложился ли, свои карты при ничьей
+        var again = Object.assign({}, room.lastPhaseMsg, { restored: true });
+        if (roomState === 'tiebreaker_prep') again.yourCards = player.cards || {};
+        if (roomState === 'tiebreaker_prep' && player.tbReady) again.youAreReady = true;
+        ws.send(JSON.stringify(again));
+
+        if (roomState === 'investing') {
+            var mine = room.investments.get(player.id);
+            if (mine && room.players.has(player.id)) {
+                var sum = 0;
+                mine.forEach(function (inv) { sum += inv.amount || 0; });
+                ws.send(JSON.stringify({ type: 'investmentAccepted', total: sum, restored: true }));
+            }
+            ws.send(JSON.stringify({
+                type: 'investmentProgress',
+                voted: room.investments.size,
+                total: room.players.size,
+                votedIds: Array.from(room.investments.keys()),
+            }));
+        }
+        if (roomState === 'tiebreaker_voting' && room.tieInvestments.has(player.id)) {
+            ws.send(JSON.stringify({ type: 'tieInvestmentAccepted', restored: true }));
+        }
     } else {
         ws.send(JSON.stringify({
             type: 'reconnectSuccess',
             roomState: roomState,
         }));
+    }
+
+    // Сколько осталось на таймере этапа. Скрытую страховку «вопросов без таймера» не показываем.
+    var hiddenSafety = roomState === 'presentation' && room.presentationStage === 'questions'
+        && !(room.settings.questionsTime > 0);
+    if (room.timer && room.timerEnd && !hiddenSafety) {
+        var left = Math.ceil((room.timerEnd - Date.now()) / 1000);
+        if (left > 0) ws.send(JSON.stringify({ type: 'timerStart', duration: left, endsAt: room.timerEnd }));
     }
 }
 
@@ -3020,6 +3167,7 @@ function checkAllReady(room) {
         type: 'readyProgress',
         ready: readyCount,
         total: totalCount,
+        readyIds: getReadyIds(room),
     });
 
     if (readyCount >= totalCount) {
@@ -3036,6 +3184,7 @@ function checkAllInvested(room) {
         type: 'investmentProgress',
         voted: room.investments.size,
         total: activeCount,
+        votedIds: Array.from(room.investments.keys()),
     });
 
     if (room.investments.size >= activeCount) {
@@ -3079,6 +3228,7 @@ function checkAllTieVoted(room) {
 
 function startGame(room) {
     room.currentRound = 0;
+    room.crowdGame = {};
     room.totalRounds = room.settings.rounds;
     room.roundHistory = [];
     room.players.forEach(p => {
@@ -3100,6 +3250,7 @@ function startNewRound(room) {
     room.currentRound++;
     room.state = 'preparation';
     room.investments.clear();
+    room.crowdTally = {};
     room.tiedPlayers = [];
     room.tieInvestments.clear();
 
@@ -3222,6 +3373,8 @@ function showCurrentPresenter(room) {
         totalRounds: room.totalRounds,
         streamerMode: room.settings.streamerMode,
         blackSwan: blackSwanResult,
+        players: getPlayersPublicInfo(room),
+        presentationOrder: getPresentationOrderPublic(room),
         stage: 'pitch',
         questionsTime: room.settings.questionsTime || 0,
     });
@@ -3673,6 +3826,14 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
 
     const isLastRound = room.currentRound >= room.totalRounds;
 
+    // Любимец зала раунда + копилка за всю игру
+    const roundCrowdFavorite = pickCrowdFavorite(room, room.crowdTally);
+    if (!room.crowdGame) room.crowdGame = {};
+    Object.keys(room.crowdTally || {}).forEach(function (id) {
+        var t = room.crowdTally[id];
+        Object.keys(t.byEmotion).forEach(function (em) { addTally(room.crowdGame, id, em, t.byEmotion[em]); });
+    });
+
     broadcastToRoom(room, {
         type: 'roundResults',
         phase: 'roundResults',
@@ -3688,6 +3849,7 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
         })),
         luckyInvestors,
         roundBestInvestor,
+        crowdFavorite: roundCrowdFavorite,
         players: getPlayersPublicInfo(room),
         isLastRound,
     });
@@ -3732,6 +3894,7 @@ function showFinalResults(room) {
         players,
         bestInvestor: bestInvestor ? { nickname: bestInvestor.nickname, capital: bestInvestor.capital } : null,
         bestEntrepreneur: bestEntrepreneur ? { nickname: bestEntrepreneur.nickname, attracted: bestEntrepreneur.attractedInvestments } : null,
+        crowdFavorite: pickCrowdFavorite(room, room.crowdGame),
         roundHistory: room.roundHistory,
     });
 
@@ -4286,8 +4449,13 @@ wss.on('connection', (ws) => {
                     destroyRoom(lvRoom, 'empty');
                 } else {
                     if (lvRoom.hostId === lvInfo.playerId) {
-                        var lvFirst = lvRoom.players.values().next().value;
-                        if (lvFirst) { lvRoom.hostId = lvFirst.id; lvFirst.isHost = true; }
+                        if (lvRoom.state === 'lobby') {
+                            // В лобби новый хост узнает о правах из lobbyUpdate ниже
+                            var lvFirst = lvRoom.players.values().next().value;
+                            if (lvFirst) { lvRoom.hostId = lvFirst.id; lvFirst.isHost = true; }
+                        } else {
+                            transferHost(lvRoom);
+                        }
                     }
                     broadcastToRoom(lvRoom, { type: 'playerLeft', playerId: lvInfo.playerId, nickname: lvNick, players: getPlayersPublicInfo(lvRoom) });
                     if (lvRoom.state === 'lobby') {
@@ -4465,12 +4633,33 @@ wss.on('connection', (ws) => {
                 const info = playerRooms.get(ws);
                 if (!info) return;
                 const room = rooms.get(info.roomCode);
-                const player = room && room.players.get(info.playerId);
-                if (!room || !player) return;
-                const VALID_EMOTIONS = ['laugh','angry','scared','love','think','mindblown'];
+                if (!room) return;
+                const sender = info.isSpectator
+                    ? (room.spectators && room.spectators.get(info.playerId))
+                    : room.players.get(info.playerId);
+                if (!sender) return;
                 const em = String(msg.emotion || '');
-                if (!VALID_EMOTIONS.includes(em)) return;
-                broadcastToRoom(room, { type: 'playerEmotion', playerId: info.playerId, nickname: player.nickname, emotion: em });
+                if (!REACTIONS.includes(em)) return;
+                if (!allowReaction(ws)) return;
+                touchRoom(room);
+
+                const out = {
+                    type: 'playerEmotion',
+                    playerId: info.playerId,
+                    nickname: info.isSpectator ? sender.nickname : getDisplayNickname(room, info.playerId),
+                    emotion: em,
+                    spectator: !!info.isSpectator,
+                };
+                // Во время выступления реакция засчитывается выступающему (себе — не считается)
+                if (room.state === 'presentation') {
+                    const presenterId = room.presentationOrder[room.currentPresenterIndex];
+                    if (presenterId && presenterId !== info.playerId) {
+                        if (!room.crowdTally) room.crowdTally = {};
+                        out.presenterId = presenterId;
+                        out.tally = addTally(room.crowdTally, presenterId, em);
+                    }
+                }
+                broadcastToRoom(room, out);
                 break;
             }
 
@@ -4605,6 +4794,7 @@ wss.on('connection', (ws) => {
                     type: 'readyProgress',
                     ready: readyCount,
                     total: totalCount,
+                    readyIds: getReadyIds(room),
                 });
 
                 console.log(`[READY] ${player.nickname} ready (${readyCount}/${totalCount}) in ${room.code}`);
@@ -4788,6 +4978,7 @@ wss.on('connection', (ws) => {
                         type: 'investmentProgress',
                         voted: room.investments.size,
                         total: room.players.size,
+                        votedIds: Array.from(room.investments.keys()),
                     });
 
                     if (room.investments.size >= room.players.size) {
@@ -4842,6 +5033,7 @@ wss.on('connection', (ws) => {
                     type: 'investmentProgress',
                     voted: room.investments.size,
                     total: room.players.size,
+                    votedIds: Array.from(room.investments.keys()),
                 });
                 // Если все проголосовали — автоматически переходим
                 if (room.investments.size >= room.players.size) {
@@ -5149,6 +5341,16 @@ wss.on('connection', (ws) => {
                         }, RECONNECT_TIMEOUT);
 
                         disconnectTimers.set(info.playerId, timerId);
+
+                        if (room.hostId === info.playerId) {
+                            setTimeout(function () {
+                                var r = rooms.get(info.roomCode);
+                                if (!r || r.hostId !== info.playerId) return;
+                                var h = r.players.get(info.playerId);
+                                if (h && h.connected) return; // вернулся
+                                transferHost(r);
+                            }, HOST_HANDOFF_MS);
+                        }
                         // Счётчик живых игроков в списке комнат изменился — обновляем его сразу,
                         // а не только когда кто-то дойдёт до конца партии.
                         broadcastRoomsList();
