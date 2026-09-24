@@ -1,4 +1,4 @@
-import { state, escapeHtml } from '../app.js';
+import { state, escapeHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
@@ -269,6 +269,7 @@ export function renderTiebreaker(container) {
 
 export function renderTiebreakerVoting(container) {
     var tied = state.tiedPlayers || [];
+    var isSpectator = !!state.isSpectator;
 
     var html = '';
     html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen relative">';
@@ -276,8 +277,9 @@ export function renderTiebreakerVoting(container) {
 
     html += '<div class="text-center mb-6">';
     html += '<h2 class="text-xl font-black text-corp-white mb-1">🗳 Переголосование</h2>';
-    html += '<p class="text-xs text-corp-muted">Выберите, чей продукт лучше (нажмите на карточку)</p>';
+    html += '<p class="text-xs text-corp-muted">' + (isSpectator ? 'Игроки выбирают, чей продукт лучше' : 'Выберите, чей продукт лучше (нажмите на карточку)') + '</p>';
     html += '</div>';
+    if (isSpectator) html += observerNoticeHtml('Голосуют только игроки. Результат появится, когда все проголосуют или выйдет время.');
 
     // Timer
     html += '<div class="text-center mb-6">';
@@ -292,12 +294,13 @@ export function renderTiebreakerVoting(container) {
     for (var i = 0; i < tied.length; i++) {
         var p = tied[i];
         var isSelf = p.id === state.playerId;
+        var canVote = !isSelf && !isSpectator;
 
         html += '<div class="corp-card p-5';
         if (isSelf) html += ' opacity-30';
-        else html += ' cursor-pointer hover:border-accent-blue/40 transition-colors';
+        else if (canVote) html += ' cursor-pointer hover:border-accent-blue/40 transition-colors';
         html += '" data-vote-id="' + p.id + '"';
-        if (!isSelf) html += ' data-voteable';
+        if (canVote) html += ' data-voteable';
         html += '>';
 
         html += '<div class="flex items-center justify-between gap-4 mb-3">';
@@ -309,7 +312,7 @@ export function renderTiebreakerVoting(container) {
         html += '</div>';
 
         // Vote indicator
-        if (!isSelf) {
+        if (canVote) {
             html += '<div class="vote-indicator w-9 h-9 rounded-full border-2 border-corp-border flex items-center justify-center text-sm font-bold transition-all flex-shrink-0" data-vote-target="' + p.id + '"></div>';
         }
 
@@ -339,9 +342,11 @@ export function renderTiebreakerVoting(container) {
     html += '</div>';
 
     // Submit
-    html += '<button id="btn-submit-tie-vote" class="btn-neon-solid w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">';
-    html += '✓ ПОДТВЕРДИТЬ ГОЛОС';
-    html += '</button>';
+    if (!isSpectator) {
+        html += '<button id="btn-submit-tie-vote" class="btn-neon-solid w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">';
+        html += '✓ ПОДТВЕРДИТЬ ГОЛОС';
+        html += '</button>';
+    }
 
     html += '</div>';
     container.innerHTML = html;

@@ -1,4 +1,4 @@
-import { state, escapeHtml } from '../app.js';
+import { state, escapeHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 
@@ -100,6 +100,19 @@ export function renderCardInput(container) {
     html += '<div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
     html += '</div>';
     html += '</div>';
+
+    if (state.isSpectator) {
+        // Ведущий без карт и зрители карты не придумывают — только следят за прогрессом
+        html += '<div class="w-full max-w-md">' + observerNoticeHtml('Игроки придумывают карты — потом их перемешают и раздадут случайным участникам.') + '</div>';
+        html += '<div id="card-input-progress" class="text-sm font-semibold text-corp-muted"></div>';
+        html += '</div>';
+        container.innerHTML = html;
+        var btnExitObs = container.querySelector('#btn-exit-game');
+        if (btnExitObs) btnExitObs.addEventListener('click', function () {
+            if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+        });
+        return;
+    }
 
     // Disclaimer
     html += '<div class="corp-card border-accent-gold/20 bg-accent-gold-dim px-5 py-3 mb-6 w-full max-w-md">';

@@ -212,6 +212,30 @@ export function escapeHtml(str) {
         .replace(/"/g, '&quot;');
 }
 
+// ==================== НАБЛЮДАТЕЛЬ ====================
+// Ведущий без карт или зритель: смотрит партию, но не играет.
+
+// Плашка в шапке экрана вместо капитала
+export function observerHudHtml() {
+    var host = state.isHost;
+    return '<div class="text-right">'
+        + '<div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Роль</div>'
+        + '<div class="text-base font-black mt-1 ' + (host ? 'text-accent-gold' : 'text-corp-light') + '">' + (host ? '🎙 Ведущий' : '👀 Зритель') + '</div>'
+        + '</div>';
+}
+
+// Пояснение вместо игровых действий: что сейчас делают игроки
+export function observerNoticeHtml(text) {
+    var host = state.isHost;
+    return '<div class="corp-card px-6 py-5 mb-8 flex items-center gap-4' + (host ? ' border-accent-gold/30 bg-accent-gold-dim' : '') + '">'
+        + '<div class="text-3xl flex-shrink-0">' + (host ? '🎙' : '👀') + '</div>'
+        + '<div class="text-left">'
+        + '<div class="text-xs font-black uppercase tracking-widest mb-1 ' + (host ? 'text-accent-gold' : 'text-corp-light') + '">' + (host ? 'Вы ведёте игру' : 'Вы зритель') + '</div>'
+        + '<div class="text-sm text-corp-dim leading-relaxed">' + text + '</div>'
+        + '</div>'
+        + '</div>';
+}
+
 // ==================== INIT ====================
 
 function init() {

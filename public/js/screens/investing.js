@@ -1,4 +1,4 @@
-import { state, escapeHtml } from '../app.js';
+import { state, escapeHtml, observerHudHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
@@ -13,6 +13,11 @@ export function renderInvesting(container) {
     var budget = Math.max(0, Math.min(capital, investmentCap));
     var confirmed = state.investmentConfirmed;
     var alreadyInvested = parseInt(state.lastInvestmentTotal) || 0;
+
+    if (state.isSpectator) {
+        renderInvestingObserver(container, presentations, isHost);
+        return;
+    }
 
     var html = '';
     html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen">';
@@ -374,4 +379,68 @@ export function renderInvesting(container) {
         });
     }
 
+}
+
+// Ведущий без карт и зрители: видят проекты и прогресс, но не вкладывают
+function renderInvestingObserver(container, presentations, isHost) {
+    var html = '';
+    html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen">';
+
+    html += '<div class="corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
+    html += '  <div>';
+    html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
+    html += '    <div class="text-2xl font-black text-corp-white">' + state.currentRound + '<span class="text-corp-muted text-lg">/' + state.totalRounds + '</span></div>';
+    html += '  </div>';
+    html += '  <div class="flex-1 max-w-md mx-6">';
+    html += '    <div class="flex justify-between text-xs font-bold text-corp-muted mb-1.5">';
+    html += '      <span>ИНВЕСТИРОВАНИЕ</span>';
+    html += '      <span data-timer-text class="font-mono text-corp-light"></span>';
+    html += '    </div>';
+    html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
+    html += '  </div>';
+    html += observerHudHtml();
+    html += '  <button id="btn-exit-game" class="px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
+    html += '</div>';
+
+    html += observerNoticeHtml('Игроки распределяют жетоны между проектами. Итоги раунда появятся, когда все подтвердят вложения или выйдет время.');
+
+    html += '<div class="text-center mb-6">';
+    html += '  <div id="invest-progress" class="text-sm font-bold text-accent-blue"></div>';
+    html += '</div>';
+
+    html += '<div class="space-y-3 mb-8">';
+    for (var i = 0; i < presentations.length; i++) {
+        var p = presentations[i];
+        html += '<div class="corp-card px-6 py-5">';
+        html += '  <div class="flex items-center justify-between gap-3 mb-3">';
+        html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
+        if (isHost) {
+            html += '    <button class="kick-player-btn w-8 h-8 rounded-lg border border-accent-red/25 text-accent-red hover:bg-accent-red/10 transition-colors text-sm font-black cursor-pointer" title="Исключить игрока" data-player-id="' + p.id + '" data-player-name="' + escapeHtml(p.nickname) + '">✕</button>';
+        }
+        html += '  </div>';
+        html += '  <div class="flex flex-wrap gap-2">';
+        for (var ct = 0; ct < CARD_TYPES.length; ct++) {
+            var cval = p.cards && p.cards[CARD_TYPES[ct].key];
+            if (cval) html += '<span class="text-xs font-bold px-3 py-1 rounded-lg border border-corp-border bg-corp-black/40 text-corp-light">' + escapeHtml(cval) + '</span>';
+        }
+        html += '  </div>';
+        html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    var btnExitGame = container.querySelector('#btn-exit-game');
+    if (btnExitGame) btnExitGame.addEventListener('click', function () {
+        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    });
+    container.querySelectorAll('.kick-player-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var targetId = btn.getAttribute('data-player-id');
+            if (!targetId) return;
+            if (!window.confirm('Исключить игрока «' + (btn.getAttribute('data-player-name') || 'игрока') + '» из партии?')) return;
+            sendMsg({ type: 'kickPlayer', targetPlayerId: targetId });
+        });
+    });
 }

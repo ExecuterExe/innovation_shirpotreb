@@ -160,6 +160,9 @@ export function setupSurvey(container, mode) {
     var box = container.querySelector('#survey-box');
     if (!box) return;
 
+    // Вопросы про собственные выступления — ведущему без карт и зрителям их не задаём
+    if (state.isSpectator) { box.classList.add('hidden'); return; }
+
     // Один ответ на игру — иначе человек накликает десяток и данные поплывут.
     try {
         if (sessionStorage.getItem('surveyDone') === '1') { box.classList.add('hidden'); return; }

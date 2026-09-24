@@ -1,4 +1,4 @@
-import { state, escapeHtml } from '../app.js';
+import { state, escapeHtml, observerHudHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 
 // ═══════════════════════════════════════════
@@ -82,10 +82,14 @@ export function renderPresentation(container) {
     }
     html += '  </div>';
 
-    html += '  <div class="text-right">';
-    html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Капитал</div>';
-    html += '    <div class="text-2xl font-black text-accent-blue">' + state.myCapital + '</div>';
-    html += '  </div>';
+    if (isSpectator) {
+        html += observerHudHtml();
+    } else {
+        html += '  <div class="text-right">';
+        html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Капитал</div>';
+        html += '    <div class="text-2xl font-black text-accent-blue">' + state.myCapital + '</div>';
+        html += '  </div>';
+    }
     html += '  <button id="btn-exit-game" class="px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
 

@@ -496,6 +496,20 @@ function handleMessage(msg) {
             setState({ spectators: msg.spectators || [] });
             break;
 
+        case 'hostObserving':
+            // Хост только ведёт партию: карт и голосов у него нет, управление остаётся
+            setState({ isHost: true, isSpectator: true });
+            if (!msg.reconnect) showNotification('🎙 Вы ведёте игру — карты получают только игроки', 'info');
+            break;
+
+        case 'hostChanged':
+            setState({ players: msg.players || state.players, isHost: msg.hostId === state.playerId });
+            showNotification(msg.hostId === state.playerId
+                ? '👑 Ведущий ушёл — теперь управляете игрой вы'
+                : '👑 Новый ведущий: ' + msg.nickname, 'info');
+            refreshCurrentScreen();
+            break;
+
         case 'chatBroadcast':
             appendChatMsg(msg.msg);
             break;
@@ -662,14 +676,19 @@ function handleMessage(msg) {
 function handleLobbyUpdate(msg) {
     var wasHost = state.isHost;
     var amIHost = false;
+    var amIPlayer = false;
     for (var i = 0; i < msg.players.length; i++) {
-        if (msg.players[i].id === state.playerId && msg.players[i].isHost) {
-            amIHost = true;
+        if (msg.players[i].id === state.playerId) {
+            amIPlayer = true;
+            amIHost = !!msg.players[i].isHost;
             break;
         }
     }
 
-    setState({ players: msg.players, spectators: msg.spectators || [], settings: msg.settings, isHost: amIHost });
+    // В лобби все снова игроки: и ведущий-наблюдатель, и зрители после «Играть ещё»
+    var updates = { players: msg.players, spectators: msg.spectators || [], settings: msg.settings, isHost: amIHost };
+    if (amIPlayer) updates.isSpectator = false;
+    setState(updates);
 
     // Если статус хоста только что изменился (например, старый хост вышел и права
     // перешли к другому игроку) — нужен полный рендер: у "нового" хоста в DOM ещё

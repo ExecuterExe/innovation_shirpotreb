@@ -1,4 +1,4 @@
-import { state, escapeHtml } from '../app.js';
+import { state, escapeHtml, observerHudHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { renderCardGrid, CARD_TYPES } from './presentation.js';
 
@@ -7,6 +7,7 @@ export function renderPreparation(container) {
     var event = state.currentEvent;
     var order = state.presentationOrder || [];
     var isHost = state.isHost;
+    var isSpectator = !!state.isSpectator;
     var streamer = state.settings.streamerMode;
 
     var cardList = [];
@@ -35,10 +36,14 @@ export function renderPreparation(container) {
     html += '    </div>';
     html += '    <div class="timer-bar"><div data-timer-bar class="timer-bar-fill" style="width:100%"></div></div>';
     html += '  </div>';
-    html += '  <div class="text-right">';
-    html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Капитал</div>';
-    html += '    <div class="text-3xl font-black text-accent-blue">' + state.myCapital + '</div>';
-    html += '  </div>';
+    if (isSpectator) {
+        html += observerHudHtml();
+    } else {
+        html += '  <div class="text-right">';
+        html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Капитал</div>';
+        html += '    <div class="text-3xl font-black text-accent-blue">' + state.myCapital + '</div>';
+        html += '  </div>';
+    }
     html += '  <button id="btn-exit-game" class="px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
 
@@ -55,17 +60,23 @@ export function renderPreparation(container) {
         html += '</div>';
     }
 
-    // Title
-    html += '<div class="text-center mb-4">';
-    html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Ваши карты</h2>';
-    html += '  <p class="text-corp-muted">Придумайте, как объединить эти понятия в один инновационный продукт</p>';
-    html += '</div>';
+    if (isSpectator) {
+        html += observerNoticeHtml(isHost
+            ? 'Игроки получили карты и готовят питчи. Выступления начнутся, когда все будут готовы или выйдет время' + (streamer ? '.' : ' — или раньше, если пропустите подготовку.')
+            : 'Игроки готовят питчи. Карты каждого вы увидите во время выступлений.');
+    } else {
+        // Title
+        html += '<div class="text-center mb-4">';
+        html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Ваши карты</h2>';
+        html += '  <p class="text-corp-muted">Придумайте, как объединить эти понятия в один инновационный продукт</p>';
+        html += '</div>';
 
-    // Cards
-    html += renderCardGrid(cardList, 'preparation');
+        // Cards
+        html += renderCardGrid(cardList, 'preparation');
+    }
 
     // Pitch section (streamer mode)
-    if (streamer) {
+    if (streamer && !isSpectator) {
         html += '<div class="max-w-2xl mx-auto mt-10 corp-card p-6">';
         html += '  <div class="flex items-center justify-between mb-3">';
         html += '    <h4 class="text-sm font-bold text-accent-blue">📝 Напишите текст питча</h4>';

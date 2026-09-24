@@ -1632,7 +1632,7 @@ const GIFTS = [
 ];
 
 const HIDDEN_DEFECTS = [
-    "НЕ ИМЕЕТ СКРЫТОГО ДЕФФЕКТА",
+    "НЕ ИМЕЕТ СКРЫТОГО ДЕФЕКТА",
     "У ЧЕЛОВЕКА УХУДШАЕТСЯ ЗДОРОВЬЕ",
     "РАЗРЯЖАЕТСЯ ПОЛНОСТЬЮ ЗА 1 ЧАС",
     "РЕМОНТ СТОИТ В 3 РАЗА ДОРОЖЕ ПОКУПКИ",
@@ -2482,6 +2482,8 @@ function createRoom(hostId, settings) {
             bunkerActionCards: settings.bunkerActionCards !== false,
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
+            // Хост только ведёт партию: без карт, капитала и голосов
+            hostObserves: !!settings.hostObserves,
             // Комната создаётся закрытой — хост сам решает, когда сделать её видимой в общем списке
             roomPrivate: true,
             roomPassword: '',
@@ -2594,6 +2596,72 @@ function addPlayer(room, playerId, nickname, ws) {
     });
 }
 
+// ═══════ ВЕДУЩИЙ БЕЗ КАРТ ═══════
+// Если хост только ведёт партию, на время игры он переезжает из игроков в зрители.
+// hostId при этом не меняется, поэтому все проверки прав хоста работают как раньше,
+// а игровая логика (раздача, порядок выступлений, инвестиции, итоги) его просто не видит.
+
+// Сколько мест занято именно играющими — ведущий-наблюдатель не в счёт
+function countPlayingSeats(room) {
+    var n = room.players.size;
+    if (room.settings.hostObserves && room.players.has(room.hostId)) n--;
+    return n;
+}
+
+function detachObservingHost(room) {
+    if (!room.settings.hostObserves) return;
+    var host = room.players.get(room.hostId);
+    if (!host) return;
+    room.players.delete(host.id);
+    if (!room.spectators) room.spectators = new Map();
+    room.spectators.set(host.id, { id: host.id, nickname: host.nickname, ws: host.ws, isHost: true });
+    if (host.ws) {
+        playerRooms.set(host.ws, { roomCode: room.code, playerId: host.id, isSpectator: true });
+        try { host.ws.send(JSON.stringify({ type: 'hostObserving' })); } catch (e) { /* ignore */ }
+    }
+}
+
+// Права хоста — первому игроку на связи (ведущий ушёл и не вернулся)
+function transferHost(room) {
+    var next = null;
+    room.players.forEach(function (p) {
+        if (!next && p.connected && !p.eliminated) next = p;
+    });
+    if (!next) next = room.players.values().next().value;
+    if (!next) return;
+    room.hostId = next.id;
+    next.isHost = true;
+    broadcastToRoom(room, {
+        type: 'hostChanged',
+        hostId: next.id,
+        nickname: next.nickname,
+        players: getPlayersPublicInfo(room),
+    });
+}
+
+const HOST_OBSERVER_TIMEOUT = 60000; // ведущему минута на возврат — дальше без него игра встанет
+
+function handleObservingHostTimeout(room, hostId) {
+    var spec = room.spectators && room.spectators.get(hostId);
+    if (!spec || spec.ws) return; // уже вернулся
+    room.spectators.delete(hostId);
+    console.log(`[HOST] Ведущий "${spec.nickname}" не вернулся в ${room.code} — права переходят игроку`);
+    if (room.hostId === hostId) transferHost(room);
+    broadcastToRoom(room, { type: 'spectatorsUpdate', spectators: getSpectatorsPublicInfo(room) });
+}
+
+// Зрители (и ведущий-наблюдатель) тоже должны видеть смену фаз, которые игрокам
+// рассылаются поштучно вместе с картами
+function sendToSpectators(room, message) {
+    if (!room.spectators) return;
+    var msg = JSON.stringify(message);
+    room.spectators.forEach(function (spec) {
+        if (spec.ws && spec.ws.readyState === WebSocket.OPEN) {
+            try { spec.ws.send(msg); } catch (e) { /* ignore */ }
+        }
+    });
+}
+
 function broadcastToRoom(room, message) {
     const msg = JSON.stringify(message);
     room.players.forEach(player => {
@@ -2664,7 +2732,7 @@ function getSpectatorsPublicInfo(room) {
     if (!room.spectators) return [];
     const specs = [];
     room.spectators.forEach(s => {
-        specs.push({ id: s.id, nickname: s.nickname });
+        specs.push({ id: s.id, nickname: s.nickname, isHost: !!s.isHost });
     });
     return specs;
 }
@@ -2703,7 +2771,7 @@ function getLobbyState(room) {
         players: getPlayersPublicInfo(room),
         spectators: getSpectatorsPublicInfo(room),
         settings: room.settings,
-        canStart: room.players.size >= 3,
+        canStart: countPlayingSeats(room) >= 3,
     };
 }
 
@@ -3706,7 +3774,7 @@ function recordFinishedGame(room, mode, payload) {
 // СПИСОК ОТКРЫТЫХ КОМНАТ
 // =====================================================================
 
-const TAG_PRIORITY = ['bunker', 'blackSwan', 'events', 'streamer', 'pseudo', 'absurdGen', 'modifier', 'review', 'audience', 'defects', 'packaging', 'chat', 'questions'];
+const TAG_PRIORITY = ['bunker', 'blackSwan', 'events', 'streamer', 'pseudo', 'absurdGen', 'modifier', 'review', 'audience', 'defects', 'packaging', 'chat', 'questions', 'hostObserves'];
 
 function getPublicRoomInfo(room) {
     var s = room.settings || {};
@@ -3728,6 +3796,7 @@ function getPublicRoomInfo(room) {
     if (s.usePackaging)            tags.push({ key: 'packaging', label: '📦 Упаковка',        tier: 'minor' });
     if (s.bunkerChat)              tags.push({ key: 'chat',      label: '💬 Чат в игре',      tier: 'minor' });
     if (s.questionsTime)           tags.push({ key: 'questions', label: '🙋 Вопросы',         tier: 'minor' });
+    if (s.hostObserves)            tags.push({ key: 'hostObserves', label: '🎙 С ведущим',   tier: 'minor' });
 
     var stateLabel, stateType;
     if (room.state === 'lobby') {
@@ -3744,7 +3813,7 @@ function getPublicRoomInfo(room) {
         stateType = 'active';
     }
 
-    var hostPlayer = room.players.get(room.hostId);
+    var hostPlayer = room.players.get(room.hostId) || (room.spectators && room.spectators.get(room.hostId));
     // Считаем только тех, кто реально на связи: отвалившиеся во время партии висят
     // в room.players до конца окна реконнекта и раздували счётчик в списке комнат.
     var connectedCount = 0;
@@ -4084,8 +4153,15 @@ wss.on('connection', (ws) => {
                     // Может это зритель переподключается?
                     var reconnSpectator = reconnRoom.spectators && reconnRoom.spectators.get(reconnPlayerId);
                     if (reconnSpectator) {
+                        var hostTimerR = disconnectTimers.get(reconnPlayerId);
+                        if (hostTimerR) { clearTimeout(hostTimerR); disconnectTimers.delete(reconnPlayerId); }
                         reconnSpectator.ws = ws;
+                        browserClients.delete(ws);
                         playerRooms.set(ws, { roomCode: reconnCode, playerId: reconnPlayerId, isSpectator: true });
+                        if (reconnSpectator.isHost && reconnRoom.hostId === reconnPlayerId) {
+                            ws.send(JSON.stringify({ type: 'hostObserving', reconnect: true }));
+                            console.log(`[RECONNECT] Ведущий "${reconnSpectator.nickname}" вернулся в ${reconnCode}`);
+                        }
                         sendCurrentStateToPlayer(reconnRoom, { id: reconnPlayerId, cards: {}, actionCards: [] }, ws);
                     } else {
                         ws.send(JSON.stringify({ type: 'reconnectFailed', reason: 'Игрок не найден.' }));
@@ -4130,12 +4206,12 @@ wss.on('connection', (ws) => {
                             attractedInvestments: 0,
                             cards: null,
                             connected: true,
-                            isHost: false,
+                            isHost: specId === paRoom.hostId,
                             pitchText: '',
                             investorCups: 0,
                             entrepreneurMoneybags: 0,
                         });
-                        playerRooms.set(spec.ws, { roomCode: paRoom.code, playerId: specId });
+                        if (spec.ws) playerRooms.set(spec.ws, { roomCode: paRoom.code, playerId: specId });
                     });
                     paRoom.spectators.clear();
                 }
@@ -4185,6 +4261,11 @@ wss.on('connection', (ws) => {
                 if (lvInfo.isSpectator && lvRoom.spectators) {
                     lvRoom.spectators.delete(lvInfo.playerId);
                     playerRooms.delete(ws);
+                    if (lvRoom.hostId === lvInfo.playerId) {
+                        var lvHostTimer = disconnectTimers.get(lvInfo.playerId);
+                        if (lvHostTimer) { clearTimeout(lvHostTimer); disconnectTimers.delete(lvInfo.playerId); }
+                        transferHost(lvRoom);
+                    }
                     broadcastToRoom(lvRoom, { type: 'spectatorsUpdate', spectators: getSpectatorsPublicInfo(lvRoom) });
                     // Клиент вернулся на главную — снова считаем его "браузером" комнат
                     browserClients.add(ws);
@@ -4353,7 +4434,7 @@ wss.on('connection', (ws) => {
                     }
                     return;
                 }
-                if (room.players.size >= (room.settings.maxPlayers || 8)) {
+                if (countPlayingSeats(room) >= (room.settings.maxPlayers || 8)) {
                     var maxP = room.settings.maxPlayers || 8;
                     ws.send(JSON.stringify({ type: 'error', message: 'Комната заполнена (максимум ' + maxP + ' игроков).' }));
                     return;
@@ -4424,6 +4505,7 @@ wss.on('connection', (ws) => {
                 if (s.useSpeech !== undefined) room.settings.useSpeech = !!s.useSpeech;
                 if (s.investTime !== undefined) room.settings.investTime = Math.min(600, Math.max(10, parseInt(s.investTime) || 60));
                 if (s.questionsTime !== undefined) room.settings.questionsTime = normalizeQuestionsTime(s.questionsTime);
+                if (s.hostObserves !== undefined) room.settings.hostObserves = !!s.hostObserves;
                 if (s.pseudoMode !== undefined) room.settings.pseudoMode = !!s.pseudoMode;
                 if (s.modifier !== undefined) {
                     var mod = s.modifier;
@@ -4466,10 +4548,13 @@ wss.on('connection', (ws) => {
                 if (!info) return;
                 const room = rooms.get(info.roomCode);
                 if (!room || room.hostId !== info.playerId || room.state !== 'lobby') return;
-                if (room.players.size < 3) {
-                    ws.send(JSON.stringify({ type: 'error', message: 'Нужно минимум 3 игрока!' }));
+                if (countPlayingSeats(room) < 3) {
+                    ws.send(JSON.stringify({ type: 'error', message: room.settings.hostObserves
+                        ? 'Нужно минимум 3 игрока, не считая ведущего!'
+                        : 'Нужно минимум 3 игрока!' }));
                     return;
                 }
+                detachObservingHost(room);
                 console.log(`[GAME] Starting in room ${room.code} with ${room.players.size} players`);
 
                 room.startedAt = Date.now();
@@ -4998,6 +5083,21 @@ wss.on('connection', (ws) => {
         if (info) {
             const room = rooms.get(info.roomCode);
             if (room) {
+                // Ведущий-наблюдатель: держим место, иначе партия останется без хоста
+                // (например, в «Бункере» с ручным управлением игра встанет).
+                var closedSpec = info.isSpectator && room.spectators && room.spectators.get(info.playerId);
+                if (closedSpec && closedSpec.isHost && room.hostId === info.playerId) {
+                    closedSpec.ws = null;
+                    playerRooms.delete(ws);
+                    console.log(`[-] Ведущий "${closedSpec.nickname}" отключился от ${room.code}`);
+                    var hostTimerId = setTimeout(function () {
+                        disconnectTimers.delete(info.playerId);
+                        var r = rooms.get(info.roomCode);
+                        if (r) handleObservingHostTimeout(r, info.playerId);
+                    }, HOST_OBSERVER_TIMEOUT);
+                    disconnectTimers.set(info.playerId, hostTimerId);
+                    return;
+                }
                 // Если это зритель — удаляем и уведомляем
                 if (info.isSpectator && room.spectators) {
                     room.spectators.delete(info.playerId);
@@ -5716,6 +5816,26 @@ function startBunkerGame(room) {
             chatHistory: room.bunkerChat || [],
             chatEnabled: !!(room.settings && room.settings.bunkerChat),
         });
+    });
+    sendToSpectators(room, {
+        type: 'bunkerStart',
+        globalProblem: problem,
+        yourCards: {},
+        yourActionCards: [],
+        revealOrder: revealOrder.map(id => ({
+            id: id,
+            nickname: room.players.get(id) ? room.players.get(id).nickname : '???',
+        })),
+        revealedCards: revealedCards,
+        currentTurnIndex: 0,
+        currentRound: 1,
+        survivorsCount: survivorsCount,
+        totalPlayers: totalPlayers,
+        eliminatedPlayers: [],
+        players: getPlayersPublicInfo(room),
+        hostMode: !!room.settings.bunkerHostMode,
+        chatHistory: room.bunkerChat || [],
+        chatEnabled: !!(room.settings && room.settings.bunkerChat),
     });
 
     // Системное сообщение старта
@@ -6700,6 +6820,20 @@ function sendRoundStartToAll(room) {
             prepTime: room.settings.prepTime,
             streamerMode: room.settings.streamerMode,
         });
+    });
+    sendToSpectators(room, {
+        type: 'roundStart',
+        round: room.currentRound,
+        totalRounds: room.totalRounds,
+        yourCards: {},
+        event: room.currentEvent,
+        phase: 'preparation',
+        players: getPlayersPublicInfo(room),
+        presentationOrder: room.presentationOrder.map(id => {
+            return { id, nickname: getDisplayNickname(room, id) };
+        }),
+        prepTime: room.settings.prepTime,
+        streamerMode: room.settings.streamerMode,
     });
 }
 

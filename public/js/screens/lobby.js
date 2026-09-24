@@ -10,6 +10,18 @@ var IS_CODE_HIDDEN = false;
 
 // Вкладки: 'params' | 'modes' | 'bunker'
 
+// Сколько человек реально играет: ведущий без карт место не занимает
+function countPlayingSeats() {
+    var players = state.players || [];
+    var n = players.length;
+    if (state.settings && state.settings.hostObserves) {
+        for (var i = 0; i < players.length; i++) {
+            if (players[i].isHost) { n--; break; }
+        }
+    }
+    return n;
+}
+
 // ═══════════════════════════════════════════
 // Экспортируемые функции для частичного обновления
 // (вызываются из socket.js при lobbyUpdate)
@@ -30,26 +42,39 @@ export function updatePlayersList(container) {
     var list = container.querySelector('#players-list');
     if (!list) return;
     var players = state.players || [];
+    var hostObserves = !!(state.settings && state.settings.hostObserves);
 
     var countEl = container.querySelector('#players-count');
-    if (countEl) countEl.textContent = players.length;
+    if (countEl) countEl.textContent = countPlayingSeats() + (hostObserves ? ' + ведущий' : '');
 
     var html = '';
+    var seat = 0;
     for (var i = 0; i < players.length; i++) {
         var p = players[i];
         var isMe = p.id === state.playerId;
         var canKick = state.isHost && !isMe && !p.isHost;
+        // Ведущий без карт — не занимает игровое место и не получает номер
+        var observing = hostObserves && p.isHost;
+        if (!observing) seat++;
         var hue1 = i * 45 + 120;
         var hue2 = i * 45 + 160;
         var hue3 = i * 45 + 140;
 
         html += '<div class="corp-card px-5 py-4 flex items-center gap-4 emotion-anchor';
-        if (isMe) html += ' border-accent-blue/20';
+        if (observing) html += ' border-accent-gold/25';
+        else if (isMe) html += ' border-accent-blue/20';
         html += '" data-player-id="' + p.id + '"' + (isMe ? ' data-emotion-self="1"' : '') + '>';
-        html += '<div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black" style="background: linear-gradient(135deg, hsl(' + hue1 + ',40%,20%), hsl(' + hue2 + ',40%,15%)); color: hsl(' + hue3 + ',60%,65%);">';
-        html += (i + 1);
+        if (observing) {
+            html += '<div class="w-9 h-9 rounded-full flex items-center justify-center text-base" style="background:rgba(255,199,44,0.12);border:1px solid rgba(255,199,44,0.3)">🎙</div>';
+        } else {
+            html += '<div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black" style="background: linear-gradient(135deg, hsl(' + hue1 + ',40%,20%), hsl(' + hue2 + ',40%,15%)); color: hsl(' + hue3 + ',60%,65%);">';
+            html += seat;
+            html += '</div>';
+        }
+        html += '<div class="flex-1 min-w-0">';
+        html += '<div class="font-bold text-corp-light truncate">' + escapeHtml(p.nickname) + '</div>';
+        if (observing) html += '<div class="text-[0.65rem] text-corp-dim">ведёт игру, без карт</div>';
         html += '</div>';
-        html += '<span class="font-bold text-corp-light flex-1">' + escapeHtml(p.nickname) + '</span>';
         var cups = parseInt(p.investorCups) || 0;
         var bags = parseInt(p.entrepreneurMoneybags) || 0;
         if (cups > 0 || bags > 0) {
@@ -64,7 +89,7 @@ export function updatePlayersList(container) {
         }
         html += '<div class="flex gap-2">';
         if (p.isHost) {
-            html += '<span class="text-[0.65rem] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-accent-gold-dim text-accent-gold border border-accent-gold/20">ХОСТ</span>';
+            html += '<span class="text-[0.65rem] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-accent-gold-dim text-accent-gold border border-accent-gold/20">' + (observing ? 'ВЕДУЩИЙ' : 'ХОСТ') + '</span>';
         }
         if (isMe) {
             html += '<span class="text-[0.65rem] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-accent-blue-dim text-accent-blue border border-accent-blue/20">ВЫ</span>';
@@ -109,7 +134,9 @@ export function updateStartButton(container) {
     if (!area) return;
 
     var isHost = state.isHost;
-    var canStart = (state.players || []).length >= 3;
+    var seats = countPlayingSeats();
+    var canStart = seats >= 3;
+    var needText = seats + ' / 3 минимум' + (state.settings && state.settings.hostObserves ? ' (без ведущего)' : '');
 
     var html = '';
     if (isHost && canStart) {
@@ -118,11 +145,11 @@ export function updateStartButton(container) {
         var btnEmoji = isBunker ? '🏠' : '🚀';
         html = '<button id="btn-start" class="btn-neon-solid w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">' + btnEmoji + ' ' + btnText + '</button>';
     } else if (isHost) {
-        html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + (state.players || []).length + ' / 3 минимум</div></div>';
+        html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
     } else if (canStart) {
         html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание хоста</div><div class="inline-flex items-center gap-1.5"><div class="conn-dot bg-accent-blue w-1.5 h-1.5"></div><span class="text-sm font-bold text-accent-blue">Готово к старту</span></div></div>';
     } else {
-        html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + (state.players || []).length + ' / 3 минимум</div></div>';
+        html = '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
     }
     area.innerHTML = html;
 
@@ -180,6 +207,18 @@ export function updateSettingsPanel(container) {
 
     // ─── ВКЛАДКА: ПАРТИЯ ───
     html += '<div id="settings-pane-params"' + (isParams ? '' : ' class="hidden"') + '>';
+
+    // Ведущий без карт — для преподавателя, тренера, ведущего мероприятия
+    var observesOn = !!s.hostObserves;
+    html += '<label for="set-host-observes" class="flex items-center justify-between gap-4 py-3.5 px-4 rounded-xl cursor-pointer transition-all mb-4" style="background:' + (observesOn ? 'rgba(255,199,44,0.09)' : 'rgba(0,0,0,0.2)') + ';border:1px solid ' + (observesOn ? 'rgba(255,199,44,0.3)' : 'rgba(255,255,255,0.07)') + '">';
+    html += '  <div class="text-2xl flex-shrink-0">🎙</div>';
+    html += '  <div class="flex-1">';
+    html += '    <div class="text-sm font-black ' + (observesOn ? 'text-accent-gold' : 'text-corp-light') + '">Я только веду игру</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5 leading-snug">Вы не получаете карт и не инвестируете — видите все выступления и управляете переходами. Для преподавателя или ведущего.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-host-observes" class="toggle-corp flex-shrink-0"' + (observesOn ? ' checked' : '') + '>';
+    html += '</label>';
+
     html += '<div class="space-y-1">';
     html += buildSetting('👥 Макс. игроков',       'maxPlayers', 'set-max-players', MAX_PLAYERS_MIN, MAX_PLAYERS_MAX, s.maxPlayers || 8, 1);
     html += buildSetting('🔁 Количество раундов',  'rounds',     'set-rounds',      1, 7,   s.rounds || 3, 1);
@@ -197,7 +236,7 @@ export function updateSettingsPanel(container) {
     if ([0, -1, 30, 60, 90].indexOf(qt) === -1) qt = 0;
     html += '<div class="mt-3">';
     html += '<div class="text-sm font-bold text-corp-light mb-2 px-1">🙋 Вопросы после питча</div>';
-    html += '<div class="grid grid-cols-5 gap-1.5">';
+    html += '<div class="grid grid-cols-3 sm:grid-cols-5 gap-1.5">';
     html += buildRadioCard('0',  'questions-radio', qt === 0,  '🚫', 'Выкл',        '', 'muted');
     html += buildRadioCard('-1', 'questions-radio', qt === -1, '♾️', 'Без таймера', '', 'gold');
     html += buildRadioCard('30', 'questions-radio', qt === 30, '⏱', '30 сек',      '', 'gold');
@@ -211,7 +250,7 @@ export function updateSettingsPanel(container) {
     html += '<div class="space-y-2">';
     html += '<div>';
     html += '<div class="flex gap-2 items-stretch">';
-    html += '<input type="text" id="set-room-name" class="input-corp text-sm flex-1" placeholder="✏️ Название комнаты (необязательно)..." maxlength="40" autocomplete="off" value="' + escapeHtml(s.roomName || '') + '">';
+    html += '<input type="text" id="set-room-name" class="input-corp text-sm flex-1 min-w-0" placeholder="✏️ Название комнаты (необязательно)..." maxlength="40" autocomplete="off" value="' + escapeHtml(s.roomName || '') + '">';
     html += '<button id="btn-apply-room-name" class="btn-apply-inline">Применить</button>';
     html += '</div>';
     html += '<div class="text-[0.55rem] text-corp-dim mt-1">Показывается вместо/рядом с кодом — своим и в списке открытых комнат.</div>';
@@ -221,7 +260,7 @@ export function updateSettingsPanel(container) {
         html += '<div class="px-3 py-2 rounded-xl" style="background:rgba(255,180,0,0.06);border:1px solid rgba(255,180,0,0.15)">';
         html += '<div class="text-[0.6rem] font-black text-accent-gold uppercase tracking-wider mb-1.5">🔑 Пароль для входа (необязательно)</div>';
         html += '<div class="flex gap-2 items-stretch">';
-        html += '<input type="text" id="set-room-password" class="input-corp text-sm flex-1" placeholder="Пусто — вход только по коду, без пароля" maxlength="30" autocomplete="off" value="' + escapeHtml(s.roomPassword || '') + '">';
+        html += '<input type="text" id="set-room-password" class="input-corp text-sm flex-1 min-w-0" placeholder="Пусто — вход только по коду, без пароля" maxlength="30" autocomplete="off" value="' + escapeHtml(s.roomPassword || '') + '">';
         html += '<button id="btn-apply-room-password" class="btn-apply-inline">Применить</button>';
         html += '</div>';
         html += '<div class="text-[0.55rem] text-corp-dim mt-1">Комната не отображается в публичном списке. Если пароль задан — игрок должен знать и код, и пароль.</div>';
@@ -241,29 +280,37 @@ export function updateSettingsPanel(container) {
     html += buildRadioCard('players',  'card-source-radio', isPlayers, '🧟', 'Генератор абсурда', 'Карты придумывают игроки', 'gold');
     html += '</div>';
 
-    html += buildSectionDivider('Дополнительные карты');
-    html += '<div class="space-y-0.5">';
-    html += buildToggle('Карточка отзыва',    'Первый отзыв клиента',          'set-reviews',         s.useReviews,         false);
-    html += buildToggle('Целевая аудитория',  'Для кого предназначен продукт', 'set-target-audience', s.useTargetAudience,  false);
-    html += buildToggle('Скрытый дефект',     'Тайный недостаток продукта',    'set-hidden-defects',  s.useHiddenDefects,   false);
-    html += buildToggle('Упаковка',           'Абсурдная упаковка продукта',   'set-packaging',       s.usePackaging,       false);
-    html += '</div>';
+    // Колода: живой пример продукта → быстрые наборы → из чего собрать руку
+    html += buildDeckPreview(s);
 
-    html += buildSectionDivider('Модификатор предмета');
+    html += buildSectionDivider('Быстрый выбор');
+    html += buildDeckPresets(s);
+
+    html += buildSectionDivider('Основа продукта');
+    html += buildDeckBase(s);
+
+    html += buildSectionDivider('Слово к предмету');
     var modNone = !s.modifier || s.modifier === 'none';
     var modAdd  = s.modifier === 'addition';
     var modMeta = s.modifier === 'metaphor';
-    html += '<div class="grid grid-cols-3 gap-2 mb-4">';
-    html += buildRadioCard('none',      'modifier-radio', modNone, '🚫', 'Без мод.',   'Классика',                   'muted');
-    html += buildRadioCard('addition',  'modifier-radio', modAdd,  '📜', 'Дополнение', '+1 слово после предмета',    'green');
-    html += buildRadioCard('metaphor',  'modifier-radio', modMeta, '🌀', 'Метафора',   '+2 слова после предмета',    'green');
+    html += '<div class="grid grid-cols-3 gap-2 mb-1">';
+    html += buildRadioCard('none',      'modifier-radio', modNone, '➖', 'Без слова',  'УТЮГ',                   'muted');
+    html += buildRadioCard('addition',  'modifier-radio', modAdd,  '📜', '+1 слово',   'УТЮГ ЛЮБВИ',             'green');
+    html += buildRadioCard('metaphor',  'modifier-radio', modMeta, '🌀', '+2 слова',   'УТЮГ ВНЕЗАПНОГО УСПЕХА', 'green');
     html += '</div>';
 
-    html += buildSectionDivider('Механики игры');
-    html += '<div class="space-y-0.5">';
-    html += buildToggle('Псевдоинновации', 'Лайт: только прилагательное + предмет',    'set-pseudo',    s.pseudoMode,   false);
-    html += buildToggle('Колода событий',  'Случайные ограничения каждый раунд',       'set-events',    s.useEvents,    false);
-    html += buildToggle('Чёрный лебедь',   '20% шанс замены карты при выступлении',    'set-blackswan', s.blackSwan,    false);
+    html += buildSectionDivider('Дополнительные карты');
+    html += '<div class="grid grid-cols-2 gap-2">';
+    html += buildDeckTile('set-reviews',         '💬', 'Первый отзыв',  '«Пока ждал — успел состариться!»', s.useReviews,        '#f5b731');
+    html += buildDeckTile('set-target-audience', '🎯', 'Аудитория',     'для трудоголиков',                 s.useTargetAudience, '#ec4899');
+    html += buildDeckTile('set-hidden-defects',  '⚠️', 'Скрытый дефект', 'разряжается за 1 час',            s.useHiddenDefects,  '#f97316');
+    html += buildDeckTile('set-packaging',       '📦', 'Упаковка',      'замотано в 5 слоёв изоленты',      s.usePackaging,      '#14b8a6');
+    html += '</div>';
+
+    html += buildSectionDivider('Сюрпризы раунда');
+    html += '<div class="grid grid-cols-2 gap-2">';
+    html += buildDeckTile('set-events',    '🎲', 'События',       'новое условие каждый раунд: «продаём только государству»', s.useEvents, '#00b4ff');
+    html += buildDeckTile('set-blackswan', '🦢', 'Чёрный лебедь', '20% шанс, что карту заменят прямо во время питча',        s.blackSwan, '#a78bfa');
     html += '</div>';
 
     html += buildSectionDivider('Стриминг');
@@ -405,7 +452,7 @@ export function renderLobby(container) {
 
     // Players
     html += '<div>';
-    html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Участник�� · <span id="players-count">' + (state.players || []).length + '</span></div>';
+    html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-3">Участники · <span id="players-count">' + (state.players || []).length + '</span></div>';
     html += '<div class="space-y-2" id="players-list"></div>';
     html += '</div>';
 
@@ -418,7 +465,7 @@ export function renderLobby(container) {
     if (isHost) {
         html += '<div class="lg:w-[520px] space-y-4">';
         html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-1">Приборная панель</div>';
-        html += '<div class="corp-card p-7 space-y-5" id="settings-panel"></div>';
+        html += '<div class="corp-card p-4 sm:p-7 space-y-5" id="settings-panel"></div>';
         html += '</div>';
     }
 
@@ -513,6 +560,179 @@ function buildInfoTile(emoji, title, sub) {
         + '</div>';
 }
 
+// ═══════════════════════════════════════════
+// КОЛОДА
+// ═══════════════════════════════════════════
+
+// Наборы для быстрого выбора. pseudo — без карты особенности.
+var DECK_PRESETS = [
+    { key: 'warmup',  emoji: '🌱', title: 'Разминка', hint: 'для новичков',
+      pseudo: true,  reviews: false, audience: false, defects: false, packaging: false, modifier: 'none',     events: false, blackSwan: false },
+    { key: 'classic', emoji: '⚖️', title: 'Классика', hint: '3 карты',
+      pseudo: false, reviews: false, audience: false, defects: false, packaging: false, modifier: 'none',     events: false, blackSwan: false },
+    { key: 'rich',    emoji: '🎭', title: 'Насыщенно', hint: '+отзыв, ЦА',
+      pseudo: false, reviews: true,  audience: true,  defects: false, packaging: false, modifier: 'addition', events: true,  blackSwan: false },
+    { key: 'chaos',   emoji: '🌀', title: 'Хаос',     hint: 'всё сразу',
+      pseudo: false, reviews: true,  audience: true,  defects: true,  packaging: true,  modifier: 'metaphor', events: true,  blackSwan: true },
+];
+
+function presetMatches(preset, s) {
+    return !!s.pseudoMode === preset.pseudo
+        && !!s.useReviews === preset.reviews
+        && !!s.useTargetAudience === preset.audience
+        && !!s.useHiddenDefects === preset.defects
+        && !!s.usePackaging === preset.packaging
+        && (s.modifier || 'none') === preset.modifier
+        && !!s.useEvents === preset.events
+        && !!s.blackSwan === preset.blackSwan;
+}
+
+function countHandCards(s) {
+    var n = 2; // прилагательное + предмет
+    if (!s.pseudoMode) n++;
+    if (s.modifier && s.modifier !== 'none') n++;
+    if (s.useReviews) n++;
+    if (s.useTargetAudience) n++;
+    if (s.useHiddenDefects) n++;
+    if (s.usePackaging) n++;
+    return n;
+}
+
+// Живой пример: как будет выглядеть продукт с текущими настройками
+function buildDeckPreview(s) {
+    var product = 'ЛЕТАЮЩИЙ УТЮГ';
+    if (s.modifier === 'addition') product += ' ЛЮБВИ';
+    else if (s.modifier === 'metaphor') product += ' ВНЕЗАПНОГО УСПЕХА';
+    if (!s.pseudoMode) product += ', КОТОРЫЙ ОТПУГИВАЕТ КОМАРОВ';
+
+    var extras = [];
+    if (s.useTargetAudience) extras.push('🎯 для трудоголиков');
+    if (s.useHiddenDefects)  extras.push('⚠️ разряжается за 1 час');
+    if (s.usePackaging)      extras.push('📦 в 5 слоях изоленты');
+    if (s.useReviews)        extras.push('💬 «Пока ждал — успел состариться!»');
+
+    var n = countHandCards(s);
+    var html = '';
+    html += '<div class="rounded-2xl p-4 mt-1" style="background:linear-gradient(135deg,rgba(255,199,44,0.09),rgba(0,180,255,0.04));border:1px solid rgba(255,199,44,0.22)">';
+    html += '  <div class="flex items-center justify-between gap-3 mb-2">';
+    html += '    <div class="text-[0.6rem] font-black uppercase tracking-[0.14em] text-accent-gold">Так выглядит продукт игрока</div>';
+    html += '    <div class="text-[0.65rem] font-black text-corp-light whitespace-nowrap">🃏 ' + n + ' ' + pluralCards(n) + '</div>';
+    html += '  </div>';
+    html += '  <div class="text-base font-black text-corp-white leading-snug">' + product + '</div>';
+    if (extras.length) {
+        html += '  <div class="flex flex-wrap gap-1.5 mt-2.5">';
+        for (var i = 0; i < extras.length; i++) {
+            html += '<span class="text-[0.65rem] font-bold px-2 py-1 rounded-lg text-corp-light" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)">' + extras[i] + '</span>';
+        }
+        html += '  </div>';
+    }
+    var surprises = [];
+    if (s.useEvents) surprises.push('🎲 событие раунда');
+    if (s.blackSwan) surprises.push('🦢 чёрный лебедь');
+    if (surprises.length) {
+        html += '  <div class="text-[0.65rem] text-corp-dim mt-2">+ ' + surprises.join(' · ') + '</div>';
+    }
+    if (s.cardSource === 'players') {
+        html += '  <div class="text-[0.65rem] text-accent-gold/80 mt-2">🧟 Слова придумают сами игроки — это просто пример структуры.</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+function pluralCards(n) {
+    var mod10 = n % 10, mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'карта';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'карты';
+    return 'карт';
+}
+
+function buildDeckPresets(s) {
+    var html = '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">';
+    for (var i = 0; i < DECK_PRESETS.length; i++) {
+        var p = DECK_PRESETS[i];
+        var active = presetMatches(p, s);
+        html += '<button type="button" class="deck-preset flex flex-col items-center gap-0.5 py-2.5 px-2 rounded-xl cursor-pointer transition-all" data-preset="' + p.key + '" style="background:' + (active ? 'rgba(255,199,44,0.12)' : 'rgba(0,0,0,0.2)') + ';border:1px solid ' + (active ? 'rgba(255,199,44,0.4)' : 'rgba(255,255,255,0.07)') + '">';
+        html += '  <span class="text-lg leading-none">' + p.emoji + '</span>';
+        html += '  <span class="text-[0.7rem] font-black ' + (active ? 'text-accent-gold' : 'text-corp-light') + '">' + p.title + '</span>';
+        html += '  <span class="text-[0.6rem] text-corp-dim">' + p.hint + '</span>';
+        html += '</button>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// Прилагательное и предмет есть всегда; особенность можно убрать (режим «Псевдоинновации»)
+function buildDeckBase(s) {
+    var featureOn = !s.pseudoMode;
+    var html = '';
+    html += '<div class="rounded-xl p-3.5" style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.07)">';
+    html += '  <div class="flex flex-wrap items-center gap-1.5">';
+    html += '    <span class="text-xs font-black px-2.5 py-1.5 rounded-lg" style="color:#f87171;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25)">🎨 Прилагательное</span>';
+    html += '    <span class="text-corp-muted text-xs font-black">+</span>';
+    html += '    <span class="text-xs font-black px-2.5 py-1.5 rounded-lg" style="color:#22d3ee;background:rgba(34,211,238,0.1);border:1px solid rgba(34,211,238,0.25)">📦 Предмет</span>';
+    html += '    <span class="text-corp-muted text-xs font-black">+</span>';
+    html += '    <label for="set-feature" class="inline-flex items-center gap-1.5 text-xs font-black px-2.5 py-1.5 rounded-lg cursor-pointer transition-all select-none" style="' + (featureOn
+        ? 'color:#c084fc;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35)'
+        : 'color:#6b7a94;background:transparent;border:1px dashed rgba(255,255,255,0.15);text-decoration:line-through') + '">';
+    html += '      <input type="checkbox" id="set-feature" class="deck-toggle" style="position:absolute;opacity:0;width:0;height:0"' + (featureOn ? ' checked' : '') + '>';
+    html += '      ✨ Особенность <span class="text-[0.6rem] font-bold no-underline" style="text-decoration:none">' + (featureOn ? '✓' : 'выкл') + '</span>';
+    html += '    </label>';
+    html += '  </div>';
+    html += '  <div class="text-[0.65rem] text-corp-dim mt-2 leading-snug">' + (featureOn
+        ? 'Нажмите на «Особенность», чтобы убрать её — получится лайт-режим «Псевдоинновации», проще для первой игры.'
+        : '🌱 Режим «Псевдоинновации»: только прилагательное и предмет. Нажмите, чтобы вернуть особенность.') + '</div>';
+    html += '</div>';
+    return html;
+}
+
+// Плитка колоды: вся карточка — переключатель, с примером карты внутри
+function buildDeckTile(inputId, emoji, title, example, checked, color) {
+    var on = !!checked;
+    var html = '';
+    html += '<label for="' + inputId + '" class="relative flex flex-col gap-1 p-3.5 rounded-xl cursor-pointer transition-all select-none" style="background:' + (on ? hexToRgba(color, 0.1) : 'rgba(0,0,0,0.2)') + ';border:1px solid ' + (on ? hexToRgba(color, 0.4) : 'rgba(255,255,255,0.07)') + '">';
+    html += '  <input type="checkbox" id="' + inputId + '" class="deck-toggle" style="position:absolute;opacity:0;width:0;height:0"' + (on ? ' checked' : '') + '>';
+    html += '  <div class="flex items-center justify-between">';
+    html += '    <span class="text-xl leading-none' + (on ? '' : ' opacity-50') + '">' + emoji + '</span>';
+    html += '    <span class="w-5 h-5 rounded-full flex items-center justify-center text-[0.65rem] font-black" style="' + (on
+        ? 'background:' + color + ';color:#15151e'
+        : 'border:1.5px solid rgba(255,255,255,0.18)') + '">' + (on ? '✓' : '') + '</span>';
+    html += '  </div>';
+    html += '  <div class="text-sm font-black mt-1" style="color:' + (on ? color : '#c5cede') + '">' + title + '</div>';
+    html += '  <div class="text-[0.68rem] leading-snug ' + (on ? 'text-corp-light' : 'text-corp-dim') + '">' + example + '</div>';
+    html += '</label>';
+    return html;
+}
+
+function hexToRgba(hex, alpha) {
+    var h = hex.replace('#', '');
+    var r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function applyDeckPreset(container, key) {
+    var preset = null;
+    for (var i = 0; i < DECK_PRESETS.length; i++) if (DECK_PRESETS[i].key === key) preset = DECK_PRESETS[i];
+    if (!preset) return;
+    var set = function (id, value) { var el = container.querySelector('#' + id); if (el) el.checked = value; };
+    // В «Бункере» нужны все карты — лайт-режим там не включаем
+    var bunkerOn = !!(state.settings && state.settings.bunkerMode);
+    set('set-feature', bunkerOn ? true : !preset.pseudo);
+    set('set-reviews', preset.reviews);
+    set('set-target-audience', preset.audience);
+    set('set-hidden-defects', preset.defects);
+    set('set-packaging', preset.packaging);
+    set('set-events', preset.events);
+    set('set-blackswan', preset.blackSwan);
+    var mod = container.querySelector('input[name="modifier"][value="' + preset.modifier + '"]');
+    if (mod) mod.checked = true;
+    // Модификатор и чёрный лебедь не работают с генератором абсурда
+    if (preset.modifier !== 'none' || preset.blackSwan) {
+        var db = container.querySelector('input[name="card-source"][value="database"]');
+        if (db) db.checked = true;
+    }
+    pushSettings(container);
+}
+
 function buildFutureSetting(label, sub) {
     return '<div class="flex items-center justify-between py-2.5 px-3.5 rounded-xl opacity-40 select-none" style="background:rgba(0,0,0,0.15);border:1px dashed rgba(255,255,255,0.08)">'
         + '<div>'
@@ -600,7 +820,7 @@ function attachSettingsListeners(container) {
     }
 
     // Inputs
-    var inputs = container.querySelectorAll('.stepper-input, .toggle-corp');
+    var inputs = container.querySelectorAll('.stepper-input, .toggle-corp, .deck-toggle');
     for (var k = 0; k < inputs.length; k++) {
         (function (inp) {
             inp.addEventListener('change', function () {
@@ -663,6 +883,16 @@ function attachSettingsListeners(container) {
         })(sourceRadios[r]);
     }
 
+    // Быстрые наборы колоды
+    var presetBtns = container.querySelectorAll('.deck-preset');
+    for (var pb = 0; pb < presetBtns.length; pb++) {
+        (function (btn) {
+            btn.addEventListener('click', function () {
+                applyDeckPreset(container, btn.getAttribute('data-preset'));
+            });
+        })(presetBtns[pb]);
+    }
+
     // Вопросы после питча
     var questionRadios = container.querySelectorAll('.questions-radio');
     for (var qr = 0; qr < questionRadios.length; qr++) {
@@ -696,8 +926,8 @@ function attachSettingsListeners(container) {
                 if (dbRadio) dbRadio.checked = true;
 
                 // Отключаем псевдоинновации (нужны все 9 карт)
-                var pseudoToggle = container.querySelector('#set-pseudo');
-                if (pseudoToggle) pseudoToggle.checked = false;
+                var featureToggle = container.querySelector('#set-feature');
+                if (featureToggle) featureToggle.checked = true;
             }
             pushSettings(container);
         });
@@ -765,10 +995,12 @@ function pushSettings(container) {
         presentTime: parseInt(container.querySelector('#set-present')?.value) || 120,
         investTime: parseInt(container.querySelector('#set-invest')?.value) || 60,
         questionsTime: questionsEl ? parseInt(questionsEl.value, 10) : 0,
+        hostObserves: container.querySelector('#set-host-observes')?.checked || false,
         cardSource: cardSourceEl ? cardSourceEl.value : 'database',
         blackSwan: container.querySelector('#set-blackswan')?.checked || false,
         modifier: modifierEl ? modifierEl.value : 'none',
-        pseudoMode: container.querySelector('#set-pseudo')?.checked || false,
+        // Псевдоинновации = карта особенности выключена
+        pseudoMode: container.querySelector('#set-feature') ? !container.querySelector('#set-feature').checked : !!(state.settings && state.settings.pseudoMode),
         bunkerMode: container.querySelector('#set-bunker')?.checked || false,
         bunkerHostMode: container.querySelector('#set-bunker-hostmode')?.checked || false,
         bunkerChat: container.querySelector('#set-bunker-chat') ? container.querySelector('#set-bunker-chat').checked : true,

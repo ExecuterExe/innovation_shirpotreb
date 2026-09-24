@@ -1,4 +1,4 @@
-import { state, escapeHtml } from '../app.js';
+import { state, escapeHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { renderBunkerChat } from '../components/bunker-chat.js';
 import { showNotification } from '../components/notification.js';
@@ -56,7 +56,9 @@ export function renderBunkerVote(container) {
     html += '  <div id="bunker-vote-progress" class="text-sm font-semibold text-corp-muted"></div>';
     html += '</div>';
 
-    if (isEliminated) {
+    if (state.isSpectator) {
+        html += observerNoticeHtml('Голосуют выжившие игроки. ' + (isHost && bunker.hostMode ? 'Завершите голосование, когда все выскажутся.' : 'Результат появится, когда все проголосуют.'));
+    } else if (isEliminated) {
         html += '<div class="corp-card p-6 text-center mb-6">';
         html += '  <span class="text-corp-muted">Вы выбыли и не можете голосовать</span>';
         html += '</div>';
@@ -396,7 +398,9 @@ export function renderBunkerTieVote(container) {
         html += '</div>';
     }
 
-    if (isEliminated) {
+    if (state.isSpectator) {
+        html += observerNoticeHtml('Игроки переголосовывают между кандидатами с равным числом голосов.');
+    } else if (isEliminated) {
         html += '<div class="corp-card p-6 text-center"><span class="text-corp-muted">Вы выбыли</span></div>';
     } else {
         html += '<div class="space-y-3 mb-6">';
