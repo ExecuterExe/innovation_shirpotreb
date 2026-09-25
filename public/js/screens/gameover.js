@@ -2,6 +2,8 @@ import { state, escapeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { countUp, burst } from '../components/fx.js';
 import { crowdFavoriteHtml } from './results.js';
+import { audiencePrizeHtml } from '../components/audience.js';
+import { analyticsTeaserHtml, bindAnalyticsTeaser } from '../components/game-analytics.js';
 
 export function renderGameOver(container) {
     var players = state.players || [];
@@ -50,7 +52,7 @@ export function renderGameOver(container) {
 
     html += '</div>'; // end winner cards
 
-    html += '<div class="text-left">' + crowdFavoriteHtml(state.gameCrowdFavorite, 'игры') + '</div>';
+    html += '<div class="text-left">' + crowdFavoriteHtml(state.gameCrowdFavorite, 'игры') + audiencePrizeHtml(state.audiencePrize) + '</div>';
 
     // Scoreboard
     html += '<div class="text-left mb-8">';
@@ -83,6 +85,9 @@ export function renderGameOver(container) {
     html += '</div>';
     html += '</div>'; // end scoreboard
 
+    // Разбор партии — если ведущий включил его в настройках
+    html += analyticsTeaserHtml(state.gameAnalytics);
+
     // Мини-опрос. Это единственное место, где можно поймать эффект игры
     // по горячим следам — через пять минут человек уже закроет вкладку.
     html += buildSurvey();
@@ -107,6 +112,7 @@ export function renderGameOver(container) {
     container.innerHTML = html;
 
     setupSurvey(container, 'classic');
+    bindAnalyticsTeaser(container, state.gameAnalytics);
 
     // Confetti
     launchConfetti();

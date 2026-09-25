@@ -4,6 +4,7 @@ import { renderBunkerChat } from '../components/bunker-chat.js';
 import { renderBunkerLegend } from '../components/bunker-legend.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
+import { audienceResultHtml } from '../components/audience.js';
 
 // ═══════════════════════════════════════════
 // Конфиг карт для бункера (все 9)
@@ -1198,6 +1199,7 @@ export function renderBunkerVoteResult(container) {
     }
 
     var bunkerFull = result.result === 'eliminated' && result.remainingPlayers && result.survivorsCount && result.remainingPlayers <= result.survivorsCount;
+    html += audienceResultHtml(result.audience);
     html += '<div class="text-sm text-corp-muted animate-pulse">' + (bunkerFull ? 'Двери закрываются — сейчас узнаем, кто выжил…' : 'Переход к следующему раунду...') + '</div>';
 
     html += '</div>';

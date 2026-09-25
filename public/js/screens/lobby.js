@@ -4,6 +4,7 @@ import { showNotification } from '../components/notification.js';
 import { renderBunkerChat } from '../components/bunker-chat.js';
 import { logoSvg } from '../components/logo.js';
 import { buildReactionBarHtml, bindReactionButtons } from '../components/reactions.js';
+import { openInviteModal, viewerCount } from '../components/audience.js';
 
 var MAX_PLAYERS_MIN = 3;
 var MAX_PLAYERS_MAX = 18;
@@ -120,23 +121,17 @@ export function updatePlayersList(container) {
         html += '<div class="flex-1"><div class="font-bold text-corp-muted">Ждём игрока…</div><div class="text-[0.7rem] text-corp-dim">отправьте код или ссылку</div></div></div>';
     }
 
-    // Зрители
-    var spectators = state.spectators || [];
-    if (spectators.length > 0) {
-        html += '<div class="mt-3 pt-3 border-t border-corp-border/30">';
-        html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">👀 Зрители</div>';
-        html += '<div class="flex flex-wrap gap-2">';
-        for (var si = 0; si < spectators.length; si++) {
-            html += '<span class="text-xs px-2 py-1 rounded-lg bg-corp-graphite border border-corp-border text-corp-dim">' + escapeHtml(spectators[si].nickname) + '</span>';
-        }
-        html += '</div>';
-        html += '</div>';
-    }
-
     list.innerHTML = html;
+
+    // Зрительный зал
+    var hall = container.querySelector('#lobby-hall');
+    if (hall) hall.innerHTML = lobbyHallHtml();
+    var seatBox = container.querySelector('#lobby-seat');
+    if (seatBox) seatBox.innerHTML = lobbySeatHtml();
+    bindLobbyHall(container);
     seenPlayers.ids = nextSeen;
 
-    var kickBtns = container.querySelectorAll('.kick-player-btn');
+    var kickBtns = container.querySelectorAll('#players-list .kick-player-btn');
     for (var kb = 0; kb < kickBtns.length; kb++) {
         (function (btn) {
             btn.addEventListener('click', function () {
@@ -153,6 +148,11 @@ export function updatePlayersList(container) {
 export function updateStartButton(container) {
     var area = container.querySelector('#start-button-area');
     if (!area) return;
+    if (state.isSpectator && !state.isHost) {
+        area.innerHTML = buildGameSummary(state.settings || {}) + '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ждём старта</div><div class="text-sm font-bold text-corp-dim">Игру запускает ведущий</div></div>';
+        updateLobbyPreview(container);
+        return;
+    }
 
     var isHost = state.isHost;
     var seats = countPlayingSeats();
@@ -257,6 +257,16 @@ export function updateSettingsPanel(container) {
     html += buildToggle('🎬 Текстовые питчи',        'Питч пишут текстом — для стрима и игры без микрофона', 'set-streamer', s.streamerMode,          false);
     html += buildToggle('🕶 Зашифровать участников', 'Имена → псевдонимы (только с текстовыми питчами)',    'set-anon',     s.anonymizeParticipants, !s.streamerMode);
     html += buildToggle('🔊 Озвучка',                'Браузер зачитывает карты и питчи вслух',              'set-speech',   s.useSpeech,             false);
+    html += '</div>';
+    html += buildSectionDivider('После игры');
+    html += '<div class="space-y-1.5">';
+    html += buildToggle('📊 Разбор партии', 'В финале — графики и цифры: кто кого поддерживал, точность ставок, время питчей, вопросы, реакции, номинации. Можно выгрузить в Excel', 'set-analytics', s.postGameAnalytics, false);
+    html += '</div>';
+    html += buildSectionDivider('Зрительный зал');
+    html += '<div class="twitch-setting">';
+    html += '  <div class="twitch-setting-head"><b>📺 Twitch-чат как зал</b><span>Зрители стрима голосуют цифрами за лучший питч, а смайлы из чата летят реакциями на экран. Ключи и вход не нужны — укажите канал.</span></div>';
+    html += '  <div class="twitch-setting-row"><span class="twitch-prefix">twitch.tv/</span><input type="text" id="set-twitch" class="deck-toggle twitch-input" placeholder="ваш_канал" maxlength="60" autocomplete="off" spellcheck="false" value="' + escapeHtml(s.twitchChannel || '') + '"></div>';
+    html += twitchStatusHtml();
     html += '</div>';
 
     html += buildSectionDivider('Видимость комнаты');
@@ -483,15 +493,22 @@ export function renderLobby(container) {
     html += '<div class="room-actions">';
     html += '<button id="btn-copy" class="room-action-btn">📋 Код</button>';
     html += '<button id="btn-copy-link" class="room-action-btn room-action-main">🔗 Ссылка-приглашение</button>';
+    html += '<button id="btn-qr" class="room-action-btn" title="QR-код для входа с телефона">📱 QR</button>';
     html += '</div>';
     html += '<p class="room-hint">' + (IS_CODE_HIDDEN && state.isHost ? 'Код скрыт — удобно для стрима. Нажмите 👁, чтобы показать.' : 'По ссылке друзья попадут сразу в комнату — останется ввести имя') + '</p>';
     html += '</div>';
+
+    // Зритель: сесть за стол / игрок: только смотреть
+    html += '<div id="lobby-seat"></div>';
 
     // Players
     html += '<div>';
     html += '<div class="flex items-center justify-between mb-3"><div class="text-xs font-bold text-corp-muted uppercase tracking-widest">👥 Участники</div><span id="players-count" class="lobby-count-pill"></span></div>';
     html += '<div class="space-y-2" id="players-list"></div>';
     html += '</div>';
+
+    // Зрительный зал
+    html += '<div id="lobby-hall"></div>';
 
     // Реакции — пока ждём старта, можно пошуметь
     html += '<div class="rail-panel rail-react lobby-react">';
@@ -549,6 +566,12 @@ export function renderLobby(container) {
             renderLobby(container);
         });
     }
+
+    var btnQr = container.querySelector('#btn-qr');
+    if (btnQr) btnQr.addEventListener('click', function () {
+        if (IS_CODE_HIDDEN && state.isHost) { showNotification('Сначала покажите код комнаты', 'info'); return; }
+        openInviteModal('play');
+    });
 
     var btnLink = container.querySelector('#btn-copy-link');
     if (btnLink) {
@@ -700,6 +723,7 @@ function summaryChips(s) {
         if (s.streamerMode) chips.push(['🎬', 'текстом', '']);
     }
     if (s.hostObserves) chips.push(['🎙', 'с ведущим', '']);
+    if (s.postGameAnalytics) chips.push(['📊', 'разбор партии', '']);
     return chips;
 }
 
@@ -1211,6 +1235,8 @@ function pushSettings(container) {
         bunkerMode: container.querySelector('#set-bunker')?.checked || false,
         bunkerHostMode: container.querySelector('#set-bunker-hostmode')?.checked || false,
         bunkerChat: container.querySelector('#set-bunker-chat') ? container.querySelector('#set-bunker-chat').checked : true,
+        postGameAnalytics: container.querySelector('#set-analytics') ? container.querySelector('#set-analytics').checked : !!(state.settings && state.settings.postGameAnalytics),
+        twitchChannel: container.querySelector('#set-twitch') ? container.querySelector('#set-twitch').value : ((state.settings && state.settings.twitchChannel) || ''),
         bunkerActionCards: container.querySelector('#set-bunker-actioncards') ? container.querySelector('#set-bunker-actioncards').checked : true,
         bunkerSurvivors: container.querySelector('input[name="survivors"]:checked') ? parseInt(container.querySelector('input[name="survivors"]:checked').value, 10) : (parseInt(state.settings.bunkerSurvivors, 10) || 0),
         bunkerDraft: container.querySelector('#set-bunker-draft') ? container.querySelector('#set-bunker-draft').checked : (state.settings.bunkerDraft !== false),
@@ -1222,4 +1248,81 @@ function pushSettings(container) {
     };
     console.log('[lobby] Pushing settings:', settings);
     sendMsg({ type: 'updateSettings', settings: settings });
+}
+// ═══════════════════════════════════════════
+// ЗРИТЕЛЬНЫЙ ЗАЛ В ЛОББИ
+// ═══════════════════════════════════════════
+
+function lobbyHallHtml() {
+    var list = (state.spectators || []).filter(function (s) { return !s.isHost && s.connected !== false; });
+    var html = '<div class="lobby-hall">';
+    html += '<div class="lobby-hall-head"><span>👀 Зрительный зал</span><b>' + list.length + '</b></div>';
+    if (list.length) {
+        html += '<div class="lobby-hall-chips">';
+        list.slice(0, 24).forEach(function (sp) {
+            var me = sp.id === state.playerId;
+            html += '<span class="lobby-hall-chip' + (me ? ' lobby-hall-me' : '') + '">' + escapeHtml(sp.nickname) + (me ? ' · вы' : '');
+            if (state.isHost && !me) html += '<button class="kick-player-btn lobby-hall-kick" data-player-id="' + escapeHtml(sp.id) + '" data-player-name="' + escapeHtml(sp.nickname) + '" title="Удалить из зала">✕</button>';
+            html += '</span>';
+        });
+        if (list.length > 24) html += '<span class="lobby-hall-chip">+' + (list.length - 24) + '</span>';
+        html += '</div>';
+    } else {
+        html += '<div class="lobby-hall-empty">Зрители смотрят игру с телефонов, ставят реакции и выбирают свой лучший питч. Покажите им QR.</div>';
+    }
+    html += '<button id="btn-hall-qr" class="lobby-hall-btn">📱 QR для зрителей</button>';
+    html += '</div>';
+    return html;
+}
+
+function lobbySeatHtml() {
+    var seats = (state.settings && state.settings.maxPlayers) || 8;
+    if (state.isSpectator && !state.isHost) {
+        var free = seats - countPlayingSeats();
+        var html = '<div class="spec-banner">';
+        html += '<div class="spec-banner-icon">👀</div>';
+        html += '<div class="spec-banner-body"><b>Вы в зрительном зале</b><span>' + (free > 0 ? 'За столом есть места: ' + free + ' — можно сесть и играть' : 'Мест за столом нет — вы будете смотреть и голосовать за лучший питч') + '</span></div>';
+        if (free > 0) html += '<button id="btn-take-seat" class="spec-banner-btn">🪑 Сесть за стол</button>';
+        html += '</div>';
+        return html;
+    }
+    if (!state.isHost && !state.isSpectator) {
+        return '<div class="seat-leave"><button id="btn-leave-seat" class="seat-leave-btn">👀 Хочу только смотреть</button></div>';
+    }
+    return '';
+}
+
+function bindLobbyHall(container) {
+    var take = container.querySelector('#btn-take-seat');
+    if (take) take.addEventListener('click', function () { sendMsg({ type: 'takeSeat' }); });
+    var leave = container.querySelector('#btn-leave-seat');
+    if (leave) leave.addEventListener('click', function () {
+        if (window.confirm('Перейти в зрительный зал? Вы будете смотреть игру, а не играть.')) sendMsg({ type: 'leaveSeat' });
+    });
+    var qr = container.querySelector('#btn-hall-qr');
+    if (qr) qr.addEventListener('click', function () {
+        if (IS_CODE_HIDDEN && state.isHost) { showNotification('Сначала покажите код комнаты', 'info'); return; }
+        openInviteModal('watch');
+    });
+    container.querySelectorAll('.lobby-hall-kick').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-player-id');
+            if (!window.confirm('Удалить «' + (btn.getAttribute('data-player-name') || 'зрителя') + '» из зала?')) return;
+            sendMsg({ type: 'kickPlayer', targetPlayerId: id });
+        });
+    });
+}
+
+// Статус подключения Twitch-чата (обновляется по сообщению twitchStatus)
+export function twitchStatusHtml() {
+    var tw = state.twitch;
+    if (!tw || !tw.channel) return '<div id="twitch-status" class="twitch-status twitch-status-off">Не подключён</div>';
+    var map = {
+        connected: ['on', '🟢 Чат twitch.tv/' + tw.channel + ' подключён'],
+        connecting: ['wait', '⏳ Подключаемся к чату…'],
+        reconnecting: ['wait', '⏳ Переподключаемся к чату…'],
+        'not-found': ['bad', '⚠️ Канал не найден или чат недоступен'],
+    };
+    var m = map[tw.status] || map.connecting;
+    return '<div id="twitch-status" class="twitch-status twitch-status-' + m[0] + '">' + escapeHtml(m[1]) + '</div>';
 }

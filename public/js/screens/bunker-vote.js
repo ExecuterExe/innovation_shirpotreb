@@ -5,6 +5,8 @@ import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { BUNKER_CARD_TYPES } from './bunker-game.js';
 import { buildSurvey, setupSurvey } from './gameover.js';
+import { audienceVoteHtml, bindAudienceVote, audiencePrizeHtml } from '../components/audience.js';
+import { analyticsTeaserHtml, bindAnalyticsTeaser } from '../components/game-analytics.js';
 
 function voteAvatarHue(id) {
     var h = 0, str = String(id || '');
@@ -65,6 +67,7 @@ export function renderBunkerVote(container) {
 
     if (state.isSpectator) {
         html += observerNoticeHtml('Голосуют выжившие игроки. ' + (isHost && bunker.hostMode ? 'Завершите голосование, когда все выскажутся.' : 'Результат появится, когда все проголосуют.'));
+        html += audienceVoteHtml();
     } else if (isEliminated) {
         html += '<div class="corp-card p-6 text-center mb-6">';
         html += '  <span class="text-corp-muted">Вы выбыли и не можете голосовать</span>';
@@ -191,6 +194,7 @@ export function renderBunkerVote(container) {
     html += '</div>'; // end bunker-main-col
     html += '</div>'; // end bunker-layout
     container.innerHTML = html;
+    bindAudienceVote(container);
 
     renderBunkerChat(container);
 
@@ -530,6 +534,7 @@ export function renderBunkerGameOver(container) {
     html += '<div class="text-6xl mb-4" style="filter: drop-shadow(0 0 30px rgba(34,197,94,0.3));">🏠</div>';
     html += '<h1 class="text-3xl md:text-4xl font-black text-accent-green mb-2">БУНКЕР ОПРЕДЕЛЁН!</h1>';
     html += '<p class="text-sm text-corp-muted mb-8">Вот кто выжил и спасёт мир своими продуктами:</p>';
+    html += audiencePrizeHtml(state.audiencePrize);
 
     // Глобальная проблема
     html += '<div class="corp-card border-accent-red/20 bg-accent-red-dim px-5 py-3 mb-6 text-left">';
@@ -608,6 +613,7 @@ export function renderBunkerGameOver(container) {
     html += '</div>'; // end AI section
 
     // Мини-опрос — тот же замер, что и в классическом режиме
+    html += '<div class="text-left">' + analyticsTeaserHtml(state.gameAnalytics) + '</div>';
     html += buildSurvey();
 
     // Кнопки
@@ -624,6 +630,7 @@ export function renderBunkerGameOver(container) {
     container.innerHTML = html;
 
     setupSurvey(container, 'bunker');
+    bindAnalyticsTeaser(container, state.gameAnalytics);
 
     // ═══════ LISTENERS ═══════
 

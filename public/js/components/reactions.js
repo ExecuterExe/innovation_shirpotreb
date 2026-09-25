@@ -116,11 +116,13 @@ export function showIncomingReaction(msg) {
 
     var row = document.querySelector('[data-rail-player="' + msg.playerId + '"]')
         || document.querySelector('#players-list [data-player-id="' + msg.playerId + '"]');
+    // Зрители и Twitch-чат «сидят» в панели зала
+    if (!row && msg.spectator) row = document.getElementById('rail-audience');
     if (row && isVisible(row)) rowBubble(row, emoji);
     // На широком экране реакция летит от строки игрока к сцене; на телефоне лента
     // участников вверху — там эмодзи взлетают снизу, как в стримах
     var launchFrom = row && isVisible(row) && window.innerWidth >= 1024 ? row : null;
-    flyEmoji(emoji, msg.nickname, launchFrom, msg.playerId === state.playerId);
+    flyEmoji(emoji, (msg.twitch ? '📺 ' : '') + (msg.nickname || ''), launchFrom, msg.playerId === state.playerId);
 }
 
 function isVisible(el) {

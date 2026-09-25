@@ -2491,6 +2491,7 @@ function createRoom(hostId, settings) {
             bunkerDraft: settings.bunkerDraft !== false,
             bunkerDraftTime: normalizeDraftTime(settings.bunkerDraftTime),
             bunkerSurvivors: normalizeSurvivors(settings.bunkerSurvivors),
+            postGameAnalytics: !!settings.postGameAnalytics,
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
             // Хост только ведёт партию: без карт, капитала и голосов
@@ -2841,9 +2842,705 @@ function getSpectatorsPublicInfo(room) {
     if (!room.spectators) return [];
     const specs = [];
     room.spectators.forEach(s => {
-        specs.push({ id: s.id, nickname: s.nickname, isHost: !!s.isHost });
+        specs.push({ id: s.id, nickname: s.nickname, isHost: !!s.isHost, connected: s.connected !== false, watch: !!s.wantsToWatch });
     });
     return specs;
+}
+
+// ═══════════════════════════════════════════
+// РАЗБОР ПАРТИИ — что происходило за игру (для ведущих и игроков, кому это важно)
+// Сбор идёт всегда (это дёшево), показывается — только с настройкой «Разбор партии».
+// ═══════════════════════════════════════════
+function resetGameStats(room, mode) {
+    var names = {};
+    room.players.forEach(function (p) { names[p.id] = p.nickname; });
+    room.gstats = {
+        mode: mode, startedAt: Date.now(), names: names,
+        prep: {}, pitches: [], curPitch: null,
+        handsRaised: {}, firstHands: {}, reactionsSent: {}, reactionsSpectators: 0, reactionsTwitch: 0,
+        peakViewers: 0, chat: {}, chatSpectators: 0,
+        products: [], phases: {}, investTimes: {}, tieRounds: {},
+        bunker: { reveals: [], rounds: [], elims: [], actions: [], turns: [], curTurn: null, voteSec: [], voteStart: null },
+    };
+}
+
+function gs(room) { return room.gstats || null; }
+function gsName(room, id) {
+    var p = room.players.get(id);
+    if (p) return p.nickname;
+    return (room.gstats && room.gstats.names[id]) || '???';
+}
+function secSince(ts) { return Math.max(0, Math.round((Date.now() - ts) / 100) / 10); }
+
+// ── классика: подготовка и выступления ──
+function statsPrepStart(room) {
+    var g = gs(room); if (!g) return;
+    g.prep[room.currentRound] = { start: Date.now(), ready: {} };
+    statsPhase(room, 'prep');
+}
+// Время этапов раунда: отметка начала каждого этапа, длительность считается при сборке
+function statsPhase(room, name) {
+    var g = gs(room); if (!g) return;
+    var r = room.currentRound;
+    var ph = g.phases[r] || (g.phases[r] = {});
+    if (ph[name] === undefined) ph[name] = Date.now();
+}
+function statsReady(room, playerId) {
+    var g = gs(room); if (!g) return;
+    var pr = g.prep[room.currentRound];
+    if (pr && pr.ready[playerId] === undefined) pr.ready[playerId] = secSince(pr.start);
+}
+function statsPitchStart(room, presenterId) {
+    var g = gs(room); if (!g) return;
+    g.curPitch = { round: room.currentRound, id: presenterId, start: Date.now(), qStart: null, hands: {} };
+}
+function statsQuestionsStart(room) {
+    var g = gs(room); if (g && g.curPitch) g.curPitch.qStart = Date.now();
+}
+function statsHand(room, playerId) {
+    var g = gs(room); if (!g || !g.curPitch || g.curPitch.hands[playerId]) return;
+    if (!Object.keys(g.curPitch.hands).length) g.firstHands[playerId] = (g.firstHands[playerId] || 0) + 1;
+    g.curPitch.hands[playerId] = true;
+    g.handsRaised[playerId] = (g.handsRaised[playerId] || 0) + 1;
+}
+function statsPitchEnd(room) {
+    var g = gs(room); if (!g || !g.curPitch) return;
+    var c = g.curPitch, end = Date.now();
+    g.pitches.push({
+        round: c.round, id: c.id,
+        pitchSec: Math.round(((c.qStart || end) - c.start) / 1000),
+        questionsSec: c.qStart ? Math.round((end - c.qStart) / 1000) : 0,
+        hands: Object.keys(c.hands).length,
+        reactions: (room.crowdTally && room.crowdTally[c.id]) ? room.crowdTally[c.id].total : 0,
+    });
+    g.curPitch = null;
+}
+function statsReaction(room, sender) {
+    var g = gs(room); if (!g) return;
+    if (sender.twitch) g.reactionsTwitch++;
+    else if (sender.spectator) g.reactionsSpectators++;
+    else g.reactionsSent[sender.playerId] = (g.reactionsSent[sender.playerId] || 0) + 1;
+}
+function statsProduct(room, playerId, cards, swan) {
+    var g = gs(room); if (!g || !cards) return;
+    g.products.push({ round: room.currentRound, id: playerId, cards: Object.assign({}, cards), swan: !!swan });
+}
+function statsInvested(room, playerId) {
+    var g = gs(room); if (!g) return;
+    var ph = g.phases[room.currentRound];
+    if (!ph || !ph.invest) return;
+    var it = g.investTimes[room.currentRound] || (g.investTimes[room.currentRound] = {});
+    if (it[playerId] === undefined) it[playerId] = secSince(ph.invest);
+}
+function statsChat(room, sender, isSpectator) {
+    var g = gs(room); if (!g || room.state === 'lobby') return;
+    if (isSpectator) g.chatSpectators++;
+    else g.chat[sender] = (g.chat[sender] || 0) + 1;
+}
+function statsViewers(room) {
+    var g = gs(room); if (g) g.peakViewers = Math.max(g.peakViewers, countViewers(room));
+}
+
+// ── «Бункер» ──
+function statsTurnStart(room, playerId) {
+    var g = gs(room); if (!g) return;
+    statsTurnEnd(room);
+    g.bunker.curTurn = { id: playerId, round: room.bunker.currentRound, start: Date.now() };
+}
+function statsTurnEnd(room) {
+    var g = gs(room); if (!g || !g.bunker.curTurn) return;
+    var c = g.bunker.curTurn;
+    g.bunker.turns.push({ id: c.id, round: c.round, sec: Math.round((Date.now() - c.start) / 1000) });
+    g.bunker.curTurn = null;
+}
+
+// Насколько две величины идут вместе (-1…1); null — если данных мало
+function pearson(xs, ys) {
+    var n = xs.length;
+    if (n < 4) return null;
+    var mx = xs.reduce(function (a, b) { return a + b; }, 0) / n, my = ys.reduce(function (a, b) { return a + b; }, 0) / n;
+    var sxy = 0, sxx = 0, syy = 0;
+    for (var i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) * (xs[i] - mx); syy += (ys[i] - my) * (ys[i] - my); }
+    if (!sxx || !syy) return null;
+    return Math.round(sxy / Math.sqrt(sxx * syy) * 100) / 100;
+}
+
+// Средние и суммы без лишних проверок
+function avg(arr) { return arr.length ? Math.round(arr.reduce(function (a, b) { return a + b; }, 0) / arr.length * 10) / 10 : null; }
+
+function buildClassicAnalytics(room) {
+    var g = gs(room); if (!g) return null;
+    g.endedAt = Date.now();
+    var ids = Object.keys(g.names);
+    room.players.forEach(function (p) { if (ids.indexOf(p.id) === -1) ids.push(p.id); });
+    var start = room.settings.startCapital;
+    var rounds = room.roundHistory || [];
+    var per = {};
+    ids.forEach(function (id) {
+        per[id] = {
+            id: id, nickname: gsName(room, id),
+            capital: [start], attracted: [], invested: 0, onWinners: 0, betIncome: 0, wins: 0,
+            pitchSec: [], questionsReceived: 0, readySec: [], reactions: 0, reactionsBy: {},
+            reactionsSent: g.reactionsSent[id] || 0, handsRaised: g.handsRaised[id] || 0, audienceVotes: 0,
+            finalCapital: room.players.get(id) ? room.players.get(id).capital : null,
+        };
+    });
+    var matrix = {};
+    var totalInvested = 0, totalReactions = 0;
+    rounds.forEach(function (r) {
+        var winners = r.winnerIds || [];
+        ids.forEach(function (id) {
+            var pp = per[id];
+            pp.attracted.push((r.attracted && r.attracted[id]) || 0);
+            pp.capital.push(r.capitals && r.capitals[id] !== undefined ? r.capitals[id] : pp.capital[pp.capital.length - 1]);
+            if (winners.indexOf(id) !== -1) pp.wins++;
+        });
+        (r.investmentDetails || []).forEach(function (d) {
+            if (!per[d.fromId]) return;
+            per[d.fromId].invested += d.amount;
+            totalInvested += d.amount;
+            if (winners.indexOf(d.toId) !== -1) per[d.fromId].onWinners += d.amount;
+            matrix[d.fromId] = matrix[d.fromId] || {};
+            matrix[d.fromId][d.toId] = (matrix[d.fromId][d.toId] || 0) + d.amount;
+        });
+        (r.luckyInvestors || []).forEach(function (l) { if (per[l.investorId]) per[l.investorId].betIncome += l.reward || 0; });
+        Object.keys(r.crowd || {}).forEach(function (id) {
+            if (!per[id]) return;
+            var tly = r.crowd[id];
+            per[id].reactions += tly.total || 0;
+            totalReactions += tly.total || 0;
+            Object.keys(tly.byEmotion || {}).forEach(function (em) { per[id].reactionsBy[em] = (per[id].reactionsBy[em] || 0) + tly.byEmotion[em]; });
+        });
+        if (r.audience && r.audience.top) r.audience.top.forEach(function (c) { if (per[c.id]) per[c.id].audienceVotes += c.votes; });
+    });
+    g.pitches.forEach(function (p) {
+        if (!per[p.id]) return;
+        per[p.id].pitchSec.push(p.pitchSec);
+        per[p.id].questionsReceived += p.hands;
+    });
+    Object.keys(g.prep).forEach(function (rn) {
+        var ready = g.prep[rn].ready;
+        Object.keys(ready).forEach(function (id) { if (per[id]) per[id].readySec.push(ready[id]); });
+    });
+    var players = ids.map(function (id) {
+        var pp = per[id];
+        return {
+            id: id, nickname: pp.nickname, capital: pp.capital, attracted: pp.attracted,
+            attractedTotal: pp.attracted.reduce(function (a, b) { return a + b; }, 0),
+            invested: pp.invested, onWinners: pp.onWinners,
+            accuracy: pp.invested ? Math.round(pp.onWinners / pp.invested * 100) : null,
+            betIncome: pp.betIncome, wins: pp.wins,
+            pitchAvg: avg(pp.pitchSec), pitches: pp.pitchSec.length,
+            questionsReceived: pp.questionsReceived, readyAvg: avg(pp.readySec),
+            reactions: pp.reactions, reactionsBy: pp.reactionsBy,
+            reactionsSent: pp.reactionsSent, handsRaised: pp.handsRaised,
+            audienceVotes: pp.audienceVotes,
+        };
+    });
+    // ── стиль инвестора, места по раундам, взаимность ──
+    var byId = {};
+    players.forEach(function (p) { byId[p.id] = p; });
+    players.forEach(function (p) {
+        var shares = [], spread = [], allIn = 0, recip = 0;
+        rounds.forEach(function (r, ri) {
+            var before = per[p.id].capital[ri] || 0;
+            var mine = (r.investmentDetails || []).filter(function (d) { return d.fromId === p.id; });
+            var sum = mine.reduce(function (a, d) { return a + d.amount; }, 0);
+            if (before > 0) { shares.push(sum / before); if (sum / before >= 0.9) allIn++; }
+            spread.push(mine.length);
+            mine.forEach(function (d) {
+                if ((r.investmentDetails || []).some(function (x) { return x.fromId === d.toId && x.toId === p.id; })) recip++;
+            });
+        });
+        p.spendShare = shares.length ? Math.round(avg(shares) * 100) : null;
+        p.allIn = allIn;
+        p.spreadAvg = avg(spread);
+        p.reciprocity = recip;
+        var it = [];
+        Object.keys(g.investTimes).forEach(function (rn) { if (g.investTimes[rn][p.id] !== undefined) it.push(g.investTimes[rn][p.id]); });
+        p.investSpeedAvg = avg(it);
+        p.firstHands = g.firstHands[p.id] || 0;
+        p.chat = g.chat[p.id] || 0;
+        p.products = g.products.filter(function (x) { return x.id === p.id; }).map(function (x) {
+            var rr = rounds[x.round - 1];
+            return { round: x.round, cards: x.cards, swan: x.swan, attracted: rr && rr.attracted ? rr.attracted[p.id] || 0 : null, won: rr ? (rr.winnerIds || []).indexOf(p.id) !== -1 : false };
+        });
+        p.rankByRound = [];
+    });
+    rounds.forEach(function (r, ri) {
+        var order = players.slice().sort(function (a, b) { return (b.capital[ri + 1] || 0) - (a.capital[ri + 1] || 0); });
+        order.forEach(function (p, i) { p.rankByRound.push(i + 1); });
+    });
+
+    // ── раунды: единодушие, событие, ничья, зал vs инвесторы ──
+    var roundsTable = rounds.map(function (r, ri) {
+        var total = 0, max = 0;
+        Object.keys(r.attracted || {}).forEach(function (id) { total += r.attracted[id]; max = Math.max(max, r.attracted[id]); });
+        var aud = r.audience && r.audience.leaders ? r.audience.leaders.map(function (c) { return c.id; }) : null;
+        return {
+            round: r.round, winners: r.winners || [], invested: total,
+            topShare: total ? Math.round(max / total * 100) : null,
+            event: r.event || null, tie: !!g.tieRounds[r.round],
+            swan: g.products.filter(function (x) { return x.round === r.round && x.swan; }).map(function (x) { return gsName(room, x.id); }),
+            audience: r.audience && r.audience.leaders ? r.audience.leaders.map(function (c) { return c.nickname; }) : null,
+            audienceMatch: aud ? aud.some(function (id) { return (r.winnerIds || []).indexOf(id) !== -1; }) : null,
+        };
+    });
+
+    // ── куда ушло время ──
+    var phaseTime = { prep: 0, pitch: 0, questions: 0, invest: 0, results: 0 };
+    g.pitches.forEach(function (p) { phaseTime.pitch += p.pitchSec; phaseTime.questions += p.questionsSec; });
+    Object.keys(g.phases).forEach(function (rn) {
+        var ph = g.phases[rn], next = g.phases[+rn + 1];
+        if (ph.prep && ph.pitch) phaseTime.prep += Math.round((ph.pitch - ph.prep) / 1000);
+        if (ph.invest && ph.results) phaseTime.invest += Math.round((ph.results - ph.invest) / 1000);
+        var resEnd = next && next.prep ? next.prep : g.endedAt;
+        if (ph.results && resEnd) phaseTime.results += Math.max(0, Math.round((resEnd - ph.results) / 1000));
+    });
+
+    // ── связи по всем питчам: длина / вопросы / реакции ↔ вложения ──
+    var pitchRows = g.pitches.map(function (p) {
+        var rr = rounds[p.round - 1];
+        return { round: p.round, id: p.id, nickname: gsName(room, p.id), pitchSec: p.pitchSec, questionsSec: p.questionsSec, hands: p.hands, reactions: p.reactions, attracted: rr && rr.attracted ? rr.attracted[p.id] || 0 : 0 };
+    });
+    var att = pitchRows.map(function (x) { return x.attracted; });
+    var correlations = {
+        pitchSec: pearson(pitchRows.map(function (x) { return x.pitchSec; }), att),
+        hands: pearson(pitchRows.map(function (x) { return x.hands; }), att),
+        reactions: pearson(pitchRows.map(function (x) { return x.reactions; }), att),
+    };
+
+    return {
+        mode: 'classic',
+        roundsTable: roundsTable,
+        phaseTime: phaseTime,
+        pitchRows: pitchRows,
+        correlations: correlations,
+        chatSpectators: g.chatSpectators,
+        durationSec: Math.round((Date.now() - g.startedAt) / 1000),
+        rounds: rounds.length,
+        startCapital: start,
+        presentTime: room.settings.presentTime,
+        prepTime: room.settings.prepTime,
+        questionsOn: !!room.settings.questionsTime,
+        totals: {
+            invested: totalInvested, reactions: totalReactions,
+            reactionsSpectators: g.reactionsSpectators, reactionsTwitch: g.reactionsTwitch,
+            questions: g.pitches.reduce(function (a, p) { return a + p.hands; }, 0),
+            pitches: g.pitches.length, peakViewers: g.peakViewers,
+            audienceVotes: rounds.reduce(function (a, r) { return a + (r.audience ? r.audience.total : 0); }, 0),
+        },
+        players: players,
+        matrix: matrix,
+        roundWinners: rounds.map(function (r) { return r.winners || []; }),
+    };
+}
+
+function buildBunkerAnalytics(room) {
+    var g = gs(room); if (!g) return null;
+    statsTurnEnd(room);
+    var b = g.bunker;
+    var ids = (room.bunker && room.bunker.revealOrder) ? room.bunker.revealOrder.slice() : Object.keys(g.names);
+    var survivors = room.bunker ? getBunkerActivePlayers(room) : [];
+    var per = {};
+    ids.forEach(function (id) {
+        per[id] = { id: id, nickname: gsName(room, id), survived: survivors.indexOf(id) !== -1, elimRound: null, elimVia: null,
+            votesReceived: 0, votesCast: 0, votesOnTarget: 0, skips: 0, reveals: [], defectRound: null,
+            actions: [], turnSec: [], audienceSaves: 0 };
+    });
+    b.reveals.forEach(function (r) {
+        var pp = per[r.id]; if (!pp) return;
+        pp.reveals.push({ key: r.key, round: r.round, auto: !!r.auto });
+        if (r.key === 'hiddenDefect' && pp.defectRound === null) pp.defectRound = r.round;
+    });
+    b.elims.forEach(function (e) { if (per[e.id]) { per[e.id].elimRound = e.round; per[e.id].elimVia = e.via; } });
+    var matrix = {};
+    b.rounds.forEach(function (r) {
+        Object.keys(r.ballots || {}).forEach(function (voter) {
+            var target = r.ballots[voter];
+            if (!per[voter]) return;
+            if (target === '__skip__') { per[voter].skips++; return; }
+            per[voter].votesCast++;
+            if (per[target]) per[target].votesReceived++;
+            if (r.eliminatedId && target === r.eliminatedId) per[voter].votesOnTarget++;
+            matrix[voter] = matrix[voter] || {};
+            matrix[voter][target] = (matrix[voter][target] || 0) + 1;
+        });
+        if (r.audience && r.audience.top) r.audience.top.forEach(function (c) { if (per[c.id]) per[c.id].audienceSaves += c.votes; });
+    });
+    b.actions.forEach(function (a) { if (per[a.id]) per[a.id].actions.push(a.type); });
+    b.turns.forEach(function (tn) { if (per[tn.id]) per[tn.id].turnSec.push(tn.sec); });
+
+    // голоса против по раундам и «на волоске» (выжил, будучи вторым по голосам)
+    var nRounds = room.bunker ? room.bunker.currentRound + 1 : 0;
+    ids.forEach(function (id) { per[id].votesByRound = []; per[id].closeCalls = 0; for (var i = 1; i <= nRounds; i++) per[id].votesByRound.push(0); });
+    var pairsSame = {}, pairsFeud = {};
+    b.rounds.forEach(function (r) {
+        var cnt = {};
+        Object.keys(r.ballots || {}).forEach(function (v) { var tg = r.ballots[v]; if (tg !== '__skip__') cnt[tg] = (cnt[tg] || 0) + 1; });
+        Object.keys(cnt).forEach(function (id) { if (per[id] && per[id].votesByRound[r.round - 1] !== undefined) per[id].votesByRound[r.round - 1] = cnt[id]; });
+        var sorted = Object.keys(cnt).sort(function (a, c) { return cnt[c] - cnt[a]; });
+        if (sorted[1] && sorted[1] !== r.eliminatedId && per[sorted[1]] && cnt[sorted[1]] > 0) per[sorted[1]].closeCalls++;
+        // блоки: голосовали за одного и того же; вражда: друг против друга
+        var voters = Object.keys(r.ballots || {}).filter(function (v) { return r.ballots[v] !== '__skip__'; });
+        voters.forEach(function (a, i) {
+            voters.slice(i + 1).forEach(function (c) {
+                var key = [a, c].sort().join('|');
+                if (r.ballots[a] === r.ballots[c]) pairsSame[key] = (pairsSame[key] || 0) + 1;
+                if (r.ballots[a] === c && r.ballots[c] === a) pairsFeud[key] = (pairsFeud[key] || 0) + 1;
+            });
+        });
+    });
+    function topPairs(map) {
+        return Object.keys(map).sort(function (a, c) { return map[c] - map[a]; }).slice(0, 3).map(function (k) {
+            var ab = k.split('|');
+            return { a: gsName(room, ab[0]), b: gsName(room, ab[1]), n: map[k] };
+        });
+    }
+    var revealPop = {}, firstPop = {};
+    b.reveals.forEach(function (r) { revealPop[r.key] = (revealPop[r.key] || 0) + 1; });
+    ids.forEach(function (id) { var f = per[id].reveals[0]; if (f) firstPop[f.key] = (firstPop[f.key] || 0) + 1; });
+    // Карты действия — по названию, как их видят игроки
+    var acName = {};
+    BUNKER_ACTION_CARDS.forEach(function (c) { acName[c.type] = c.name; });
+    var actionPop = {};
+    b.actions.forEach(function (a) { var nm = acName[a.type] || a.type; actionPop[nm] = (actionPop[nm] || 0) + 1; });
+    var roundsTable = [];
+    for (var ri = 1; ri <= nRounds; ri++) {
+        var vr = b.rounds.filter(function (r) { return r.round === ri; })[0];
+        var skips = vr ? Object.keys(vr.ballots).filter(function (k) { return vr.ballots[k] === '__skip__'; }).length : null;
+        roundsTable.push({
+            round: ri,
+            reveals: b.reveals.filter(function (r) { return r.round === ri; }).length,
+            turnAvg: avg(b.turns.filter(function (tn) { return tn.round + 1 === ri; }).map(function (tn) { return tn.sec; })),
+            voted: !!vr, skips: skips,
+            eliminated: vr && vr.eliminatedId ? gsName(room, vr.eliminatedId) : null,
+            audience: vr && vr.audience && vr.audience.leaders ? vr.audience.leaders.map(function (c) { return c.nickname; }) : null,
+            actions: b.actions.filter(function (a) { return a.round === ri; }).length,
+        });
+    }
+    var phaseTime = {
+        reveal: b.turns.reduce(function (a, tn) { return a + tn.sec; }, 0),
+        vote: b.voteSec.reduce(function (a, s) { return a + s; }, 0),
+    };
+
+    return {
+        mode: 'bunker',
+        roundsTable: roundsTable,
+        phaseTime: phaseTime,
+        blocs: topPairs(pairsSame),
+        feuds: topPairs(pairsFeud),
+        revealPop: revealPop,
+        firstPop: firstPop,
+        actionPop: actionPop,
+        chatSpectators: g.chatSpectators,
+        draftAuto: (function () { var o = {}; room.players.forEach(function (p) { if (p.draftAutoPicked) o[p.nickname] = p.draftAutoPicked; }); return o; })(),
+        durationSec: Math.round((Date.now() - g.startedAt) / 1000),
+        rounds: room.bunker ? room.bunker.currentRound + 1 : 0,
+        survivorsCount: room.bunker ? room.bunker.survivorsCount : 0,
+        totals: {
+            reveals: b.reveals.length, autoReveals: b.reveals.filter(function (r) { return r.auto; }).length,
+            votes: b.rounds.reduce(function (a, r) { return a + Object.keys(r.ballots || {}).filter(function (k) { return r.ballots[k] !== '__skip__'; }).length; }, 0),
+            actions: b.actions.length, reactionsSpectators: g.reactionsSpectators, reactionsTwitch: g.reactionsTwitch, peakViewers: g.peakViewers,
+        },
+        players: ids.map(function (id) {
+            var pp = per[id];
+            return { id: id, nickname: pp.nickname, survived: pp.survived, elimRound: pp.elimRound, elimVia: pp.elimVia,
+                votesReceived: pp.votesReceived, votesCast: pp.votesCast, votesOnTarget: pp.votesOnTarget, skips: pp.skips,
+                reveals: pp.reveals, defectRound: pp.defectRound, actions: pp.actions, turnAvg: avg(pp.turnSec), audienceSaves: pp.audienceSaves,
+                reactionsSent: g.reactionsSent[id] || 0, votesByRound: pp.votesByRound, closeCalls: pp.closeCalls, chat: g.chat[id] || 0,
+                cards: room.players.get(id) ? room.players.get(id).cards : null };
+        }),
+        timeline: b.rounds.map(function (r) {
+            return { round: r.round, eliminated: r.eliminatedId ? gsName(room, r.eliminatedId) : null, votes: r.eliminatedVotes || null, skipped: !!r.skipped, ballots: Object.keys(r.ballots || {}).length, audience: r.audience && r.audience.leaders ? r.audience.leaders.map(function (c) { return c.nickname; }) : null };
+        }),
+        exits: b.elims.filter(function (e) { return e.via !== 'vote'; }).map(function (e) { return { nickname: gsName(room, e.id), round: e.round, via: e.via }; }),
+        matrix: matrix,
+    };
+}
+
+// ═══════════════════════════════════════════
+// ЗРИТЕЛЬНЫЙ ЗАЛ: вход по QR, места за столом, «Выбор зрителей», Twitch-чат
+// ═══════════════════════════════════════════
+const AUDIENCE_MAX = 300;            // зрителей в одной комнате
+const SPECTATOR_GRACE_MS = 60000;    // у зрителя с телефона погас экран — место в зале держим минуту
+
+function countViewers(room) {
+    var n = 0;
+    if (room.spectators) room.spectators.forEach(function (s) { if (!s.isHost && s.connected !== false) n++; });
+    return n;
+}
+
+// В зале одинаковые имена не нужны: «Аня», «Аня 2»
+function uniqueSpectatorNick(room, nickname) {
+    var taken = {};
+    room.players.forEach(function (p) { taken[p.nickname.toLowerCase()] = true; });
+    if (room.spectators) room.spectators.forEach(function (s) { taken[s.nickname.toLowerCase()] = true; });
+    if (!taken[nickname.toLowerCase()]) return nickname;
+    for (var i = 2; i < 1000; i++) {
+        var candidate = nickname.substring(0, 16) + ' ' + i;
+        if (!taken[candidate.toLowerCase()]) return candidate;
+    }
+    return nickname.substring(0, 14) + ' ' + uuidv4().slice(0, 4);
+}
+
+function addSpectator(room, ws, nickname, wantsToWatch) {
+    var spectator = { id: uuidv4(), nickname: uniqueSpectatorNick(room, nickname), ws: ws, connected: true, wantsToWatch: !!wantsToWatch };
+    if (!room.spectators) room.spectators = new Map();
+    room.spectators.set(spectator.id, spectator);
+    playerRooms.set(ws, { roomCode: room.code, playerId: spectator.id, isSpectator: true });
+    browserClients.delete(ws);
+    return spectator;
+}
+
+function broadcastAudienceChange(room) {
+    statsViewers(room);
+    broadcastToRoom(room, { type: 'spectatorsUpdate', spectators: getSpectatorsPublicInfo(room) });
+    if (room.state === 'lobby') broadcastToRoom(room, getLobbyState(room));
+    broadcastRoomsList();
+}
+
+// ── «Выбор зрителей»: зал (и Twitch-чат) голосует за лучший питч / кого бы спас в «Бункере» ──
+function openAudienceVote(room, kind, candidates) {
+    room.lastAudience = null;
+    room.audience = { open: true, kind: kind, candidates: candidates, votes: new Map() };
+    broadcastToRoom(room, audienceOpenMessage(room, null));
+}
+
+function audienceOpenMessage(room, voterId) {
+    var a = room.audience;
+    return {
+        type: 'audienceOpen', kind: a.kind, candidates: a.candidates,
+        count: a.votes.size, twitch: countTwitchVotes(a),
+        myVote: voterId ? (a.votes.get('sp:' + voterId) || null) : null,
+    };
+}
+
+function countTwitchVotes(a) {
+    var n = 0;
+    a.votes.forEach(function (v, key) { if (key.indexOf('tw:') === 0) n++; });
+    return n;
+}
+
+function recordAudienceVote(room, key, targetId) {
+    var a = room.audience;
+    if (!a || !a.open) return false;
+    if (!a.candidates.some(function (c) { return c.id === targetId; })) return false;
+    a.votes.set(key, targetId);
+    // Прогресс — не на каждый голос: при большом зале и чате это сотни сообщений в секунду
+    if (!room.audienceTick) {
+        room.audienceTick = setTimeout(function () {
+            room.audienceTick = null;
+            if (room.audience && room.audience.open) {
+                broadcastToRoom(room, { type: 'audienceProgress', count: room.audience.votes.size, twitch: countTwitchVotes(room.audience) });
+            }
+        }, 400);
+    }
+    return true;
+}
+
+function closeAudienceVote(room) {
+    var a = room.audience;
+    if (!a || !a.open) return room.lastAudience || null;
+    a.open = false;
+    broadcastToRoom(room, { type: 'audienceClosed' });
+    var tally = {};
+    a.votes.forEach(function (targetId) { tally[targetId] = (tally[targetId] || 0) + 1; });
+    var top = a.candidates
+        .map(function (c) { return { id: c.id, nickname: c.nickname, votes: tally[c.id] || 0 }; })
+        .filter(function (c) { return c.votes > 0; })
+        .sort(function (x, y) { return y.votes - x.votes; });
+    if (!top.length) { room.lastAudience = null; return null; }
+    if (!room.audienceTotals) room.audienceTotals = {};
+    top.forEach(function (c) {
+        var tot = room.audienceTotals[c.id] || (room.audienceTotals[c.id] = { nickname: c.nickname, votes: 0 });
+        tot.votes += c.votes;
+        tot.nickname = c.nickname;
+    });
+    var leaders = top.filter(function (c) { return c.votes === top[0].votes; });
+    room.lastAudience = {
+        kind: a.kind,
+        leaders: leaders,            // один победитель или ничья
+        total: a.votes.size,
+        twitch: countTwitchVotes(a),
+        top: top.slice(0, 3),
+    };
+    return room.lastAudience;
+}
+
+// Приз зрительских симпатий за всю партию
+function audiencePrize(room) {
+    var totals = room.audienceTotals || {};
+    var best = 0, names = [];
+    Object.keys(totals).forEach(function (id) {
+        var v = totals[id].votes;
+        if (v > best) { best = v; names = [totals[id].nickname]; }
+        else if (v === best && v > 0) names.push(totals[id].nickname);
+    });
+    return best > 0 ? { nicknames: names, votes: best } : null;
+}
+
+function resetAudience(room) {
+    if (room.audienceTick) { clearTimeout(room.audienceTick); room.audienceTick = null; }
+    room.audience = null;
+    room.lastAudience = null;
+    room.audienceTotals = {};
+}
+
+// ── Реакция на экране (игрок, зритель или Twitch-чат) ──
+function emitReaction(room, sender) {
+    statsReaction(room, sender);
+    var out = {
+        type: 'playerEmotion',
+        playerId: sender.playerId,
+        nickname: sender.nickname,
+        emotion: sender.emotion,
+        spectator: !!sender.spectator,
+    };
+    if (sender.twitch) out.twitch = true;
+    // Во время выступления реакция засчитывается выступающему (себе — не считается)
+    if (room.state === 'presentation') {
+        var presenterId = room.presentationOrder[room.currentPresenterIndex];
+        if (presenterId && presenterId !== sender.playerId) {
+            if (!room.crowdTally) room.crowdTally = {};
+            out.presenterId = presenterId;
+            out.tally = addTally(room.crowdTally, presenterId, sender.emotion);
+        }
+    }
+    broadcastToRoom(room, out);
+}
+
+// ── Twitch-чат как зрительный зал ──
+// Чат публичного канала читается анонимно (как это делают OBS-оверлеи), без ключей и авторизации.
+// Цифра в чате = голос в «Выборе зрителей», смайлы и слова = реакции на экране.
+const TWITCH_IRC_URL = process.env.TWITCH_IRC_URL || 'wss://irc-ws.chat.twitch.tv:443';
+const TWITCH_REACTION_GAP_MS = 700;   // не чаще одной реакции из чата за это время — иначе экран утонет
+const TWITCH_JOIN_TIMEOUT_MS = 12000;
+const TWITCH_REACTIONS = [
+    [/(KEKW|OMEGALUL|LULW|LUL|ахах|хаха|ахаха|ржу|😂|🤣)/i, 'laugh'],
+    [/(PogChamp|PogU|Pog|🔥|огонь|имба)/i, 'fire'],
+    [/(Clap|👏|браво|респект)/i, 'clap'],
+    [/(🤯|WutFace|жесть|вау|wow)/i, 'mindblown'],
+    [/(monkaS|😱|страшно)/i, 'scared'],
+    [/(🤔|хмм|hmm)/i, 'think'],
+    [/(💰|💸|беру|куплю|take my money)/i, 'money'],
+    [/(🍅|кринж|cringe|NotLikeThis)/i, 'tomato'],
+    [/(<3|❤|💖|люблю)/i, 'love'],
+];
+
+function normalizeTwitchChannel(v) {
+    var s = String(v || '').trim().toLowerCase()
+        .replace(/^https?:\/\//, '').replace(/^(www\.|m\.)?twitch\.tv\//, '')
+        .replace(/^[#@]/, '').split(/[\/?#\s]/)[0];
+    return /^[a-z0-9_]{3,25}$/.test(s) ? s : '';
+}
+
+function twitchStatusMessage(room) {
+    var tw = room.twitch;
+    return { type: 'twitchStatus', channel: tw ? tw.channel : '', status: tw ? tw.status : 'off' };
+}
+
+function setTwitchStatus(room, tw, status) {
+    if (tw.status === status) return;
+    tw.status = status;
+    if (room.twitch === tw) broadcastToRoom(room, twitchStatusMessage(room));
+}
+
+function twitchSetChannel(room, channel) {
+    if (room.twitch && room.twitch.channel === channel) return;
+    twitchStop(room);
+    if (channel) {
+        room.twitch = { channel: channel, ws: null, status: 'connecting', retries: 0, timer: null, lastReactAt: 0, stopped: false };
+        twitchConnect(room, room.twitch);
+    }
+    broadcastToRoom(room, twitchStatusMessage(room));
+}
+
+function twitchStop(room) {
+    var tw = room.twitch;
+    if (!tw) return;
+    tw.stopped = true;
+    clearTimeout(tw.timer);
+    clearTimeout(tw.joinTimer);
+    if (tw.ws) { try { tw.ws.close(); } catch (e) { /* ignore */ } }
+    room.twitch = null;
+}
+
+function twitchConnect(room, tw) {
+    if (tw.stopped || room.twitch !== tw) return;
+    var sock;
+    try { sock = new WebSocket(TWITCH_IRC_URL); } catch (e) { twitchRetry(room, tw); return; }
+    tw.ws = sock;
+    sock.on('open', function () {
+        sock.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+        sock.send('PASS SCHMOOPIIE');
+        sock.send('NICK justinfan' + (10000 + Math.floor(Math.random() * 80000)));
+        sock.send('JOIN #' + tw.channel);
+        clearTimeout(tw.joinTimer);
+        // Канал существует — придёт ROOMSTATE. Нет — честно говорим, что канал не найден
+        tw.joinTimer = setTimeout(function () { if (tw.status !== 'connected') setTwitchStatus(room, tw, 'not-found'); }, TWITCH_JOIN_TIMEOUT_MS);
+    });
+    sock.on('message', function (data) {
+        String(data).split('\r\n').forEach(function (line) { if (line) twitchLine(room, tw, sock, line); });
+    });
+    sock.on('close', function () {
+        if (tw.ws !== sock) return;
+        tw.ws = null;
+        if (!tw.stopped) { setTwitchStatus(room, tw, 'reconnecting'); twitchRetry(room, tw); }
+    });
+    sock.on('error', function () { /* дальше придёт close */ });
+}
+
+function twitchRetry(room, tw) {
+    if (tw.stopped) return;
+    tw.retries++;
+    var delay = Math.min(60000, 3000 * Math.pow(2, tw.retries - 1));
+    clearTimeout(tw.timer);
+    tw.timer = setTimeout(function () {
+        if (rooms.get(room.code) === room && room.twitch === tw) twitchConnect(room, tw);
+    }, delay);
+}
+
+function twitchLine(room, tw, sock, line) {
+    if (line.indexOf('PING') === 0) { try { sock.send('PONG' + line.slice(4)); } catch (e) { /* ignore */ } return; }
+    var tags = {}, rest = line;
+    if (rest[0] === '@') {
+        var sp = rest.indexOf(' ');
+        rest.slice(1, sp).split(';').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) tags[kv.slice(0, i)] = kv.slice(i + 1); });
+        rest = rest.slice(sp + 1);
+    }
+    var m = rest.match(/^:([^!\s]+)(?:!\S+)? (\S+)(?: (#\S+))?(?: :(.*))?$/);
+    if (!m) return;
+    var cmd = m[2];
+    if (cmd === 'ROOMSTATE') { tw.retries = 0; setTwitchStatus(room, tw, 'connected'); return; }
+    if (cmd !== 'PRIVMSG') return;
+    setTwitchStatus(room, tw, 'connected');
+    var user = m[1].toLowerCase();
+    var name = String(tags['display-name'] || user).replace(/[^\p{L}\p{N}_ .-]/gu, '').slice(0, 25) || user;
+    twitchChatMessage(room, tw, user, name, (m[4] || '').trim());
+}
+
+function twitchChatMessage(room, tw, user, name, text) {
+    if (!text || text.length > 300) return;
+    // «2» — голос за второго кандидата в «Выборе зрителей»
+    var num = text.match(/^#?(\d{1,2})$/);
+    if (num) {
+        var a = room.audience;
+        if (a && a.open) {
+            var c = a.candidates[parseInt(num[1], 10) - 1];
+            if (c) recordAudienceVote(room, 'tw:' + user, c.id);
+        }
+        return;
+    }
+    var now = Date.now();
+    if (now - tw.lastReactAt < TWITCH_REACTION_GAP_MS) return;
+    for (var i = 0; i < TWITCH_REACTIONS.length; i++) {
+        if (TWITCH_REACTIONS[i][0].test(text)) {
+            tw.lastReactAt = now;
+            emitReaction(room, { playerId: 'tw:' + user, nickname: name, emotion: TWITCH_REACTIONS[i][1], spectator: true, twitch: true });
+            return;
+        }
+    }
 }
 
 function formatRelativeTime(room) {
@@ -2881,6 +3578,7 @@ function getLobbyState(room) {
         spectators: getSpectatorsPublicInfo(room),
         settings: room.settings,
         canStart: countPlayingSeats(room) >= 3,
+        twitch: room.twitch ? { channel: room.twitch.channel, status: room.twitch.status } : null,
     };
 }
 
@@ -3163,6 +3861,10 @@ function sendCurrentStateToPlayer(room, player, ws) {
         }));
     }
 
+    // Голосование зала и Twitch-чат — тоже часть экрана
+    if (room.audience && room.audience.open) ws.send(JSON.stringify(audienceOpenMessage(room, player.id)));
+    if (room.twitch) ws.send(JSON.stringify(twitchStatusMessage(room)));
+
     // Сколько осталось на таймере этапа. Скрытую страховку «вопросов без таймера» не показываем.
     var hiddenSafety = roomState === 'presentation' && room.presentationStage === 'questions'
         && !(room.settings.questionsTime > 0);
@@ -3246,6 +3948,8 @@ function checkAllTieVoted(room) {
 function startGame(room) {
     room.currentRound = 0;
     room.crowdGame = {};
+    resetAudience(room);
+    resetGameStats(room, 'classic');
     room.totalRounds = room.settings.rounds;
     room.roundHistory = [];
     room.players.forEach(p => {
@@ -3321,6 +4025,7 @@ function startNewRound(room) {
 }
 
 function startPresentations(room) {
+    statsPhase(room, 'pitch');
     room.state = 'presentation';
     room.currentPresenterIndex = 0;
     showCurrentPresenter(room);
@@ -3345,6 +4050,7 @@ function showCurrentPresenter(room) {
     const presenter = room.players.get(presenterId);
     room.presentationStage = 'pitch';
     room.questionHands = [];
+    statsPitchStart(room, presenterId);
 
     // ═══════ ЧЁРНЫЙ ЛЕБЕДЬ ═══════
     var blackSwanResult = null;
@@ -3353,6 +4059,8 @@ function showCurrentPresenter(room) {
             blackSwanResult = applyBlackSwan(room, presenter);
         }
     }
+
+    statsProduct(room, presenterId, presenter.cards, !!blackSwanResult);
 
     const previousPresentations = [];
     for (let i = 0; i < room.currentPresenterIndex; i++) {
@@ -3419,6 +4127,7 @@ function getQuestionHandsPublic(room) {
 
 function startQuestions(room) {
     clearTimer(room);
+    statsQuestionsStart(room);
     room.presentationStage = 'questions';
     room.questionHands = [];
     const presenterId = room.presentationOrder[room.currentPresenterIndex];
@@ -3448,6 +4157,7 @@ function startQuestions(room) {
 
 function nextPresenter(room) {
     clearTimer(room);
+    statsPitchEnd(room);
     if (room.presentationStage === 'questions') {
         // Сколько рук поднимали — прямой замер того, задают ли вопросы вообще
         analytics.track('questions_done', { code: room.code, hands: (room.questionHands || []).length });
@@ -3487,6 +4197,7 @@ function getInvestmentCaps(room) {
 }
 
 function startInvesting(room) {
+    statsPhase(room, 'invest');
     room.state = 'investing';
     room.investments.clear();
     room.investmentCaps = getInvestmentCaps(room);
@@ -3519,6 +4230,8 @@ function startInvesting(room) {
         round: room.currentRound,
         totalRounds: room.totalRounds,
     });
+    // Пока игроки вкладывают, зал выбирает лучший питч
+    openAudienceVote(room, 'pitch', allPresentations.map(p => ({ id: p.id, nickname: p.nickname })));
 
     // ═══════ НОВОЕ — проверяем, вдруг все уже "проголосовали" ═══════
     if (room.investments.size >= room.players.size) {
@@ -3534,6 +4247,7 @@ function startInvesting(room) {
 function processInvestments(room) {
     clearTimer(room);
     room.state = 'roundResults';
+    closeAudienceVote(room);
 
     const roundInvestments = new Map();
     room.players.forEach(p => roundInvestments.set(p.id, 0));
@@ -3611,6 +4325,7 @@ function processInvestments(room) {
             if (p) p.tbReady = false;
         });
 
+        if (room.gstats) room.gstats.tieRounds[room.currentRound] = true;
         broadcastToRoom(room, {
             type: 'roundResultsTied',
             phase: 'tiebreaker_announce',
@@ -3749,6 +4464,7 @@ function processTiebreaker(room) {
 }
 
 function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) {
+    statsPhase(room, 'results');
     clearTimer(room);
     room.state = 'roundResults';
 
@@ -3831,12 +4547,20 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
     });
 
     // Сохраняем историю
+    const capitalsAfter = {};
+    room.players.forEach(p => { capitalsAfter[p.id] = p.capital; });
     room.roundHistory.push({
         round: room.currentRound,
         winners: roundWinners.map(id => {
             const p = room.players.get(id);
             return p ? p.nickname : '???';
         }),
+        winnerIds: roundWinners.slice(),
+        attracted: mapToObj(roundInvestments),
+        capitals: capitalsAfter,
+        crowd: JSON.parse(JSON.stringify(room.crowdTally || {})),
+        audience: room.lastAudience || null,
+        event: room.currentEvent || null,
         investmentDetails,
         luckyInvestors,
     });
@@ -3867,6 +4591,7 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
         luckyInvestors,
         roundBestInvestor,
         crowdFavorite: roundCrowdFavorite,
+        audience: room.lastAudience || null,
         players: getPlayersPublicInfo(room),
         isLastRound,
     });
@@ -3912,6 +4637,8 @@ function showFinalResults(room) {
         bestInvestor: bestInvestor ? { nickname: bestInvestor.nickname, capital: bestInvestor.capital } : null,
         bestEntrepreneur: bestEntrepreneur ? { nickname: bestEntrepreneur.nickname, attracted: bestEntrepreneur.attractedInvestments } : null,
         crowdFavorite: pickCrowdFavorite(room, room.crowdGame),
+        audiencePrize: audiencePrize(room),
+        analytics: room.settings.postGameAnalytics ? buildClassicAnalytics(room) : null,
         roundHistory: room.roundHistory,
     });
 
@@ -4296,9 +5023,12 @@ wss.on('connection', (ws) => {
                 const player = room.players.get(info.playerId);
                 if (!player || !player.actionCards) return;
                 if (room.state !== 'bunkerReveal' && room.state !== 'bunkerVote') return;
+                var acType = (player.actionCards.find(c => c.id === msg.cardId) || {}).type;
                 var acResult = handleBunkerActionCard(room, player, msg);
                 if (acResult && acResult.error) {
                     ws.send(JSON.stringify({ type: 'error', message: acResult.error }));
+                } else if (room.gstats && acType) {
+                    room.gstats.bunker.actions.push({ id: player.id, type: acType, round: room.bunker.currentRound + 1, target: msg.targetPlayerId || null });
                 }
                 break;
             }
@@ -4365,13 +5095,23 @@ wss.on('connection', (ws) => {
                         var hostTimerR = disconnectTimers.get(reconnPlayerId);
                         if (hostTimerR) { clearTimeout(hostTimerR); disconnectTimers.delete(reconnPlayerId); }
                         reconnSpectator.ws = ws;
+                        reconnSpectator.connected = true;
                         browserClients.delete(ws);
                         playerRooms.set(ws, { roomCode: reconnCode, playerId: reconnPlayerId, isSpectator: true });
                         if (reconnSpectator.isHost && reconnRoom.hostId === reconnPlayerId) {
                             ws.send(JSON.stringify({ type: 'hostObserving', reconnect: true }));
                             console.log(`[RECONNECT] Ведущий "${reconnSpectator.nickname}" вернулся в ${reconnCode}`);
                         }
-                        sendCurrentStateToPlayer(reconnRoom, { id: reconnPlayerId, cards: {}, actionCards: [] }, ws);
+                        if (reconnRoom.state === 'lobby' && !reconnSpectator.isHost) {
+                            ws.send(JSON.stringify({ type: 'joinedAsSpectator', roomCode: reconnCode, playerId: reconnPlayerId, nickname: reconnSpectator.nickname, inLobby: true, reconnect: true }));
+                            ws.send(JSON.stringify(getLobbyState(reconnRoom)));
+                            if (reconnRoom.twitch) ws.send(JSON.stringify(twitchStatusMessage(reconnRoom)));
+                        } else {
+                            // Свежая страница не знает, что это зритель, — говорим до того, как придёт экран этапа
+                            if (!reconnSpectator.isHost) ws.send(JSON.stringify({ type: 'joinedAsSpectator', roomCode: reconnCode, playerId: reconnPlayerId, nickname: reconnSpectator.nickname, reconnect: true }));
+                            sendCurrentStateToPlayer(reconnRoom, { id: reconnPlayerId, cards: {}, actionCards: [] }, ws);
+                        }
+                        broadcastToRoom(reconnRoom, { type: 'spectatorsUpdate', spectators: getSpectatorsPublicInfo(reconnRoom) });
                     } else {
                         ws.send(JSON.stringify({ type: 'reconnectFailed', reason: 'Игрок не найден.' }));
                     }
@@ -4404,9 +5144,17 @@ wss.on('connection', (ws) => {
                 if (!paInfo) break;
                 var paRoom = rooms.get(paInfo.roomCode);
                 if (!paRoom || paRoom.hostId !== paInfo.playerId) break;
-                // Перемещаем зрителей в игроки
+                // Зрители садятся за стол на свободные места: ведущий — всегда, остальные — кто пришёл
+                // играть (не по QR «Смотреть») и на связи. Кому не хватило места — остаются в зале.
                 if (paRoom.spectators) {
+                    var seatsFree = (paRoom.settings.maxPlayers || 8) - countPlayingSeats(paRoom);
+                    var seated = [];
                     paRoom.spectators.forEach(function(spec, specId) {
+                        if (specId !== paRoom.hostId) {
+                            if (spec.wantsToWatch || spec.connected === false || seatsFree <= 0) return;
+                            seatsFree--;
+                        }
+                        seated.push(specId);
                         paRoom.players.set(specId, {
                             id: specId,
                             nickname: spec.nickname,
@@ -4422,8 +5170,9 @@ wss.on('connection', (ws) => {
                         });
                         if (spec.ws) playerRooms.set(spec.ws, { roomCode: paRoom.code, playerId: specId });
                     });
-                    paRoom.spectators.clear();
+                    seated.forEach(function (id) { paRoom.spectators.delete(id); });
                 }
+                resetAudience(paRoom);
                 // Сбрасываем состояние комнаты в лобби
                 clearTimer(paRoom);
                 disconnectTimers.forEach(function(tid, pid) {
@@ -4544,6 +5293,7 @@ wss.on('connection', (ws) => {
                     cmText = cmText.replace(/^!питч\s+/i, '').trim();
                 }
                 sendChatMsg(cmRoom, cmType, cmText, cmPlayer.id, cmPlayer.nickname);
+                statsChat(cmRoom, cmPlayer.id, !!cmInfo.isSpectator);
                 break;
             }
 
@@ -4626,32 +5376,46 @@ wss.on('connection', (ws) => {
                             return;
                         }
                         // Новый ник — добавляем зрителем
-                        var specId = uuidv4();
-                        var spectator = { id: specId, nickname: nickname, ws: ws };
-                        if (!room.spectators) room.spectators = new Map();
-                        room.spectators.set(specId, spectator);
-                        playerRooms.set(ws, { roomCode: room.code, playerId: specId, isSpectator: true });
-                        browserClients.delete(ws);
+                        if (countViewers(room) >= AUDIENCE_MAX) {
+                            ws.send(JSON.stringify({ type: 'error', message: 'Зрительный зал переполнен.' }));
+                            return;
+                        }
+                        // Пришёл играть, а партия уже идёт — посмотрит эту и сядет за стол в следующей (если будет место)
+                        var spectator = addSpectator(room, ws, nickname, !!msg.watch);
+                        var specId = spectator.id;
                         ws.send(JSON.stringify({
                             type: 'joinedAsSpectator',
                             roomCode: room.code,
                             playerId: specId,
-                            message: 'Игра уже идёт. Вы смотрите как зритель.',
+                            nickname: spectator.nickname,
+                            message: 'Игра уже идёт — вы в зрительном зале.',
                         }));
-                        // Уведомляем комнату о новом зрителе
-                        broadcastToRoom(room, {
-                            type: 'spectatorsUpdate',
-                            spectators: getSpectatorsPublicInfo(room),
-                        });
+                        broadcastAudienceChange(room);
                         sendCurrentStateToPlayer(room, { id: specId, cards: {}, actionCards: [] }, ws);
-                        console.log(`[SPECTATOR] "${nickname}" joined ${code} as spectator`);
+                        console.log(`[SPECTATOR] "${spectator.nickname}" joined ${code} as spectator`);
                     }
                     return;
                 }
-                if (countPlayingSeats(room) >= (room.settings.maxPlayers || 8)) {
-                    var maxP = room.settings.maxPlayers || 8;
-                    ws.send(JSON.stringify({ type: 'error', message: 'Комната заполнена (максимум ' + maxP + ' игроков).' }));
-                    return;
+                // Пришёл смотреть (QR «Смотреть») или мест за столом нет — в зрительный зал, а не ошибка
+                var seatsFull = countPlayingSeats(room) >= (room.settings.maxPlayers || 8);
+                if (msg.watch || seatsFull) {
+                    if (countViewers(room) >= AUDIENCE_MAX) {
+                        ws.send(JSON.stringify({ type: 'error', message: seatsFull ? 'Комната заполнена, и зрительный зал тоже.' : 'Зрительный зал переполнен.' }));
+                        return;
+                    }
+                    var lobbySpec = addSpectator(room, ws, nickname, !!msg.watch);
+                    ws.send(JSON.stringify({
+                        type: 'joinedAsSpectator',
+                        roomCode: room.code,
+                        playerId: lobbySpec.id,
+                        nickname: lobbySpec.nickname,
+                        inLobby: true,
+                        message: msg.watch ? 'Вы в зрительном зале' : 'Мест за столом нет — вы в зрительном зале. Освободится место — сможете сесть',
+                    }));
+                    broadcastAudienceChange(room);
+                    if (room.twitch) ws.send(JSON.stringify(twitchStatusMessage(room)));
+                    console.log(`[SPECTATOR] "${lobbySpec.nickname}" joined ${code} lobby as spectator`);
+                    break;
                 }
                 let nickTaken = false;
                 room.players.forEach(p => {
@@ -4689,23 +5453,61 @@ wss.on('connection', (ws) => {
                 if (!allowReaction(ws)) return;
                 touchRoom(room);
 
-                const out = {
-                    type: 'playerEmotion',
+                emitReaction(room, {
                     playerId: info.playerId,
                     nickname: info.isSpectator ? sender.nickname : getDisplayNickname(room, info.playerId),
                     emotion: em,
                     spectator: !!info.isSpectator,
-                };
-                // Во время выступления реакция засчитывается выступающему (себе — не считается)
-                if (room.state === 'presentation') {
-                    const presenterId = room.presentationOrder[room.currentPresenterIndex];
-                    if (presenterId && presenterId !== info.playerId) {
-                        if (!room.crowdTally) room.crowdTally = {};
-                        out.presenterId = presenterId;
-                        out.tally = addTally(room.crowdTally, presenterId, em);
-                    }
+                });
+                break;
+            }
+
+            // ==================== ЗРИТЕЛЬНЫЙ ЗАЛ ====================
+            case 'takeSeat': {
+                // Зритель садится за стол, если в лобби есть свободное место
+                const info = playerRooms.get(ws);
+                if (!info || !info.isSpectator) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'lobby' || !room.spectators) return;
+                const spec = room.spectators.get(info.playerId);
+                if (!spec || spec.isHost) return;
+                if (countPlayingSeats(room) >= (room.settings.maxPlayers || 8)) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Свободных мест пока нет.' }));
+                    return;
                 }
-                broadcastToRoom(room, out);
+                room.spectators.delete(spec.id);
+                addPlayer(room, spec.id, spec.nickname, ws);
+                playerRooms.set(ws, { roomCode: room.code, playerId: spec.id });
+                ws.send(JSON.stringify({ type: 'seatTaken', playerId: spec.id }));
+                broadcastAudienceChange(room);
+                break;
+            }
+            case 'leaveSeat': {
+                // Игрок в лобби решил только смотреть (хост не может — он ведёт комнату)
+                const info = playerRooms.get(ws);
+                if (!info || info.isSpectator) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'lobby' || room.hostId === info.playerId) return;
+                const player = room.players.get(info.playerId);
+                if (!player) return;
+                room.players.delete(player.id);
+                if (!room.spectators) room.spectators = new Map();
+                room.spectators.set(player.id, { id: player.id, nickname: player.nickname, ws: ws, connected: true, wantsToWatch: true });
+                playerRooms.set(ws, { roomCode: room.code, playerId: player.id, isSpectator: true });
+                ws.send(JSON.stringify({ type: 'seatLeft', playerId: player.id }));
+                broadcastAudienceChange(room);
+                break;
+            }
+            case 'audienceVote': {
+                const info = playerRooms.get(ws);
+                if (!info || !info.isSpectator) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || !room.spectators) return;
+                const spec = room.spectators.get(info.playerId);
+                if (!spec || spec.isHost) return; // ведущий судит, а не голосует
+                if (recordAudienceVote(room, 'sp:' + spec.id, String(msg.targetId || ''))) {
+                    ws.send(JSON.stringify({ type: 'audienceVoteAccepted', targetId: msg.targetId }));
+                }
                 break;
             }
 
@@ -4732,6 +5534,11 @@ wss.on('connection', (ws) => {
                 if (s.bunkerSurvivors !== undefined) room.settings.bunkerSurvivors = normalizeSurvivors(s.bunkerSurvivors);
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
+                if (s.postGameAnalytics !== undefined) room.settings.postGameAnalytics = !!s.postGameAnalytics;
+                if (s.twitchChannel !== undefined) {
+                    room.settings.twitchChannel = normalizeTwitchChannel(s.twitchChannel);
+                    twitchSetChannel(room, room.settings.twitchChannel);
+                }
                 if (s.chatTTS !== undefined) room.settings.chatTTS = !!s.chatTTS;
                 if (s.roomPrivate !== undefined) room.settings.roomPrivate = !!s.roomPrivate;
                 if (s.roomPassword !== undefined) room.settings.roomPassword = String(s.roomPassword || '').trim().substring(0, 30);
@@ -4826,6 +5633,7 @@ wss.on('connection', (ws) => {
                 if (!player) return;
 
                 player.isReady = true;
+                statsReady(room, player.id);
 
                 // Сохраняем текст если пришёл
                 if (msg.text !== undefined) {
@@ -4946,7 +5754,7 @@ wss.on('connection', (ws) => {
 
                 const hands = room.questionHands;
                 const idx = hands.indexOf(info.playerId);
-                if (msg.up && idx === -1) hands.push(info.playerId);
+                if (msg.up && idx === -1) { hands.push(info.playerId); statsHand(room, info.playerId); }
                 else if (!msg.up && idx !== -1) hands.splice(idx, 1);
                 else return;
 
@@ -4977,7 +5785,21 @@ wss.on('connection', (ws) => {
                 const targetId = msg.targetPlayerId;
                 if (!targetId || targetId === room.hostId) return;
                 const target = room.players.get(targetId);
-                if (!target) return;
+                if (!target) {
+                    // Хост может выгнать и зрителя (например, тролля из зала)
+                    const spec = room.spectators && room.spectators.get(targetId);
+                    if (!spec || spec.isHost) return;
+                    room.spectators.delete(targetId);
+                    const sTimer = disconnectTimers.get(targetId);
+                    if (sTimer) { clearTimeout(sTimer); disconnectTimers.delete(targetId); }
+                    if (spec.ws && spec.ws.readyState === WebSocket.OPEN) {
+                        playerRooms.delete(spec.ws);
+                        spec.ws.send(JSON.stringify({ type: 'kicked', message: 'Ведущий удалил вас из зрительного зала.' }));
+                        setTimeout(() => { try { spec.ws.close(); } catch (e) { /* ignore */ } }, 100);
+                    }
+                    broadcastAudienceChange(room);
+                    return;
+                }
 
                 room.players.delete(targetId);
                 room.presentationOrder = (room.presentationOrder || []).filter(id => id !== targetId);
@@ -5089,6 +5911,7 @@ wss.on('connection', (ws) => {
                 }
 
                 room.investments.set(info.playerId, validInvestments);
+                statsInvested(room, info.playerId);
                 ws.send(JSON.stringify({ type: 'investmentAccepted', total }));
 
                 broadcastToRoom(room, {
@@ -5352,15 +6175,25 @@ wss.on('connection', (ws) => {
                     disconnectTimers.set(info.playerId, hostTimerId);
                     return;
                 }
-                // Если это зритель — удаляем и уведомляем
+                // Зритель отключился: держим место в зале минуту (телефон уснул, страница перезагрузилась)
                 if (info.isSpectator && room.spectators) {
-                    room.spectators.delete(info.playerId);
                     playerRooms.delete(ws);
-                    broadcastToRoom(room, {
-                        type: 'spectatorsUpdate',
-                        spectators: getSpectatorsPublicInfo(room),
-                    });
-                    broadcastRoomsList();
+                    var goneSpec = room.spectators.get(info.playerId);
+                    if (goneSpec) {
+                        goneSpec.ws = null;
+                        goneSpec.connected = false;
+                        var specTimer = setTimeout(function () {
+                            disconnectTimers.delete(info.playerId);
+                            var r = rooms.get(info.roomCode);
+                            var s2 = r && r.spectators && r.spectators.get(info.playerId);
+                            if (s2 && s2.connected === false) {
+                                r.spectators.delete(info.playerId);
+                                broadcastAudienceChange(r);
+                            }
+                        }, SPECTATOR_GRACE_MS);
+                        disconnectTimers.set(info.playerId, specTimer);
+                    }
+                    broadcastToRoom(room, { type: 'spectatorsUpdate', spectators: getSpectatorsPublicInfo(room) });
                     return;
                 }
                 const player = room.players.get(info.playerId);
@@ -5444,6 +6277,8 @@ function destroyRoom(room, reason) {
     if (!room || !rooms.has(room.code)) return;
 
     clearTimer(room);
+    twitchStop(room);
+    if (room.audienceTick) { clearTimeout(room.audienceTick); room.audienceTick = null; }
     if (room.autoFinalTimer) { clearTimeout(room.autoFinalTimer); room.autoFinalTimer = null; }
 
     // Таймеры реконнекта игроков этой комнаты больше не нужны
@@ -6112,6 +6947,8 @@ function finishBunkerDraft(room) {
 
 function startBunkerGame(room) {
     room.players.forEach(p => { p.eliminated = false; p.draftAutoPicked = 0; });
+    resetAudience(room);
+    resetGameStats(room, 'bunker');
     room.bunkerUsedWords = {}; // новая партия — слова прошлой снова можно выдавать
     if (room.settings.bunkerDraft !== false) {
         startBunkerDraft(room);
@@ -6344,6 +7181,7 @@ function bunkerRevealCard(room, playerId, cardKey, isAuto) {
     if (room.bunker.revealedCards[playerId][cardKey]) return; // уже раскрыта
 
     room.bunker.revealedCards[playerId][cardKey] = true;
+    if (room.gstats) room.gstats.bunker.reveals.push({ id: playerId, key: cardKey, round: room.bunker.currentRound + 1, auto: !!isAuto });
 
     var player = room.players.get(playerId);
     var cardValue = player && player.cards ? player.cards[cardKey] : '???';
@@ -6374,6 +7212,7 @@ function showBunkerCurrentTurn(room) {
 
     var currentPlayerId = activePlayers[room.bunker.currentTurnIndex];
     room.bunker.hasRevealedThisTurn = false;
+    statsTurnStart(room, currentPlayerId);
     var currentNick = room.players.get(currentPlayerId) ? room.players.get(currentPlayerId).nickname : '???';
     sendChatMsg(room, 'system', 'Раунд ' + (room.bunker.currentRound + 1) + ' — ход игрока ' + currentNick);
     broadcastToRoom(room, {
@@ -6397,6 +7236,8 @@ function showBunkerCurrentTurn(room) {
 }
 
 function startBunkerVoting(room) {
+    statsTurnEnd(room);
+    if (room.gstats) room.gstats.bunker.voteStart = Date.now();
     sendChatMsg(room, 'event', 'Начинается голосование! Выберите кого исключить из бункера.');
     // После раунда 1 голосование пропускаем — по одному предмету нечестно оценивать
     if (room.bunker.currentRound === 0) {
@@ -6462,6 +7303,8 @@ function startBunkerVoting(room) {
         players: getPlayersPublicInfo(room),
         round: room.bunker.currentRound,
     });
+    // Зал тем временем решает, кого бы он спас
+    openAudienceVote(room, 'save', activePlayers.map(id => ({ id: id, nickname: room.players.get(id) ? room.players.get(id).nickname : '???' })));
 
     if (room.bunker.votes.size >= room.players.size) {
         processBunkerVotes(room);
@@ -6477,6 +7320,17 @@ function startBunkerVoting(room) {
 
 function processBunkerVotes(room) {
     clearTimer(room);
+    closeAudienceVote(room);
+    if (room.gstats && room.gstats.bunker.voteStart) {
+        room.gstats.bunker.voteSec.push(Math.round((Date.now() - room.gstats.bunker.voteStart) / 1000));
+        room.gstats.bunker.voteStart = null;
+    }
+    if (room.gstats) {
+        // Бюллетени — только тех, кто ещё в игре
+        var ballots = {};
+        room.bunker.votes.forEach(function (target, voter) { if (!room.bunker.eliminatedPlayers.includes(voter)) ballots[voter] = target; });
+        room.gstats.bunker.rounds.push({ round: room.bunker.currentRound + 1, ballots: ballots, eliminatedId: null, skipped: false, audience: room.lastAudience || null });
+    }
 
     var activePlayers = getBunkerActivePlayers(room);
 
@@ -6528,6 +7382,7 @@ function processBunkerVotes(room) {
     if (activeSkipCount > activeVoterCount / 2) {
         broadcastToRoom(room, {
             type: 'bunkerVoteResult',
+        audience: room.lastAudience || null,
             result: 'skipped',
             voteCounts: activeVoteCounts,
             skipCount: activeSkipCount,
@@ -6547,6 +7402,7 @@ function processBunkerVotes(room) {
         // Никто ни за кого не голосовал
         broadcastToRoom(room, {
             type: 'bunkerVoteResult',
+        audience: room.lastAudience || null,
             result: 'skipped',
             voteCounts: activeVoteCounts,
             skipCount: activeSkipCount,
@@ -6668,6 +7524,7 @@ function processBunkerTieVotes(room) {
         // Никто не проголосовал — пропуск
         broadcastToRoom(room, {
             type: 'bunkerVoteResult',
+        audience: room.lastAudience || null,
             result: 'skipped',
             voteCounts: tieVoteCounts,
             skipCount: 0,
@@ -6679,6 +7536,11 @@ function processBunkerTieVotes(room) {
 
 function eliminateFromBunker(room, eliminatedId, voteCounts) {
     room.bunker.eliminatedPlayers.push(eliminatedId);
+    if (room.gstats) {
+        var gb = room.gstats.bunker, lastR = gb.rounds[gb.rounds.length - 1];
+        if (lastR && !lastR.eliminatedId) { lastR.eliminatedId = eliminatedId; lastR.eliminatedVotes = voteCounts ? voteCounts[eliminatedId] || null : null; }
+        gb.elims.push({ id: eliminatedId, round: room.bunker.currentRound + 1, via: 'vote' });
+    }
 
     var player = room.players.get(eliminatedId);
     if (player) player.eliminated = true;
@@ -6697,6 +7559,7 @@ function eliminateFromBunker(room, eliminatedId, voteCounts) {
 
     broadcastToRoom(room, {
         type: 'bunkerVoteResult',
+        audience: room.lastAudience || null,
         result: 'eliminated',
         eliminatedId: eliminatedId,
         eliminatedNickname: player ? player.nickname : '???',
@@ -6740,6 +7603,7 @@ function removeFromBunkerGame(room, targetId, reason, nicknameFallback) {
 
     room.bunker.eliminatedPlayers.push(targetId);
     if (target) target.eliminated = true;
+    if (room.gstats) room.gstats.bunker.elims.push({ id: targetId, round: room.bunker.currentRound + 1, via: reason || 'left' });
 
     if (room.bunker.revealedCards[targetId]) {
         getBunkerCardKeys().forEach(key => {
@@ -6885,6 +7749,8 @@ function endBunkerGame(room) {
         }),
         globalProblem: room.bunker.globalProblem,
         allPlayers: allPlayersData,
+        audiencePrize: audiencePrize(room),
+        analytics: room.settings.postGameAnalytics ? buildBunkerAnalytics(room) : null,
         players: getPlayersPublicInfo(room),
     });
 
@@ -7214,6 +8080,7 @@ function dealCardsFromDatabase(room) {
 }
 
 function sendRoundStartToAll(room) {
+    statsPrepStart(room);
     room.players.forEach(p => {
         sendToPlayer(room, p.id, {
             type: 'roundStart',

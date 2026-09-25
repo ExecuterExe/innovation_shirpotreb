@@ -3,6 +3,7 @@ import { sendMsg, leaveRoom } from '../socket.js';
 import { CARD_TYPES } from './presentation.js';
 import { countUp, burst } from '../components/fx.js';
 import { reactionEmoji } from '../components/reactions.js';
+import { audienceResultHtml } from '../components/audience.js';
 
 export function renderResults(container) {
     var winners = state.roundWinners || [];
@@ -74,6 +75,7 @@ export function renderResults(container) {
     html += '</div>';
 
     html += crowdFavoriteHtml(state.roundCrowdFavorite, 'раунда');
+    html += audienceResultHtml(state.roundAudience);
 
     // ═══════ WINNER RECAP ═══════
     if (winners.length > 0) {

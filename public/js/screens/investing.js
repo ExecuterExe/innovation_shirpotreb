@@ -4,6 +4,7 @@ import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { CARD_TYPES } from './presentation.js';
 import { coinBurst } from '../components/fx.js';
+import { audienceVoteHtml, bindAudienceVote } from '../components/audience.js';
 
 export function renderInvesting(container) {
     var presentations = (state.presentations || []).filter(function (p) { return p.id !== state.playerId; });
@@ -423,6 +424,7 @@ function renderInvestingObserver(container, presentations, isHost) {
     html += '</div>';
 
     html += observerNoticeHtml('Игроки распределяют жетоны между проектами. Итоги раунда появятся, когда все подтвердят вложения или выйдет время.');
+    html += audienceVoteHtml();
 
     html += '<div class="text-center mb-6">';
     html += '  <div id="invest-progress" class="text-sm font-bold text-accent-blue"></div>';
@@ -450,6 +452,7 @@ function renderInvestingObserver(container, presentations, isHost) {
     html += '</div>';
 
     container.innerHTML = html;
+    bindAudienceVote(container);
 
     var btnExitGame = container.querySelector('#btn-exit-game');
     if (btnExitGame) btnExitGame.addEventListener('click', function () {

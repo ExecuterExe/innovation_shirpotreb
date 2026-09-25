@@ -1,3 +1,5 @@
+import { refreshAudience } from './components/audience.js';
+import { twitchStatusHtml } from './screens/lobby.js';
 import { refreshPrepReady } from './screens/preparation.js';
 import { refreshBunkerDraft, resetBunkerDraftStep, updateBunkerDraftProgress } from './screens/bunker-draft.js';
 import { state, setState, navigate, startTimer, escapeHtml } from './app.js';
@@ -380,10 +382,47 @@ function handleMessage(msg) {
             break;
 
         case 'joinedAsSpectator':
-            setState({ playerId: msg.playerId, roomCode: msg.roomCode, isSpectator: true });
-            try { sessionStorage.removeItem('gameSession'); } catch (e) {} // зрители не восстанавливают сессию
-            showNotification('👀 ' + (msg.message || 'Вы смотрите как зритель'), 'info');
-            // gameStateSync придёт следующим и переведёт на нужный экран
+            setState({ playerId: msg.playerId, roomCode: msg.roomCode, isSpectator: true, isHost: false });
+            // Сессия зрителя тоже сохраняется: телефон уснул или страница перезагрузилась — вернёмся в зал
+            try { sessionStorage.setItem('gameSession', JSON.stringify({ playerId: msg.playerId, roomCode: msg.roomCode, spectator: true })); } catch (e) {}
+            if (!msg.reconnect) showNotification('👀 ' + (msg.message || 'Вы смотрите как зритель'), 'info');
+            // В лобби следом придёт lobbyUpdate, в игре — состояние этапа
+            break;
+
+        case 'seatTaken':
+            setState({ isSpectator: false });
+            showNotification('🪑 Вы за столом — играете в следующей партии', 'success');
+            break;
+
+        case 'seatLeft':
+            setState({ isSpectator: true, isHost: false });
+            showNotification('👀 Вы в зрительном зале', 'info');
+            break;
+
+        // ═══════ ЗРИТЕЛЬНЫЙ ЗАЛ ═══════
+        case 'audienceOpen':
+            setState({ audience: { open: true, kind: msg.kind, candidates: msg.candidates || [], count: msg.count || 0, twitch: msg.twitch || 0, myVote: msg.myVote || null } });
+            refreshAudience();
+            break;
+
+        case 'audienceProgress':
+            if (state.audience) { state.audience.count = msg.count; state.audience.twitch = msg.twitch; }
+            refreshAudience(true);
+            break;
+
+        case 'audienceClosed':
+            if (state.audience) state.audience.open = false;
+            refreshAudience();
+            break;
+
+        case 'audienceVoteAccepted':
+            break;
+
+        case 'twitchStatus':
+            setState({ twitch: msg.channel ? { channel: msg.channel, status: msg.status } : null });
+            refreshAudience();
+            var twEl = document.getElementById('twitch-status');
+            if (twEl) twEl.outerHTML = twitchStatusHtml();
             break;
 
         case 'playerDisconnected':
@@ -424,6 +463,7 @@ function handleMessage(msg) {
         case 'spectatorsUpdate':
             setState({ spectators: msg.spectators || [] });
             updateRail();
+            refreshAudience();
             break;
 
         case 'hostObserving':
@@ -629,7 +669,7 @@ function handleLobbyUpdate(msg) {
     }
 
     // В лобби все снова игроки: и ведущий-наблюдатель, и зрители после «Играть ещё»
-    var updates = { players: msg.players, spectators: msg.spectators || [], settings: msg.settings, isHost: amIHost };
+    var updates = { players: msg.players, spectators: msg.spectators || [], settings: msg.settings, isHost: amIHost, twitch: msg.twitch || null };
     if (amIPlayer) updates.isSpectator = false;
     setState(updates);
 
@@ -818,6 +858,7 @@ function handleRoundResults(msg) {
         luckyInvestors: msg.luckyInvestors,
         roundBestInvestor: msg.roundBestInvestor || null,
         roundCrowdFavorite: msg.crowdFavorite || null,
+        roundAudience: msg.audience || null,
         isLastRound: msg.isLastRound,
         currentRound: msg.round
     });
@@ -878,6 +919,8 @@ function handleGameOver(msg) {
         bestInvestor: msg.bestInvestor,
         bestEntrepreneur: msg.bestEntrepreneur,
         gameCrowdFavorite: msg.crowdFavorite || null,
+        audiencePrize: msg.audiencePrize || null,
+        gameAnalytics: msg.analytics || null,
     });
 
     navigate('gameOver');
@@ -1164,6 +1207,8 @@ function handleBunkerGameOver(msg) {
     setState({
         bunker: bunker,
         players: msg.players || state.players,
+        audiencePrize: msg.audiencePrize || null,
+        gameAnalytics: msg.analytics || null,
     });
 
     navigate('bunkerGameOver');

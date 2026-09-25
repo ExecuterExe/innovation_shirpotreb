@@ -7,6 +7,7 @@
 import { state, escapeHtml } from '../app.js';
 import { sendMsg } from '../socket.js';
 import { buildReactionBarHtml, bindReactionButtons } from './reactions.js';
+import { audiencePanelHtml, bindAudiencePanel } from './audience.js';
 import { BUNKER_CARD_TYPES, openBunkerPlayerDetail, getBunkerRevealedValue } from '../screens/bunker-game.js';
 
 var BUNKER_PHASES = ['bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver'];
@@ -202,9 +203,11 @@ export function mountRail(aside) {
     html += '  <div class="rail-head"><span>Реакции</span><span class="rail-hint">клавиши 1–8</span></div>';
     html += buildReactionBarHtml();
     html += '</div>';
+    html += audiencePanelHtml();
     html += '<div id="rail-extra"></div>';
     aside.innerHTML = html;
     bindReactionButtons(aside);
+    bindAudiencePanel(aside);
     bindRows(aside);
 }
 

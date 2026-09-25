@@ -72,6 +72,7 @@ export function renderWelcome(container) {
 
     html += '<div id="w-password-wrap" class="hidden">';
     html += '<input type="text" id="w-password" class="input-corp text-sm" placeholder="🔑 Пароль (для закрытой комнаты)" maxlength="30" autocomplete="off">';
+    html += '<button id="btn-watch" class="watch-link">👀 Не играть, а смотреть игру</button>';
     html += '</div>';
 
     html += '<button id="btn-solo" class="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-bold cursor-pointer btn-ghost">';
@@ -226,14 +227,16 @@ export function renderWelcome(container) {
 
     if (btnJoin) {
         btnJoin.addEventListener('click', function () {
-            doJoinRoom(container);
+            doJoinRoom(container, container.dataset.watch === '1');
         });
     }
+    var btnWatch = container.querySelector('#btn-watch');
+    if (btnWatch) btnWatch.addEventListener('click', function () { doJoinRoom(container, true); });
 
     if (nicknameInput) {
         nicknameInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
-                if (codeInput && codeInput.value.trim()) doJoinRoom(container);
+                if (codeInput && codeInput.value.trim()) doJoinRoom(container, container.dataset.watch === '1');
                 else doCreateRoom(container);
             }
         });
@@ -241,7 +244,7 @@ export function renderWelcome(container) {
 
     if (codeInput) {
         codeInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') doJoinRoom(container);
+            if (e.key === 'Enter') doJoinRoom(container, container.dataset.watch === '1');
         });
         codeInput.addEventListener('input', function () {
             var wrap = container.querySelector('#w-password-wrap');
@@ -656,7 +659,7 @@ function setButtonPending(btn, pendingText) {
 // Возвращает кнопки Create/Join в исходное состояние — вызывается при ошибке от сервера
 // (например, неверный код комнаты), чтобы кнопка не осталась залипшей в состоянии загрузки.
 export function resetWelcomeButtons() {
-    var btns = document.querySelectorAll('#btn-create, #btn-join');
+    var btns = document.querySelectorAll('#btn-create, #btn-join, #btn-watch');
     for (var i = 0; i < btns.length; i++) {
         var btn = btns[i];
         if (btn.dataset.originalHtml) {
@@ -681,7 +684,7 @@ function doCreateRoom(container) {
     sendMsg({ type: 'createRoom', nickname: nickname, settings: {} });
 }
 
-function doJoinRoom(container) {
+function doJoinRoom(container, watch) {
     var nicknameInput = container.querySelector('#w-nickname');
     var codeInput = container.querySelector('#w-room-code');
     var passwordInput = container.querySelector('#w-password');
@@ -701,10 +704,10 @@ function doJoinRoom(container) {
         codeInput.focus();
         return;
     }
-    setButtonPending(container.querySelector('#btn-join'), 'Входим...');
+    setButtonPending(container.querySelector(watch ? '#btn-watch' : '#btn-join'), watch ? '👀 Входим в зал...' : 'Входим...');
     // Приглашение использовано — после выхода из комнаты главная снова чистая
     try { if (location.search) history.replaceState(null, '', location.pathname); } catch (e) { }
-    sendMsg({ type: 'joinRoom', nickname: nickname, roomCode: code, password: password });
+    sendMsg({ type: 'joinRoom', nickname: nickname, roomCode: code, password: password, watch: !!watch });
 }
 
 // Ссылка-приглашение вида /?room=КОД: код уже вписан, остаётся назвать себя и войти
@@ -719,9 +722,21 @@ function applyInviteLink(container) {
     codeInput.value = code;
     var wrap = container.querySelector('#w-password-wrap');
     if (wrap) wrap.classList.remove('hidden');
+    // QR «Смотреть»: /?room=КОД&watch=1 — главная кнопка сразу ведёт в зрительный зал
+    var watch = false;
+    try { watch = new URLSearchParams(location.search).get('watch') === '1'; } catch (e) { }
     var banner = document.createElement('div');
     banner.className = 'invite-banner';
-    banner.innerHTML = '<span class="text-xl">📨</span><span>Вас пригласили в комнату <b>' + code + '</b> — введите позывной и нажмите «Войти»</span>';
+    if (watch) {
+        container.dataset.watch = '1';
+        var bj = container.querySelector('#btn-join');
+        if (bj) bj.innerHTML = '👀 Смотреть';
+        var bw = container.querySelector('#btn-watch');
+        if (bw) bw.classList.add('hidden');
+        banner.innerHTML = '<span class="text-xl">👀</span><span>Вас зовут смотреть игру в комнате <b>' + code + '</b> — назовите себя и нажмите «Смотреть»</span>';
+    } else {
+        banner.innerHTML = '<span class="text-xl">📨</span><span>Вас пригласили в комнату <b>' + code + '</b> — введите позывной и нажмите «Войти»</span>';
+    }
     card.insertBefore(banner, card.firstChild);
     if (nickInput) setTimeout(function () { nickInput.focus(); }, 300);
 }
