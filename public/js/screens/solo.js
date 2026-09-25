@@ -6,6 +6,7 @@ import { state, setState, navigate, escapeHtml } from '../app.js';
 import { logoSvg } from '../components/logo.js';
 import { burst } from '../components/fx.js';
 import { playSound } from '../components/sound.js';
+import { loadCardCatalog, cardCatalog, cardCatalogFailed, cardCategoriesHtml, bindCardCategories, decksInPlay, cleanSelection } from '../components/card-categories.js';
 
 // Звук — приятный бонус: если браузер его не разрешил, таймер всё равно должен идти
 function sound(name) { try { playSound(name); } catch (e) { } }
@@ -20,6 +21,7 @@ var DEFAULT_SETTINGS = {
     usePackaging: false,
     useEvents: false,
     pitchTime: 60,
+    cardCategories: {},   // темы карт: { колода: [id] }, {} — все
 };
 
 // Настройки запоминаются в браузере: вернулся — всё как было
@@ -163,6 +165,12 @@ export function renderSoloSettings(container) {
         html += '</div>';
     }
 
+    // Темы карт
+    html += '<div class="solo-section">';
+    html += '  <div class="solo-section-title">Темы карт <span>из каких слов собирать продукт</span></div>';
+    html += cardCategoriesHtml(s.cardCategories || {}, { decks: decksInPlay(s) });
+    html += '</div>';
+
     // Таймер питча
     html += '<div class="solo-section">';
     html += '  <div class="solo-section-title">Время на питч <span>таймер на экране продукта</span></div>';
@@ -200,6 +208,21 @@ export function renderSoloSettings(container) {
         r.addEventListener('change', function () { soloSettings.pitchTime = parseInt(r.value, 10) || 0; rerender(); });
     });
 
+    bindCardCategories(container,
+        function () { return soloSettings.cardCategories || {}; },
+        function (next) { soloSettings.cardCategories = next; rerender(); },
+        function () { renderSoloSettings(container); },
+        function () { showHint(container, 'Хотя бы одна тема в колоде должна остаться'); });
+    if (!cardCatalog() && !cardCatalogFailed()) {
+        loadCardCatalog().then(function () {
+            if (state.phase !== 'soloSettings') return;
+            // Темы могли поменяться с прошлого визита — лишнее выбрасываем
+            soloSettings.cardCategories = cleanSelection(soloSettings.cardCategories);
+            saveSettings();
+            renderSoloSettings(container);
+        });
+    }
+
     var btnLaunch = container.querySelector('#btn-solo-launch');
     if (btnLaunch) {
         btnLaunch.addEventListener('click', function () {
@@ -213,6 +236,18 @@ export function renderSoloSettings(container) {
             });
         });
     }
+}
+
+// Короткая подсказка над кнопкой запуска (в одиночном режиме нет общих уведомлений)
+function showHint(container, text) {
+    var old = container.querySelector('.solo-hint');
+    if (old) old.remove();
+    var el = document.createElement('div');
+    el.className = 'solo-hint';
+    el.textContent = text;
+    var launch = container.querySelector('#btn-solo-launch');
+    if (launch) launch.parentNode.insertBefore(el, launch);
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 2600);
 }
 
 // ═══════════════════════════════════════════
@@ -462,6 +497,7 @@ function fetchSoloCards(callback) {
         useHiddenDefects: on(s.useHiddenDefects),
         usePackaging: on(s.usePackaging),
         useEvents: on(s.useEvents),
+        cats: JSON.stringify(s.cardCategories || {}),
     });
 
     fetch('/api/solo-cards?' + params.toString())

@@ -3420,3 +3420,56 @@ body.ga-open { overflow: hidden; }
     .ga-rank-row { grid-template-columns: 22px 34px 1fr; row-gap: 4px; }
     .ga-rank-stats { grid-column: 3; justify-content: flex-start; gap: 10px; font-size: 0.74rem; }
 }
+
+/* ═══════════════════════════════════════════
+   ТЕМЫ КАРТ — выбор категорий слов (лобби, одиночный режим)
+   ═══════════════════════════════════════════ */
+.cc { padding: 14px 16px; border-radius: 16px; background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.07); }
+.cc-open { background: rgba(255, 199, 44, 0.035); border-color: rgba(255, 199, 44, 0.18); }
+.cc-loading { font-size: 0.78rem; font-weight: 700; color: #8a8a9a; }
+.cc-head { display: flex; align-items: center; gap: 12px; }
+.cc-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cc-head-text b { font-size: 0.9rem; font-weight: 900; color: #f0f0f5; }
+.cc-head-sub { font-size: 0.72rem; line-height: 1.4; color: #8a8a9a; }
+.cc-head-custom { color: #ffc72c; font-weight: 700; }
+.cc-expand { flex-shrink: 0; padding: 7px 14px; border-radius: 999px; font-size: 0.74rem; font-weight: 900; color: #15151e; background: #ffc72c; border: 1px solid #ffc72c; cursor: pointer; transition: transform 0.15s, filter 0.15s; }
+.cc-expand:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.cc-open .cc-expand { color: #c4c4d0; background: transparent; border-color: rgba(255, 255, 255, 0.15); }
+.cc-note { margin: 12px 0 4px; font-size: 0.7rem; line-height: 1.45; color: #8a8a9a; }
+.cc-deck { margin-top: 12px; padding: 12px; border-radius: 14px; background: #15151d; border: 1px solid #262632; animation: fadeIn 0.25s ease both; }
+.cc-deck-partial { border-color: color-mix(in srgb, var(--c) 40%, transparent); }
+.cc-deck-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.cc-deck-name { font-size: 0.82rem; font-weight: 900; color: var(--c); }
+.cc-deck-count { font-size: 0.7rem; font-weight: 700; color: #6e6e82; }
+.cc-deck-count b { color: #f0f0f5; }
+.cc-all { margin-left: auto; padding: 3px 10px; border-radius: 999px; font-size: 0.66rem; font-weight: 800; color: #c4c4d0; background: transparent; border: 1px solid rgba(255, 255, 255, 0.14); cursor: pointer; }
+.cc-all:hover { color: #fff; border-color: rgba(255, 255, 255, 0.3); }
+.cc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px 6px 7px; border-radius: 999px; font-size: 0.76rem; font-weight: 800; color: #7a7a8e; background: rgba(255, 255, 255, 0.02); border: 1px dashed rgba(255, 255, 255, 0.14); cursor: pointer; user-select: none; -webkit-user-select: none; transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s; }
+.cc-chip:hover { color: #d0d0dc; border-color: rgba(255, 255, 255, 0.28); }
+.cc-chip:active { transform: scale(0.96); }
+.cc-chip:disabled { cursor: default; }
+.cc-chip-check { width: 16px; height: 16px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 900; border: 1.5px solid rgba(255, 255, 255, 0.2); }
+.cc-chip i { font-style: normal; font-size: 0.66rem; font-weight: 800; opacity: 0.6; }
+.cc-chip-on { color: #f0f0f5; background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); }
+.cc-chip-on .cc-chip-check { color: #15151e; background: var(--c); border-color: var(--c); }
+.cc-chip-other .cc-chip-label { font-style: italic; }
+.cc-more { margin-top: 10px; }
+.cc-more summary { display: inline-block; font-size: 0.68rem; font-weight: 800; color: #6e6e82; cursor: pointer; list-style: none; }
+.cc-more summary::-webkit-details-marker { display: none; }
+.cc-more summary::before { content: '▸ '; }
+.cc-more[open] summary::before { content: '▾ '; }
+.cc-more summary:hover { color: #c4c4d0; }
+.cc-more-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.cc-more-row { font-size: 0.7rem; line-height: 1.45; color: #8a8a9a; }
+.cc-more-row b { color: #d0d0dc; font-weight: 800; }
+.cc-more-inc { color: #b0a070; }
+.lobby-preview-themes { margin-top: 10px; padding: 8px 12px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; line-height: 1.45; color: #ffc72c; background: rgba(255, 199, 44, 0.06); border: 1px solid rgba(255, 199, 44, 0.15); }
+.solo-hint { margin: 0 0 10px; padding: 9px 14px; border-radius: 12px; font-size: 0.78rem; font-weight: 800; text-align: center; color: #15151e; background: #ffc72c; animation: fadeIn 0.2s ease both; }
+@media (max-width: 640px) {
+    .cc { padding: 12px; }
+    .cc-head { flex-wrap: wrap; }
+    .cc-expand { width: 100%; }
+    .cc-deck { padding: 10px; }
+    .cc-chip { font-size: 0.72rem; padding: 6px 10px 6px 6px; }
+}

@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const analytics = require('./analytics');
+const CARD_CATEGORIES = require('./card-categories');
 
 const app = express();
 const server = http.createServer(app);
@@ -108,8 +109,16 @@ app.get('/api/random-combos', (req, res) => {
     res.json(list);
 });
 
+// Категории карт для лобби и одиночного режима
+app.get('/api/card-categories', (req, res) => {
+    res.json(cardCategoriesCatalog());
+});
+
 app.get('/api/solo-cards', (req, res) => {
     var settings = req.query;
+    // ?cats={"items":["food","home"]} — какие категории играют
+    var cats = {};
+    try { cats = normalizeCardCategories(JSON.parse(settings.cats || '{}')); } catch (e) { cats = {}; }
     var useModifier = settings.modifier && settings.modifier !== 'none';
     var modifierType = settings.modifier || 'none';
     var useReviews = settings.useReviews === 'true';
@@ -120,11 +129,11 @@ app.get('/api/solo-cards', (req, res) => {
     var useEvents = settings.useEvents === 'true';
 
     // Предмет
-    var itemObj = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+    var itemObj = ITEMS[randomDeckIndex(cats, 'items')];
     var gender = itemObj.gender;
 
     // Прилагательное
-    var adjRaw = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+    var adjRaw = ADJECTIVES[randomDeckIndex(cats, 'adjectives')];
     var adjective = declineAdjective(adjRaw, gender);
 
     var cards = {
@@ -134,13 +143,13 @@ app.get('/api/solo-cards', (req, res) => {
 
     // Особенность
     if (!pseudoMode) {
-        var featRaw = FEATURES[Math.floor(Math.random() * FEATURES.length)];
+        var featRaw = FEATURES[randomDeckIndex(cats, 'features')];
         cards.feature = declineFeature(featRaw, gender);
     }
 
     // Модификатор
     if (modifierType === 'addition') {
-        cards.modifier = ADDITIONS[Math.floor(Math.random() * ADDITIONS.length)];
+        cards.modifier = ADDITIONS[randomDeckIndex(cats, 'additions')];
     } else if (modifierType === 'metaphor') {
         // Генерируем метафору
         var useFemale = Math.random() < 0.5;
@@ -157,22 +166,22 @@ app.get('/api/solo-cards', (req, res) => {
 
     // Отзыв
     if (useReviews) {
-        cards.review = REVIEWS[Math.floor(Math.random() * REVIEWS.length)];
+        cards.review = REVIEWS[randomDeckIndex(cats, 'reviews')];
     }
 
     // Целевая аудитория
     if (useTargetAudience) {
-        cards.targetAudience = TARGET_AUDIENCE[Math.floor(Math.random() * TARGET_AUDIENCE.length)];
+        cards.targetAudience = TARGET_AUDIENCE[randomDeckIndex(cats, 'targetAudience')];
     }
 
     // Скрытый дефект
     if (useHiddenDefects) {
-        cards.hiddenDefect = HIDDEN_DEFECTS[Math.floor(Math.random() * HIDDEN_DEFECTS.length)];
+        cards.hiddenDefect = HIDDEN_DEFECTS[randomDeckIndex(cats, 'hiddenDefects')];
     }
 
     // Упаковка
     if (usePackaging) {
-        cards.packaging = PACKAGING[Math.floor(Math.random() * PACKAGING.length)];
+        cards.packaging = PACKAGING[randomDeckIndex(cats, 'packaging')];
     }
 
     // Событие
@@ -2433,6 +2442,146 @@ function generateRoomCode() {
     return code;
 }
 
+// ==================== КАТЕГОРИИ КАРТ ====================
+// Разметка слов — в card-categories.js. Категория, где меньше CATEGORY_MIN_CARDS карт, отдельно
+// не показывается: её карты играют в общей категории «Остальное». Как только в неё допишут слов
+// до порога, она сама станет отдельной. Ведущий в лобби выключает ненужные категории —
+// колоды комнаты тогда тасуются только из включённых (room.settings.cardCategories).
+const CATEGORY_MIN_CARDS = 30;
+const OTHER_CATEGORY = 'other';
+const CATEGORY_DECKS = ['items', 'adjectives', 'features', 'additions', 'reviews',
+    'targetAudience', 'hiddenDefects', 'packaging', 'gifts', 'historicalFacts'];
+let deckCategoriesCache = null;
+
+function deckListByKey(deck) {
+    switch (deck) {
+        case 'items': return ITEMS;
+        case 'adjectives': return ADJECTIVES;
+        case 'features': return FEATURES;
+        case 'additions': return ADDITIONS;
+        case 'reviews': return REVIEWS;
+        case 'targetAudience': return TARGET_AUDIENCE;
+        case 'hiddenDefects': return HIDDEN_DEFECTS;
+        case 'packaging': return PACKAGING;
+        case 'gifts': return GIFTS;
+        case 'historicalFacts': return HISTORICAL_FACTS;
+    }
+    return null;
+}
+
+function cardBaseWord(v) {
+    return String(typeof v === 'string' ? v : (v && v.word) || '').trim().toUpperCase();
+}
+
+// { deck: { label, total, groups: [{ id, label, emoji, indexes, includes? }] } } — считается один раз
+function deckCategories() {
+    if (deckCategoriesCache) return deckCategoriesCache;
+    var out = {};
+    CATEGORY_DECKS.forEach(function (deck) {
+        var list = deckListByKey(deck);
+        var src = CARD_CATEGORIES[deck] || { label: deck, categories: {} };
+        var order = Object.keys(src.categories || {});
+        var byWord = {};
+        order.forEach(function (id) {
+            (src.categories[id].words || []).forEach(function (w) { byWord[cardBaseWord(w)] = id; });
+        });
+        var fine = {};
+        list.forEach(function (v, i) {
+            var id = byWord[cardBaseWord(v)] || 'misc';
+            (fine[id] = fine[id] || []).push(i);
+        });
+        if (order.indexOf('misc') === -1) order.push('misc');
+        var groups = [];
+        var other = { id: OTHER_CATEGORY, label: 'Остальное', emoji: '🎲', indexes: [], includes: [] };
+        order.forEach(function (id) {
+            var idx = fine[id];
+            if (!idx || !idx.length) return;
+            var meta = (src.categories && src.categories[id]) || { label: 'Разное', emoji: '🎲' };
+            if (id !== 'misc' && idx.length >= CATEGORY_MIN_CARDS) {
+                groups.push({ id: id, label: meta.label, emoji: meta.emoji || '', indexes: idx });
+            } else {
+                other.indexes = other.indexes.concat(idx);
+                other.includes.push({ label: meta.label, count: idx.length });
+            }
+        });
+        if (other.indexes.length) groups.push(other);
+        out[deck] = { label: src.label || deck, total: list.length, groups: groups };
+    });
+    deckCategoriesCache = out;
+    return out;
+}
+
+// Что показать в лобби: категории с числом карт и примерами слов (без индексов)
+function cardCategoriesCatalog() {
+    var cats = deckCategories();
+    var out = { min: CATEGORY_MIN_CARDS, decks: {} };
+    Object.keys(cats).forEach(function (deck) {
+        var list = deckListByKey(deck);
+        out.decks[deck] = {
+            label: cats[deck].label,
+            total: cats[deck].total,
+            groups: cats[deck].groups.map(function (g) {
+                var examples = [];
+                var step = Math.max(1, Math.floor(g.indexes.length / 6));
+                for (var i = 0; i < g.indexes.length && examples.length < 6; i += step) {
+                    var v = list[g.indexes[i]];
+                    examples.push(typeof v === 'string' ? v : v.word);
+                }
+                var item = { id: g.id, label: g.label, emoji: g.emoji, count: g.indexes.length, examples: examples };
+                if (g.includes) item.includes = g.includes;
+                return item;
+            }),
+        };
+    });
+    return out;
+}
+
+// Храним только колоды, где включены не все категории: {} — значит «всё включено».
+// Пустой выбор тоже считаем «всё» — без карт играть нельзя.
+function normalizeCardCategories(value) {
+    var cats = deckCategories();
+    var out = {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+    Object.keys(value).forEach(function (deck) {
+        if (!cats[deck] || !Array.isArray(value[deck])) return;
+        var valid = cats[deck].groups.map(function (g) { return g.id; });
+        var picked = valid.filter(function (id) { return value[deck].indexOf(id) !== -1; });
+        if (picked.length === 0 || picked.length === valid.length) return;
+        out[deck] = picked;
+    });
+    return out;
+}
+
+// Индексы карт колоды, разрешённые настройкой категорий
+function deckPool(selection, deck) {
+    var list = deckListByKey(deck);
+    var all = [...Array(list.length).keys()];
+    var sel = selection && selection[deck];
+    if (!sel || !sel.length) return all;
+    var pool = [];
+    deckCategories()[deck].groups.forEach(function (g) {
+        if (sel.indexOf(g.id) !== -1) pool = pool.concat(g.indexes);
+    });
+    return pool.length ? pool : all;
+}
+
+// Свежая перетасованная колода комнаты с учётом категорий
+function freshDeck(room, deck) {
+    return shuffle(deckPool(room && room.settings && room.settings.cardCategories, deck));
+}
+
+// Следующая карта из колоды комнаты; кончилась — тасуем заново
+function drawDeckIndex(room, deck) {
+    if (!room.decks[deck] || room.decks[deck].length === 0) room.decks[deck] = freshDeck(room, deck);
+    return room.decks[deck].pop();
+}
+
+// Случайная карта без комнаты (одиночный режим): selection — { deck: [ids] }
+function randomDeckIndex(selection, deck) {
+    var pool = deckPool(selection, deck);
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function shuffle(array) {
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -2492,6 +2641,8 @@ function createRoom(hostId, settings) {
             bunkerDraftTime: normalizeDraftTime(settings.bunkerDraftTime),
             bunkerSurvivors: normalizeSurvivors(settings.bunkerSurvivors),
             postGameAnalytics: !!settings.postGameAnalytics,
+            // Какие категории карт играют: {} — все (см. card-categories.js)
+            cardCategories: normalizeCardCategories(settings.cardCategories),
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
             maxPlayers: Math.min(18, Math.max(3, parseInt(settings.maxPlayers) || 8)),
             // Хост только ведёт партию: без карт, капитала и голосов
@@ -2569,6 +2720,9 @@ function createRoom(hostId, settings) {
         lastActivityAt: Date.now(),
         emptySince: null,
     };
+    // Колоды — только из категорий, выбранных при создании (по умолчанию все)
+    CATEGORY_DECKS.forEach(function (deck) { room.decks[deck] = freshDeck(room, deck); });
+
     rooms.set(code, room);
     return room;
 }
@@ -5535,6 +5689,11 @@ wss.on('connection', (ws) => {
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
                 if (s.postGameAnalytics !== undefined) room.settings.postGameAnalytics = !!s.postGameAnalytics;
+                if (s.cardCategories !== undefined) {
+                    room.settings.cardCategories = normalizeCardCategories(s.cardCategories);
+                    // Колоды тасуем заново — со следующей раздачи карты идут только из выбранного
+                    CATEGORY_DECKS.forEach(function (deck) { room.decks[deck] = freshDeck(room, deck); });
+                }
                 if (s.twitchChannel !== undefined) {
                     room.settings.twitchChannel = normalizeTwitchChannel(s.twitchChannel);
                     twitchSetChannel(room, room.settings.twitchChannel);
@@ -5999,19 +6158,8 @@ wss.on('connection', (ws) => {
                 room.state = 'lobby';
                 room.currentRound = 0;
                 room.roundHistory = [];
-                room.decks = {
-                    adjectives: shuffle([...Array(ADJECTIVES.length).keys()]),
-                    items: shuffle([...Array(ITEMS.length).keys()]),
-                    features: shuffle([...Array(FEATURES.length).keys()]),
-                    events: shuffle([...EVENTS]),
-                    reviews: shuffle([...Array(REVIEWS.length).keys()]),
-                    additions: shuffle([...Array(ADDITIONS.length).keys()]),
-                    targetAudience: shuffle([...Array(TARGET_AUDIENCE.length).keys()]),
-                    gifts: shuffle([...Array(GIFTS.length).keys()]),
-                    hiddenDefects: shuffle([...Array(HIDDEN_DEFECTS.length).keys()]),
-                    packaging: shuffle([...Array(PACKAGING.length).keys()]),
-                    historicalFacts: shuffle([...Array(HISTORICAL_FACTS.length).keys()]),
-                };
+                room.decks = { events: shuffle([...EVENTS]) };
+                CATEGORY_DECKS.forEach(function (deck) { room.decks[deck] = freshDeck(room, deck); });
                 room.players.forEach(p => {
                     p.capital = room.settings.startCapital;
                     p.attractedInvestments = 0;
@@ -6805,14 +6953,21 @@ function drawBunkerIndexes(room, key, n) {
     var out = [];
     var guard = 0;
     while (out.length < n && guard++ < src.list.length * 3) {
-        if (!room.decks[src.deck] || room.decks[src.deck].length === 0) {
-            room.decks[src.deck] = shuffle([...Array(src.list.length).keys()]);
-        }
-        var idx = room.decks[src.deck].pop();
+        var idx = drawDeckIndex(room, src.deck);
         var word = bunkerBaseText(key, idx);
         if (used[word]) continue;
         used[word] = true;
         out.push(idx);
+    }
+    // Выбранные категории исчерпаны — добираем неповторяющиеся слова из всей колоды
+    if (out.length < n) {
+        var spare = shuffle([...Array(src.list.length).keys()]);
+        for (var si = 0; si < spare.length && out.length < n; si++) {
+            var sw = bunkerBaseText(key, spare[si]);
+            if (used[sw]) continue;
+            used[sw] = true;
+            out.push(spare[si]);
+        }
     }
     // Колода исчерпана целиком (на практике не бывает: самой маленькой хватает на 18 игроков) —
     // лучше повтор, чем пустая карта
@@ -7882,8 +8037,7 @@ function dealCustomCards(room) {
         if (text && text.trim()) {
             adjectives.push(text.trim().toUpperCase());
         } else {
-            var idx = Math.floor(Math.random() * ADJECTIVES.length);
-            adjectives.push(ADJECTIVES[idx]);
+            adjectives.push(ADJECTIVES[drawDeckIndex(room, 'adjectives')]);
         }
     });
 
@@ -7891,8 +8045,7 @@ function dealCustomCards(room) {
         if (text && text.trim()) {
             items.push(text.trim().toUpperCase());
         } else {
-            var idx = Math.floor(Math.random() * ITEMS.length);
-            items.push(ITEMS[idx].word);
+            items.push(ITEMS[drawDeckIndex(room, 'items')].word);
         }
     });
 
@@ -7900,8 +8053,7 @@ function dealCustomCards(room) {
         if (text && text.trim()) {
             features.push(text.trim().toUpperCase());
         } else {
-            var idx = Math.floor(Math.random() * FEATURES.length);
-            features.push(FEATURES[idx]);
+            features.push(FEATURES[drawDeckIndex(room, 'features')]);
         }
     });
 
@@ -7910,9 +8062,7 @@ function dealCustomCards(room) {
             if (text && text.trim()) {
                 reviews.push(text.trim().toUpperCase());
             } else {
-                if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
-                var idx = room.decks.reviews.pop();
-                reviews.push(REVIEWS[idx]);
+                reviews.push(REVIEWS[drawDeckIndex(room, 'reviews')]);
             }
         });
         reviews = shuffle(reviews);
@@ -7927,8 +8077,7 @@ function dealCustomCards(room) {
             if (text && text.trim()) {
                 customTargetAudience.push(text.trim().toUpperCase());
             } else {
-                var idx = Math.floor(Math.random() * TARGET_AUDIENCE.length);
-                customTargetAudience.push(TARGET_AUDIENCE[idx]);
+                customTargetAudience.push(TARGET_AUDIENCE[drawDeckIndex(room, 'targetAudience')]);
             }
         });
         customTargetAudience = shuffle(customTargetAudience);
@@ -7939,8 +8088,7 @@ function dealCustomCards(room) {
             if (text && text.trim()) {
                 customHiddenDefects.push(text.trim().toUpperCase());
             } else {
-                var idx = Math.floor(Math.random() * HIDDEN_DEFECTS.length);
-                customHiddenDefects.push(HIDDEN_DEFECTS[idx]);
+                customHiddenDefects.push(HIDDEN_DEFECTS[drawDeckIndex(room, 'hiddenDefects')]);
             }
         });
         customHiddenDefects = shuffle(customHiddenDefects);
@@ -7951,8 +8099,7 @@ function dealCustomCards(room) {
             if (text && text.trim()) {
                 customPackaging.push(text.trim().toUpperCase());
             } else {
-                var idx = Math.floor(Math.random() * PACKAGING.length);
-                customPackaging.push(PACKAGING[idx]);
+                customPackaging.push(PACKAGING[drawDeckIndex(room, 'packaging')]);
             }
         });
         customPackaging = shuffle(customPackaging);
@@ -8013,16 +8160,12 @@ function dealCustomCards(room) {
 
 function dealCardsFromDatabase(room) {
     room.players.forEach(p => {
-        if (room.decks.items.length === 0) room.decks.items = shuffle([...Array(ITEMS.length).keys()]);
-        if (room.decks.adjectives.length === 0) room.decks.adjectives = shuffle([...Array(ADJECTIVES.length).keys()]);
-        if (room.decks.features.length === 0) room.decks.features = shuffle([...Array(FEATURES.length).keys()]);
-
-        var itemIndex = room.decks.items.pop();
+        var itemIndex = drawDeckIndex(room, 'items');
         var itemObj = ITEMS[itemIndex];
         var gender = itemObj.gender;
         var itemWord = itemObj.word;
 
-        var adjIndex = room.decks.adjectives.pop();
+        var adjIndex = drawDeckIndex(room, 'adjectives');
         var adjWord = declineAdjective(ADJECTIVES[adjIndex], gender);
 
         p.cards = {
@@ -8032,15 +8175,14 @@ function dealCardsFromDatabase(room) {
 
         // Особенность — только если НЕ псевдоинновации
         if (!room.settings.pseudoMode) {
-            var featIndex = room.decks.features.pop();
+            var featIndex = drawDeckIndex(room, 'features');
             var featWord = declineFeature(FEATURES[featIndex], gender);
             p.cards.feature = featWord;
         }
 
         // Модификатор
         if (room.settings.modifier === 'addition') {
-            if (room.decks.additions.length === 0) room.decks.additions = shuffle([...Array(ADDITIONS.length).keys()]);
-            var addIdx = room.decks.additions.pop();
+            var addIdx = drawDeckIndex(room, 'additions');
             p.cards.modifier = ADDITIONS[addIdx];
         } else if (room.settings.modifier === 'metaphor') {
             p.cards.modifier = generateMetaphor();
@@ -8048,29 +8190,25 @@ function dealCardsFromDatabase(room) {
 
         // Отзыв
         if (room.settings.useReviews) {
-            if (room.decks.reviews.length === 0) room.decks.reviews = shuffle([...Array(REVIEWS.length).keys()]);
-            var reviewIndex = room.decks.reviews.pop();
+            var reviewIndex = drawDeckIndex(room, 'reviews');
             p.cards.review = REVIEWS[reviewIndex];
         }
 
         // Целевая аудитория
         if (room.settings.useTargetAudience) {
-            if (room.decks.targetAudience.length === 0) room.decks.targetAudience = shuffle([...Array(TARGET_AUDIENCE.length).keys()]);
-            var taIndex = room.decks.targetAudience.pop();
+            var taIndex = drawDeckIndex(room, 'targetAudience');
             p.cards.targetAudience = TARGET_AUDIENCE[taIndex];
         }
 
         // Скрытый дефект
         if (room.settings.useHiddenDefects) {
-            if (room.decks.hiddenDefects.length === 0) room.decks.hiddenDefects = shuffle([...Array(HIDDEN_DEFECTS.length).keys()]);
-            var hdIndex = room.decks.hiddenDefects.pop();
+            var hdIndex = drawDeckIndex(room, 'hiddenDefects');
             p.cards.hiddenDefect = HIDDEN_DEFECTS[hdIndex];
         }
 
         // Упаковка
         if (room.settings.usePackaging) {
-            if (room.decks.packaging.length === 0) room.decks.packaging = shuffle([...Array(PACKAGING.length).keys()]);
-            var pkgIndex = room.decks.packaging.pop();
+            var pkgIndex = drawDeckIndex(room, 'packaging');
             p.cards.packaging = PACKAGING[pkgIndex];
         }
 
@@ -8129,39 +8267,39 @@ function applyBlackSwan(room, presenter) {
     var gender = getGenderOfItem(presenter.cards.item);
 
     if (targetKey === 'item') {
-        var itemIndex = Math.floor(Math.random() * ITEMS.length);
+        var itemIndex = drawDeckIndex(room, 'items');
         newValue = ITEMS[itemIndex].word;
         presenter.cards.item = newValue;
     } else if (targetKey === 'adjective') {
-        var adjIdx = Math.floor(Math.random() * ADJECTIVES.length);
+        var adjIdx = drawDeckIndex(room, 'adjectives');
         newValue = declineAdjective(ADJECTIVES[adjIdx], gender);
         presenter.cards.adjective = newValue;
     } else if (targetKey === 'feature') {
-        var featIdx = Math.floor(Math.random() * FEATURES.length);
+        var featIdx = drawDeckIndex(room, 'features');
         newValue = declineFeature(FEATURES[featIdx], gender);
         presenter.cards.feature = newValue;
     } else if (targetKey === 'review') {
-        var revIdx = Math.floor(Math.random() * REVIEWS.length);
+        var revIdx = drawDeckIndex(room, 'reviews');
         newValue = REVIEWS[revIdx];
         presenter.cards.review = newValue;
     } else if (targetKey === 'modifier') {
         if (room.settings.modifier === 'addition') {
-            var addIdx = Math.floor(Math.random() * ADDITIONS.length);
+            var addIdx = drawDeckIndex(room, 'additions');
             newValue = ADDITIONS[addIdx];
         } else if (room.settings.modifier === 'metaphor') {
             newValue = generateMetaphor();
         }
         presenter.cards.modifier = newValue;
     } else if (targetKey === 'targetAudience') {
-        var taIdx = Math.floor(Math.random() * TARGET_AUDIENCE.length);
+        var taIdx = drawDeckIndex(room, 'targetAudience');
         newValue = TARGET_AUDIENCE[taIdx];
         presenter.cards.targetAudience = newValue;
     } else if (targetKey === 'hiddenDefect') {
-        var hdIdx = Math.floor(Math.random() * HIDDEN_DEFECTS.length);
+        var hdIdx = drawDeckIndex(room, 'hiddenDefects');
         newValue = HIDDEN_DEFECTS[hdIdx];
         presenter.cards.hiddenDefect = newValue;
     } else if (targetKey === 'packaging') {
-        var pkgIdx = Math.floor(Math.random() * PACKAGING.length);
+        var pkgIdx = drawDeckIndex(room, 'packaging');
         newValue = PACKAGING[pkgIdx];
         presenter.cards.packaging = newValue;
     }

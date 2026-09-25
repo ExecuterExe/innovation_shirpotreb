@@ -5,6 +5,7 @@ import { renderBunkerChat } from '../components/bunker-chat.js';
 import { logoSvg } from '../components/logo.js';
 import { buildReactionBarHtml, bindReactionButtons } from '../components/reactions.js';
 import { openInviteModal, viewerCount } from '../components/audience.js';
+import { loadCardCatalog, cardCatalog, cardCatalogFailed, cardCategoriesHtml, bindCardCategories, decksInPlay, selectionSummary } from '../components/card-categories.js';
 
 var MAX_PLAYERS_MIN = 3;
 var MAX_PLAYERS_MAX = 18;
@@ -337,6 +338,10 @@ export function updateSettingsPanel(container) {
     html += buildDeckTile('set-blackswan', '🦢', 'Чёрный лебедь', '20% шанс, что карту заменят прямо во время питча',        s.blackSwan, '#a78bfa');
     html += '</div>';
 
+    // Темы карт: какие категории слов раздавать (по умолчанию все)
+    html += buildSectionDivider('Темы карт');
+    html += cardCategoriesHtml(s.cardCategories || {}, { decks: decksInPlay(Object.assign({}, s, { bunkerMode: false })) });
+
 
     html += '</div>';
 
@@ -399,6 +404,10 @@ export function updateSettingsPanel(container) {
     html += buildSectionDivider('Места в бункере');
     html += buildSurvivorsSetting(s);
 
+    // Темы карт — те же, что во вкладке «Карты», но по колодам «Бункера»
+    html += buildSectionDivider('Темы карт');
+    html += cardCategoriesHtml(s.cardCategories || {}, { decks: decksInPlay(Object.assign({}, s, { bunkerMode: true })) });
+
     // Статистика режима
     html += buildSectionDivider('Как это работает');
     html += '<div class="grid grid-cols-2 gap-2 mb-4">';
@@ -449,6 +458,20 @@ export function updateSettingsPanel(container) {
     panel.innerHTML = html;
     panel.classList.toggle('settings-panel-bunker-active', !!s.bunkerMode);
     attachSettingsListeners(container);
+    bindCardCategories(panel,
+        function () { return (state.settings && state.settings.cardCategories) || {}; },
+        function (next) {
+            // Сразу показываем выбор, сервер пришлёт то же самое в lobbyUpdate
+            if (state.settings) state.settings.cardCategories = next;
+            sendMsg({ type: 'updateSettings', settings: { cardCategories: next } });
+            updateSettingsPanel(container);
+        },
+        function () { updateSettingsPanel(container); },
+        function () { showNotification('Хотя бы одна тема в колоде должна остаться', 'info'); });
+    // Каталог тем грузится один раз; как придёт — перерисуем панель
+    if (!cardCatalog() && !cardCatalogFailed()) {
+        loadCardCatalog().then(function () { if (container.querySelector('#settings-panel')) updateSettingsPanel(container); });
+    }
 }
 
 
@@ -724,6 +747,7 @@ function summaryChips(s) {
     }
     if (s.hostObserves) chips.push(['🎙', 'с ведущим', '']);
     if (s.postGameAnalytics) chips.push(['📊', 'разбор партии', '']);
+    if (s.cardCategories && Object.keys(s.cardCategories).length) chips.push(['🗂', 'свои темы карт', '']);
     return chips;
 }
 
@@ -752,6 +776,15 @@ function updateLobbyPreview(container) {
         html += buildDeckPreview(s);
     }
     html += '<div class="mt-4">' + buildGameSummary(s) + '</div>';
+    // Хост выбрал темы карт — покажем, какие именно
+    if (s.cardCategories && Object.keys(s.cardCategories).length) {
+        if (cardCatalog()) {
+            var themes = selectionSummary(s.cardCategories, decksInPlay(s));
+            if (themes) html += '<div class="lobby-preview-themes">🗂 ' + escapeHtml(themes) + '</div>';
+        } else if (!cardCatalogFailed()) {
+            loadCardCatalog().then(function () { if (container.querySelector('#lobby-preview')) updateLobbyPreview(container); });
+        }
+    }
     html += '<div class="lobby-preview-note">Хост ещё может поменять настройки — всё обновится здесь</div>';
     box.innerHTML = html;
 }
