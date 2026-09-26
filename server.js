@@ -190,9 +190,27 @@ app.get('/api/solo-cards', (req, res) => {
         event = EVENTS[Math.floor(Math.random() * EVENTS.length)];
     }
 
-    analytics.bump('solo_generated');
+    // Превью в лобби («Что может выпасть») — не одиночная игра, в её статистику не считаем
+    if (settings.preview !== '1') analytics.bump('solo_generated');
     res.json({ cards, event });
 });
+
+// Начало случайной катастрофы для лобби «Бункера»: пара строк, остальное — уже в игре
+app.get('/api/catastrophe-teaser', (req, res) => {
+    var full = GLOBAL_PROBLEMS[Math.floor(Math.random() * GLOBAL_PROBLEMS.length)];
+    res.json({ teaser: catastropheTeaser(full), total: GLOBAL_PROBLEMS.length });
+});
+
+function catastropheTeaser(text) {
+    var words = String(text || '').split(/\s+/);
+    var out = [];
+    for (var i = 0; i < words.length; i++) {
+        out.push(words[i]);
+        if (out.join(' ').length >= 95 && i >= 9) break;
+    }
+    if (out.length >= words.length) return String(text).trim();
+    return out.join(' ').replace(/[\s,.:;!?—–-]+$/, '');
+}
 // =====================================================================
 // ПОЛНЫЕ КОЛОДЫ КАРТ — 60 прилагательных, 60 предметов, 60 особенностей, 50 событий
 // =====================================================================
@@ -774,7 +792,7 @@ const ITEMS = [
 
 
 // Особенности хранятся в мужском роде (с "КОТОРЫЙ")
-// При выдаче "КОТОРЫЙ" склоняется в "КОТОРАЯ"/"КОТОРОЕ" по роду предмета
+// При выдаче "КОТОРЫЙ" склоняется по роду предмета: "КОТОРАЯ"/"КОТОРОЕ", а в "который можно…" — "КОТОРУЮ"
 const FEATURES = [
     // Старые 60
     "КОТОРЫЙ БЬЕТ ТОКОМ",
@@ -2390,13 +2408,20 @@ function declineAdjective(adj, gender) {
  * @param {string} gender - "m", "f", "n"
  * @returns {string} - склонённая особенность
  */
+// «Который можно надеть», «который нужно выгуливать» — здесь «который» не подлежащее, а дополнение:
+// в женском роде «которую», а не «которая»
+const FEATURE_OBJECT_WORDS = ['МОЖНО', 'НЕВОЗМОЖНО', 'НУЖНО', 'НЕЛЬЗЯ', 'НАДО'];
+
 function declineFeature(feature, gender) {
     if (gender === 'm') return feature;
 
     if (feature.startsWith('КОТОРЫЙ')) {
         var rest = feature.slice(7); // всё после "КОТОРЫЙ"
+        var next = rest.trim().split(/\s+/)[0];
+        // Краткое прилагательное согласуется с родом: «незаменим» → «незаменима», «незаменимо»
+        if (next === 'НЕЗАМЕНИМ') rest = rest.replace('НЕЗАМЕНИМ', gender === 'f' ? 'НЕЗАМЕНИМА' : 'НЕЗАМЕНИМО');
         if (gender === 'f') {
-            return 'КОТОРАЯ' + rest;
+            return (FEATURE_OBJECT_WORDS.indexOf(next) !== -1 ? 'КОТОРУЮ' : 'КОТОРАЯ') + rest;
         }
         if (gender === 'n') {
             return 'КОТОРОЕ' + rest;

@@ -6,6 +6,7 @@ import { logoSvg } from '../components/logo.js';
 import { buildReactionBarHtml, bindReactionButtons } from '../components/reactions.js';
 import { openInviteModal, viewerCount } from '../components/audience.js';
 import { lobbyQrHtml, bindLobbyQr } from '../components/room-qr.js';
+import { syncLobbyTeaser } from '../components/lobby-teaser.js';
 import { loadCardCatalog, cardCatalog, cardCatalogFailed, cardCategoriesHtml, bindCardCategories, decksInPlay, selectionSummary } from '../components/card-categories.js';
 
 var MAX_PLAYERS_MIN = 3;
@@ -43,6 +44,8 @@ function buildRoomNameHtml() {
 export function updateRoomHeader(container) {
     var el = container.querySelector('#room-name-display');
     if (el) el.innerHTML = buildRoomNameHtml();
+    // Хост поменял режим или колоды — пример в «Что может выпасть» сразу меняется
+    syncLobbyTeaser();
     // QR в карточке комнаты: хост мог включить или выключить его в настройках
     var slot = container.querySelector('#room-qr-slot');
     if (slot) {
@@ -518,6 +521,8 @@ export function renderLobby(container) {
 
     var html = '';
     html += '<div class="bunker-layout">';
+    // Слева: «Что может выпасть» (меняется каждые 25 секунд), под ним — чат
+    html += '<aside id="lobby-side" class="lobby-side"><div id="lobby-teaser"></div></aside>';
     html += '<div id="bunker-main-content" class="bunker-main-col">';
     html += '<div class="max-w-6xl mx-auto px-4 py-8 min-h-screen lobby-page">';
 
@@ -612,6 +617,7 @@ export function renderLobby(container) {
     // Чат доступен в лобби всегда, вне зависимости от настройки «Чат в бункере»
     // (та настройка решает только, продолжит ли чат работать после старта игры)
     renderBunkerChat(container, true);
+    syncLobbyTeaser();
 
     // Static listeners
     var btnBack = container.querySelector('#btn-back');

@@ -70,9 +70,12 @@ export function renderBunkerChat(container, forceShow) {
 
     html += '</div>';
 
-    // Append chat as sibling to #bunker-main-content inside .bunker-layout
+    // В лобби — в левую колонку под «Что может выпасть»; в игре — рядом с основной колонкой
+    var side = isLobby ? container.querySelector('#lobby-side') : null;
     var layout = container.querySelector('.bunker-layout');
-    if (layout) {
+    if (side) {
+        side.insertAdjacentHTML('beforeend', html);
+    } else if (layout) {
         layout.insertAdjacentHTML('beforeend', html);
     } else {
         container.insertAdjacentHTML('beforeend', html);
