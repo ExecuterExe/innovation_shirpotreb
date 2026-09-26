@@ -2641,6 +2641,8 @@ function createRoom(hostId, settings) {
             bunkerDraftTime: normalizeDraftTime(settings.bunkerDraftTime),
             bunkerSurvivors: normalizeSurvivors(settings.bunkerSurvivors),
             postGameAnalytics: !!settings.postGameAnalytics,
+            // QR-код комнаты постоянно в углу экрана — зрители сканируют сами
+            qrOnScreen: settings.qrOnScreen !== false,
             // Какие категории карт играют: {} — все (см. card-categories.js)
             cardCategories: normalizeCardCategories(settings.cardCategories),
             anonymizeParticipants: !!settings.anonymizeParticipants && !!settings.streamerMode,
@@ -5689,6 +5691,7 @@ wss.on('connection', (ws) => {
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
                 if (s.postGameAnalytics !== undefined) room.settings.postGameAnalytics = !!s.postGameAnalytics;
+                if (s.qrOnScreen !== undefined) room.settings.qrOnScreen = !!s.qrOnScreen;
                 if (s.cardCategories !== undefined) {
                     room.settings.cardCategories = normalizeCardCategories(s.cardCategories);
                     // Колоды тасуем заново — со следующей раздачи карты идут только из выбранного

@@ -14,15 +14,20 @@ export function renderGameOver(container) {
     var sorted = players.slice().sort(function (a, b) { return b.capital - a.capital; });
 
     var html = '';
-    html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen text-center">';
+    html += '<div class="max-w-3xl mx-auto px-4 py-8 min-h-screen text-center go-page">';
 
     // Trophy
-    html += '<div class="text-7xl mb-4 animate-float" style="filter: drop-shadow(0 0 30px rgba(255,215,0,0.3));"><span id="final-trophy" class="trophy-in">🏆</span></div>';
+    html += '<div class="go-hero">';
+    html += '<div class="text-7xl mb-4 animate-float go-trophy" style="filter: drop-shadow(0 0 30px rgba(255,215,0,0.3));"><span id="final-trophy" class="trophy-in">🏆</span></div>';
     html += '<h1 class="font-display text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-accent-gold via-yellow-300 to-accent-gold mb-2">ФИНАЛ</h1>';
     html += '<p class="text-sm text-corp-muted mb-10">Игра завершена! Вот наши победители:</p>';
+    html += '</div>';
+
+    // На широком экране — две колонки: слева победители и таблица, справа опрос, разбор и кнопки
+    html += '<div class="go-grid"><div class="go-col">';
 
     // Winner cards
-    html += '<div class="flex flex-col md:flex-row gap-6 justify-center mb-10">';
+    html += '<div class="flex flex-col md:flex-row gap-6 justify-center mb-10 go-winners">';
 
     // Best Investor
     html += '<div class="corp-card-elevated flex-1 max-w-sm p-8 border-accent-green/20 hover:-translate-y-1 transition-transform">';
@@ -84,6 +89,7 @@ export function renderGameOver(container) {
     }
     html += '</div>';
     html += '</div>'; // end scoreboard
+    html += '</div><div class="go-col go-col-side">';
 
     // Разбор партии — если ведущий включил его в настройках
     html += analyticsTeaserHtml(state.gameAnalytics);
@@ -106,6 +112,7 @@ export function renderGameOver(container) {
     }
     html += '<button id="btn-exit-gameover" class="text-xs font-bold text-corp-muted hover:text-accent-red transition-colors cursor-pointer">✕ Выйти в главное меню</button>';
     html += '</div>';
+    html += '</div></div>'; // go-col-side, go-grid
 
     html += '</div>';
 

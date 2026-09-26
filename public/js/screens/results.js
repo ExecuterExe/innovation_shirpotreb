@@ -18,13 +18,16 @@ export function renderResults(container) {
     var byAttracted = players.slice().sort(function (a, b) { return b.attractedInvestments - a.attractedInvestments; });
 
     var html = '';
-    html += '<div class="max-w-5xl mx-auto px-4 py-8 min-h-screen">';
+    html += '<div class="max-w-5xl mx-auto px-4 py-8 min-h-screen res-page">';
 
-    html += '<div class="flex items-start justify-between mb-8 gap-3">';
+    html += '<div class="flex items-start justify-between mb-8 gap-3 res-head">';
     html += '  <div class="w-0 flex-shrink-0 sm:w-[70px]"></div>';
     html += '  <h2 class="text-2xl font-black text-corp-white text-center flex-1">Результаты раунда ' + state.currentRound + '</h2>';
     html += '  <button id="btn-exit-game" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
+
+    // На широком экране — две колонки: слева кто победил, справа цифры и топы
+    html += '<div class="res-grid"><div class="res-col res-col-main">';
 
     if (winners.length > 0) {
         var mvp = winners[0];
@@ -46,7 +49,7 @@ export function renderResults(container) {
     }
 
     // ═══════ TOP BANNERS ═══════
-    html += '<div class="grid md:grid-cols-2 gap-4 mb-8">';
+    html += '<div class="grid md:grid-cols-2 gap-4 mb-8 res-awards">';
     html += '<div class="corp-card border-accent-gold/30 bg-accent-gold-dim p-6 text-center">';
     if (winners.length > 0) {
         var winnerNames = [];
@@ -117,6 +120,8 @@ export function renderResults(container) {
         html += '</div>';
     }
 
+    html += '</div><div class="res-col res-col-side">';
+
     // ═══════ INVESTMENT DETAILS ═══════
     html += '<div class="mb-8">';
     html += '<button id="btn-toggle-details" class="results-fold">💸 Кто и куда инвестировал' + (details.length ? ' <span>(' + details.length + ')</span>' : '') + ' <i id="details-arrow">▼</i></button>';
@@ -183,6 +188,7 @@ export function renderResults(container) {
     html += buildTopCard(byAttracted, '🧲 Топ по привлечённым инвестициям', 'attractedInvestments', 'text-accent-gold');
     html += '</div>';
     html += '</div>';
+    html += '</div></div>'; // res-col-side, res-grid
     html += '</div>';
 
     // ═══════ CONTROLS ═══════

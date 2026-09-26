@@ -32,7 +32,7 @@ export function renderBunkerVote(container) {
     html += '<div id="bunker-main-content" class="bunker-main-col">';
 
     // Header
-    html += '<div class="flex items-start justify-between mb-6">';
+    html += '<div class="flex items-start justify-between mb-6 bk-vote-head">';
     html += '<div class="text-center flex-1">';
     html += '  <div class="bk-vote-kicker">🗳 Голосование</div>';
     html += '  <h2 class="bk-vote-title">Кого не пустим в бункер?</h2>';
@@ -74,7 +74,7 @@ export function renderBunkerVote(container) {
         html += '</div>';
     } else {
         // Кандидаты
-        html += '<div class="space-y-3 mb-6">';
+        html += '<div class="space-y-3 mb-6 bk-vote-list">';
 
         // Кнопка пропуска
         html += '<div class="bk-vote-card bk-vote-skip" data-bunker-vote="__skip__" data-voteable>';
@@ -529,11 +529,11 @@ export function renderBunkerGameOver(container) {
     var isHost = state.isHost;
 
     var html = '';
-    html += '<div class="max-w-4xl mx-auto px-4 py-8 min-h-screen text-center">';
+    html += '<div class="max-w-4xl mx-auto px-4 py-8 min-h-screen text-center bgo-page">';
 
-    html += '<div class="text-6xl mb-4" style="filter: drop-shadow(0 0 30px rgba(34,197,94,0.3));">🏠</div>';
+    html += '<div class="text-6xl mb-4 bgo-house" style="filter: drop-shadow(0 0 30px rgba(34,197,94,0.3));">🏠</div>';
     html += '<h1 class="text-3xl md:text-4xl font-black text-accent-green mb-2">БУНКЕР ОПРЕДЕЛЁН!</h1>';
-    html += '<p class="text-sm text-corp-muted mb-8">Вот кто выжил и спасёт мир своими продуктами:</p>';
+    html += '<p class="text-sm text-corp-muted mb-8 bgo-sub">Вот кто выжил и спасёт мир своими продуктами:</p>';
     html += audiencePrizeHtml(state.audiencePrize);
 
     // Глобальная проблема
@@ -541,6 +541,9 @@ export function renderBunkerGameOver(container) {
     html += '  <div class="text-xs font-black text-accent-red uppercase tracking-widest mb-1">🌍 Глобальная проблема</div>';
     html += '  <div class="text-xs text-corp-light leading-relaxed">' + escapeHtml(bunker.globalProblem || '') + '</div>';
     html += '</div>';
+
+    // На широком экране: слева продукты игроков, справа — вердикт ИИ, опрос и кнопки (закреплены)
+    html += '<div class="bgo-grid"><div class="bgo-players">';
 
     // Выжившие
     html += '<div class="mb-8">';
@@ -561,6 +564,8 @@ export function renderBunkerGameOver(container) {
     }
     html += '  </div>';
     html += '</div>';
+
+    html += '</div><div class="bgo-side">';
 
     // ═══════ AI PROMPT SECTION ═══════
     html += '<div class="corp-card border-accent-purple/20 bg-purple-900/10 p-6 mb-8">';
@@ -625,6 +630,7 @@ export function renderBunkerGameOver(container) {
     }
     html += '<button id="btn-exit-bunker-over" class="text-xs font-bold text-corp-muted hover:text-accent-red transition-colors cursor-pointer">✕ Выйти в главное меню</button>';
     html += '</div>';
+    html += '</div></div>'; // bgo-side, bgo-grid
 
     html += '</div>';
     container.innerHTML = html;

@@ -22,7 +22,7 @@ export function renderInvesting(container) {
     }
 
     var html = '';
-    html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen">';
+    html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen inv-page">';
 
     // ═══════ HUD ═══════
     html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
@@ -55,7 +55,7 @@ export function renderInvesting(container) {
     html += '</div>';
 
     // ═══════ HEADER ═══════
-    html += '<div class="text-center mb-8">';
+    html += '<div class="text-center mb-8 inv-title">';
     html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Терминал инвестиций</h2>';
     html += '  <p class="text-corp-muted text-sm">Распределите жетоны между проектами. Ваш проект скрыт из списка.</p>';
     html += '  <p class="text-accent-blue font-bold text-sm mt-1">Кто вложится в лучшего предпринимателя — получит ×2!</p>';
@@ -76,15 +76,15 @@ export function renderInvesting(container) {
     }
 
     // ═══════ INVESTMENT LIST ═══════
-    html += '<div class="space-y-4 mb-8" id="invest-list">';
+    html += '<div class="space-y-4 mb-8 inv-list' + (presentations.length === 1 ? ' inv-list-single' : '') + '" id="invest-list">';
 
     for (var i = 0; i < presentations.length; i++) {
         var p = presentations[i];
 
-        html += '<div class="corp-card overflow-hidden hover:border-accent-blue/20 transition-colors">';
+        html += '<div class="corp-card overflow-hidden hover:border-accent-blue/20 transition-colors inv-item">';
 
         // Top section — name + cards
-        html += '<div class="px-6 py-5">';
+        html += '<div class="px-6 py-5 inv-top">';
         html += '  <div class="flex items-center justify-between gap-3 mb-3">';
         html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
         if (isHost) {
@@ -115,7 +115,7 @@ export function renderInvesting(container) {
         html += '  </div>';
 
         if (p.pitchText && p.pitchText.trim()) {
-            html += '  <div class="mt-4 p-4 rounded-xl border border-accent-blue/15 bg-accent-blue-dim">';
+            html += '  <div class="mt-4 p-4 rounded-xl border border-accent-blue/15 bg-accent-blue-dim inv-pitch">';
             html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest mb-2">Текстовый питч</div>';
             html += '    <div class="text-sm text-corp-light leading-relaxed whitespace-pre-wrap break-words">' + escapeHtml(p.pitchText) + '</div>';
             html += '  </div>';
@@ -123,7 +123,7 @@ export function renderInvesting(container) {
         html += '</div>';
 
         // Bottom section — investment controls
-        html += '<div class="bg-corp-black/40 px-6 py-5 border-t border-corp-border">';
+        html += '<div class="bg-corp-black/40 px-6 py-5 border-t border-corp-border inv-controls">';
         if (confirmed) {
             html += '  <div class="text-xs font-semibold text-corp-muted">Инвестиции зафиксированы, изменение недоступно.</div>';
             html += '</div>';
@@ -165,8 +165,9 @@ export function renderInvesting(container) {
 
     html += '</div>'; // end invest-list
 
-    // ═══════ FOOTER — remaining ═══════
-    html += '<div class="corp-card px-6 py-5 flex items-center justify-between flex-wrap gap-4 mb-6">';
+    // ═══════ FOOTER — remaining + подтверждение: закреплены внизу экрана ═══════
+    html += '<div class="inv-dock">';
+    html += '<div class="corp-card px-6 py-5 flex items-center justify-between flex-wrap gap-4 mb-6 inv-summary">';
     html += '  <div class="flex items-center gap-4">';
     html += '    <span class="text-sm font-bold text-corp-dim">Осталось жетонов:</span>';
     var initialRemaining = confirmed ? Math.max(0, budget - alreadyInvested) : budget;
@@ -192,6 +193,7 @@ export function renderInvesting(container) {
         html += '  ✓ ПОДТВЕРДИТЬ ТРАНЗАКЦИЮ';
         html += '</button>';
     }
+    html += '</div>'; // inv-dock
 
     html += '</div>'; // end main
 

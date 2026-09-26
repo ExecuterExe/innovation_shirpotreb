@@ -3473,3 +3473,285 @@ body.ga-open { overflow: hidden; }
     .cc-deck { padding: 10px; }
     .cc-chip { font-size: 0.72rem; padding: 6px 10px 6px 6px; }
 }
+
+/* ═══════════════════════════════════════════
+   НАСТРОЙКИ: РЕЖИМ ИГРЫ + ВКЛАДКИ «ОБЩЕЕ / ПРАВИЛА / КАРТЫ»
+   ═══════════════════════════════════════════ */
+.mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.mode-opt { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; cursor: pointer; background: rgba(0, 0, 0, 0.25); border: 1.5px solid rgba(255, 255, 255, 0.08); transition: background 0.2s, border-color 0.2s, transform 0.15s; }
+.mode-opt:hover { border-color: rgba(255, 255, 255, 0.2); }
+.mode-opt:active { transform: scale(0.98); }
+.mode-emoji { font-size: 1.5rem; flex-shrink: 0; filter: grayscale(0.6); opacity: 0.7; transition: filter 0.2s, opacity 0.2s; }
+.mode-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mode-body b { font-family: 'Montserrat', 'Inter', sans-serif; font-size: 0.95rem; font-weight: 900; color: #a0a0b2; }
+.mode-body span { font-size: 0.68rem; line-height: 1.3; color: #6e6e82; }
+.mode-opt-on .mode-emoji { filter: none; opacity: 1; }
+.mode-opt-classic.mode-opt-on { background: rgba(255, 199, 44, 0.1); border-color: rgba(255, 199, 44, 0.55); box-shadow: 0 8px 22px rgba(255, 199, 44, 0.12); }
+.mode-opt-classic.mode-opt-on .mode-body b { color: #ffc72c; }
+.mode-opt-bunker.mode-opt-on { background: rgba(229, 72, 61, 0.12); border-color: rgba(229, 72, 61, 0.6); box-shadow: 0 8px 22px rgba(229, 72, 61, 0.14); }
+.mode-opt-bunker.mode-opt-on .mode-body b { color: #ff6b5e; }
+.mode-opt-on .mode-body span { color: #b0b0c0; }
+.set-head .set-tabs { margin-bottom: 14px; }
+.set-scope { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 4px; padding: 4px 11px; border-radius: 999px; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
+.set-scope-common { color: #9fd8ff; background: rgba(0, 180, 255, 0.08); border: 1px solid rgba(0, 180, 255, 0.25); }
+.set-scope-classic { color: #ffc72c; background: rgba(255, 199, 44, 0.08); border: 1px solid rgba(255, 199, 44, 0.28); }
+.set-scope-bunker { color: #ff7b70; background: rgba(229, 72, 61, 0.09); border: 1px solid rgba(229, 72, 61, 0.3); }
+.set-tiles-solo { grid-template-columns: minmax(0, 220px); }
+.set-tiles-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bunker-intro { margin: 10px 0 2px; font-size: 0.74rem; line-height: 1.5; color: #a0a0b2; }
+
+/* ═══════════════════════════════════════════
+   ЛОББИ В ОДИН ЭКРАН (компьютер): страница не прокручивается —
+   настройки листаются внутри своей карточки, кнопка старта всегда видна
+   ═══════════════════════════════════════════ */
+@media (min-width: 1024px) and (min-height: 660px) {
+    .lobby-page { height: calc(100vh - 20px); min-height: 0 !important; display: flex; flex-direction: column; padding-top: 16px !important; padding-bottom: 14px !important; box-sizing: border-box; }
+    .lobby-top { margin-bottom: 12px !important; flex-shrink: 0; }
+    .lobby-cols { flex: 1; min-height: 0; gap: 24px !important; }
+    .lobby-left { position: relative; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 0 6px 0 0; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.12) transparent; }
+    .lobby-left > * { margin-top: 0 !important; margin-bottom: 0 !important; flex-shrink: 0; }
+    .lobby-left > * + * { margin-top: 14px !important; }
+    .lobby-left > #lobby-seat:empty, .lobby-left > #lobby-hall:empty { display: none; }
+    .lobby-start { position: sticky; bottom: 0; margin-top: auto !important; padding-top: 14px !important; z-index: 3; background: linear-gradient(180deg, rgba(10, 10, 10, 0) 0%, #0a0a0a 26%); }
+    .lobby-right { min-height: 0; display: flex; flex-direction: column; }
+    .lobby-right > * + * { margin-top: 10px !important; }
+    .lobby-right #settings-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 18px 6px !important; }
+    .set-head { flex-shrink: 0; }
+    .set-body { position: relative; flex: 1; min-height: 0; overflow-y: auto; margin-right: -12px; padding: 0 12px 14px 0; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+    .lobby-right-preview { overflow-y: auto; }
+    /* плотнее: код комнаты и участники */
+    .lobby-page .lobby-room { padding: 18px 20px; }
+    .lobby-page .room-code-tile { width: 48px; height: 56px; font-size: 1.75rem; }
+    .lobby-page .room-actions { margin-top: 12px; }
+    .lobby-page .room-hint { margin-top: 8px; }
+    .lobby-page #players-list > .lobby-player, .lobby-page #players-list > .lobby-slot { padding: 10px 14px; }
+    .lobby-page .lobby-avatar { width: 34px; height: 34px; font-size: 0.9rem; }
+    .lobby-page .lobby-react { margin-top: 0; }
+    .lobby-page .lobby-react .rx-bar { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+    .lobby-page .lobby-react .rx-btn { height: 44px; }
+    .lobby-page .lobby-hall { padding: 12px 14px; }
+    .lobby-page .lobby-hall-head { margin-bottom: 6px; }
+    .lobby-page .lobby-hall-empty { margin-bottom: 8px; font-size: 0.74rem; }
+}
+/* Больше четырёх игроков — в две колонки */
+#players-list.lobby-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#players-list.lobby-grid > * { margin: 0 !important; }
+#players-list.lobby-grid .lobby-player { gap: 10px; }
+@media (max-width: 520px) { #players-list.lobby-grid { grid-template-columns: 1fr; } }
+
+/* Быстрые наборы тем карт */
+.cc-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.cc-preset { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 0.76rem; font-weight: 800; color: #c4c4d0; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s; }
+.cc-preset:hover { color: #fff; border-color: rgba(255, 199, 44, 0.45); }
+.cc-preset:active { transform: scale(0.96); }
+.cc-preset-on { color: #15151e; background: #ffc72c; border-color: #ffc72c; }
+.cc-preset-on:hover { color: #15151e; }
+.cc-preset-custom { cursor: default; color: #ffc72c; background: rgba(255, 199, 44, 0.1); border-color: rgba(255, 199, 44, 0.4); }
+
+/* ═══════════════════════════════════════════
+   QR-КОД КОМНАТЫ НА ЭКРАНЕ
+   ═══════════════════════════════════════════ */
+.lobby-room { display: flex; align-items: center; gap: 18px; }
+.lobby-room-main { flex: 1; min-width: 0; }
+#room-qr-slot:empty { display: none; }
+.room-qr-mini { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 8px 6px; border-radius: 16px; cursor: zoom-in; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 199, 44, 0.3); transition: transform 0.15s, border-color 0.2s; }
+.room-qr-mini:hover { transform: translateY(-2px); border-color: rgba(255, 199, 44, 0.6); }
+.room-qr-mini svg { display: block; border-radius: 8px; }
+.room-qr-mini span { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #ffc72c; }
+@media (max-width: 1023px) { .room-qr-mini { display: none; } }
+
+
+
+/* ═══════════════════════════════════════════
+   ИГРОВЫЕ ЭКРАНЫ БЕЗ ПРОКРУТКИ (компьютер)
+   ═══════════════════════════════════════════ */
+.prep-order { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin-top: 18px; }
+.prep-order-label { margin-right: 4px; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #8a8a9a; }
+.prep-order-chip { padding: 5px 12px; border-radius: 999px; font-size: 0.8rem; font-weight: 800; color: #d4d4e0; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); }
+.prep-order-me { color: #fff; background: #1e8fff; border-color: #1e8fff; }
+@media (min-width: 1024px) {
+    .game-main .classic-hud { margin-bottom: 14px !important; padding-top: 12px !important; padding-bottom: 12px !important; }
+    .game-main .round-path { margin-bottom: 10px; }
+    .prep-title { margin-bottom: 0 !important; }
+    .prep-title h2 { margin-bottom: 2px !important; font-size: 1.35rem !important; }
+    .prep-title p { font-size: 0.85rem; }
+    .game-card-grid { margin-top: 12px !important; }
+    /* Карта не выше трети экрана: на ноутбуке кнопка «Я готов» не уезжает вниз */
+    .game-card-grid .game-card-face { max-height: max(170px, 30vh); }
+    .pitch-tips { margin-top: 14px; }
+    .pitch-tips-title { margin-bottom: 6px; }
+    .prep-ready { margin-top: 14px; }
+}
+
+/* Инвестиции: итог и подтверждение всегда на виду */
+.inv-dock { position: sticky; bottom: 10px; z-index: 6; display: flex; flex-direction: column; gap: 8px; padding: 8px; margin: 0 -8px; border-radius: 24px; background: rgba(10, 10, 10, 0.86); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.06); box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35); }
+.inv-dock .inv-summary { margin: 0 !important; padding: 10px 18px !important; }
+.inv-dock .inv-summary #inv-remaining { font-size: 1.9rem; }
+.inv-dock #btn-confirm-invest { padding-top: 14px !important; padding-bottom: 14px !important; }
+.inv-pitch { max-height: 120px; overflow-y: auto; }
+@media (min-width: 640px) {
+    .inv-dock { flex-direction: row; align-items: stretch; }
+    .inv-dock .inv-summary { flex: 1; }
+    .inv-dock #btn-confirm-invest { width: auto !important; flex: 0 0 44%; }
+    .inv-dock > .corp-card:last-child:not(.inv-summary) { flex: 0 0 44%; margin: 0; display: flex; align-items: center; justify-content: center; }
+}
+@media (min-width: 1024px) {
+    .inv-title { margin-bottom: 14px !important; }
+    .inv-title h2 { font-size: 1.35rem !important; margin-bottom: 2px !important; }
+    .inv-title p { display: inline; margin: 0 4px !important; }
+    .inv-list { margin-bottom: 12px !important; }
+    .inv-top { padding: 14px 18px !important; }
+    .inv-top .mb-3 { margin-bottom: 8px !important; }
+    .inv-controls { padding: 10px 18px !important; }
+    .inv-pitch { margin-top: 10px !important; padding: 10px 12px !important; max-height: 96px; }
+}
+/* Широкий экран — проекты в две колонки */
+@media (min-width: 1200px) {
+    .inv-page { max-width: 1120px !important; }
+    .inv-list:not(.inv-list-single) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .inv-list > * { margin: 0 !important; }
+    .inv-list:not(.inv-list-single) .inv-controls .flex-wrap { gap: 8px !important; }
+    .inv-list:not(.inv-list-single) .inv-controls .flex-1 { min-width: 90px !important; }
+}
+
+/* Итоги раунда: на широком экране всё видно сразу */
+@media (min-width: 1024px) {
+    .res-page { padding-top: 16px !important; padding-bottom: 16px !important; }
+    .res-head { margin-bottom: 12px !important; }
+    .res-grid .mb-8 { margin-bottom: 14px !important; }
+    .res-grid .mvp-reveal { padding: 14px 20px !important; }
+    .res-awards > .corp-card { padding: 14px 16px !important; }
+    .res-awards .text-4xl { font-size: 1.6rem !important; margin-bottom: 4px !important; }
+    .res-grid h3 { margin-bottom: 8px !important; }
+}
+@media (min-width: 1200px) {
+    .res-page { max-width: 1180px !important; }
+    .res-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+    .res-col-side .grid.md\:grid-cols-2 { grid-template-columns: 1fr 1fr; }
+}
+
+/* Финал классики: две колонки на широком экране */
+@media (min-width: 1024px) {
+    .go-page { padding-top: 14px !important; }
+    .go-trophy { font-size: 3rem !important; margin-bottom: 0 !important; }
+    .go-hero h1 { font-size: 2.4rem !important; margin-bottom: 0 !important; }
+    .go-hero p { margin-bottom: 16px !important; }
+    .go-winners { gap: 14px !important; margin-bottom: 16px !important; }
+    .go-winners > div { padding: 16px 18px !important; }
+    .go-winners .text-5xl { font-size: 2rem !important; margin-bottom: 6px !important; }
+}
+@media (min-width: 1200px) {
+    .go-page { max-width: 1180px !important; }
+    .go-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; text-align: left; }
+    .go-col-side { text-align: center; }
+    .go-col-side > *:first-child { margin-top: 0 !important; }
+}
+
+
+/* Катастрофа на компьютере: 3 строки + «читать полностью» — досье и сцена помещаются на экран */
+@media (min-width: 641px) {
+    .bk-disaster-body:not(.bk-disaster-full) .bk-disaster-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .bk-disaster-body:not(.bk-disaster-full) .bk-disaster-more { display: inline-block; }
+    .bk-disaster-body { padding-bottom: 10px; }
+}
+
+/* «Бункер» на компьютере: сцена хода и досье плотнее — ход помещается на экран */
+@media (min-width: 1024px) {
+    .bk-stage { padding: 12px 16px 12px; margin-bottom: 12px; }
+    .bk-stage-wait { margin-top: 6px; }
+    .bk-disaster-body { font-size: 0.86rem; line-height: 1.5; }
+    .bk-dossier-head { margin-bottom: 8px; }
+    .bk-dossier-tip { margin-bottom: 8px; padding: 7px 12px; }
+    .bk-cards { gap: 8px; }
+    .bk-card { min-height: 94px; padding: 10px 12px 8px; }
+    .bk-card-value { margin-top: 4px; font-size: 0.84rem; }
+    .bk-card-cta { margin-top: 4px; }
+}
+@media (min-width: 1024px) {
+    #bunker-action-hand { margin-top: 10px !important; }
+    #bunker-action-hand h3 { margin-bottom: 6px !important; }
+    #bunker-action-hand .flex { gap: 8px !important; }
+    #bunker-action-hand .bunker-action-card { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: center; max-width: none !important; padding: 9px 12px !important; }
+    #bunker-action-hand .bunker-action-card > .text-3xl { grid-row: span 3; margin: 0 !important; font-size: 1.6rem !important; }
+    #bunker-action-hand .bunker-action-card > .text-xs { margin-bottom: 2px !important; }
+    #bunker-action-hand .bunker-action-card > .text-\[0\.7rem\] { line-height: 1.35 !important; }
+}
+
+/* Финал «Бункера»: продукты слева, действия справа и всегда на виду */
+@media (min-width: 1024px) {
+    .bgo-page { padding-top: 14px !important; }
+    .bgo-house { font-size: 2.6rem !important; margin-bottom: 0 !important; }
+    .bgo-page h1 { font-size: 2rem !important; margin-bottom: 0 !important; }
+    .bgo-sub { margin-bottom: 14px !important; }
+}
+@media (min-width: 1200px) {
+    .bgo-page { max-width: 1240px !important; }
+    .bgo-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start; text-align: left; }
+    .bgo-side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; text-align: center; scrollbar-width: thin; }
+    .bgo-side > .corp-card:first-child { padding: 16px !important; margin-bottom: 14px !important; }
+    .bgo-players .mb-8 { margin-bottom: 16px !important; }
+}
+
+/* Подготовка: до пяти карт — в один ряд, даже когда колонка уже (например, из-за QR в углу) */
+@media (min-width: 1024px) {
+    .game-card-grid:not(:has(> :nth-child(6))) { flex-wrap: nowrap !important; }
+    .game-card-grid:not(:has(> :nth-child(6))) > .game-card-container { flex: 1 1 0; min-width: 0; }
+}
+
+/* Голосование «Бункера»: кандидаты в две колонки */
+@media (min-width: 1024px) {
+    .bk-vote-head { margin-bottom: 10px !important; }
+    .bk-vote-head .bk-vote-title { font-size: 1.7rem; }
+    .bk-vote-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .bk-vote-list > * { margin: 0 !important; }
+    .bk-vote-list > .bk-vote-skip { grid-column: 1 / -1; padding-top: 10px; padding-bottom: 10px; }
+    .bk-vote-list > .bk-vote-card { padding: 10px 12px; }
+}
+
+/* Невысокие экраны компьютера (ноутбук 1366×768, проектор 1280×720): «Бункер» плотнее */
+@media (min-width: 1024px) and (max-height: 820px) {
+    .bk-disaster-head { padding: 8px 14px; }
+    .bk-disaster-body:not(.bk-disaster-full) .bk-disaster-text { -webkit-line-clamp: 2; }
+    .bk-disaster-body { padding-bottom: 8px; font-size: 0.82rem; }
+    .bkd-product { padding: 10px 14px; margin-bottom: 10px; }
+    .bkd-product-label { margin-bottom: 4px; }
+    .bkd-product-name { font-size: 1.2rem; }
+    .bkd-product-feature { margin-top: 2px; font-size: 0.82rem; }
+    .bkd-step { padding: 12px 14px; margin-bottom: 10px; }
+    .bkd-step-title { font-size: 1.15rem; }
+    .bkd-step-hint { margin-bottom: 8px; }
+    .bkd-opt { min-height: 86px; padding: 10px 12px; gap: 6px; }
+    .bkd-done { padding: 12px 14px; margin-bottom: 10px; }
+    .bkd-done-icon { font-size: 1.6rem; }
+    .bkd-done-title { margin-top: 2px; font-size: 1.15rem; }
+    .bkd-summary { margin-top: 10px; gap: 6px; }
+    .bkd-sum { padding: 6px 10px; }
+    .bk-stage { padding: 8px 14px 8px; }
+    .bk-card { min-height: 80px; padding: 8px 10px 6px; }
+    .bk-card-value { font-size: 0.8rem; }
+}
+@media (min-width: 1024px) and (max-height: 960px) {
+    .bk-out { margin-bottom: 12px; }
+    .bk-out-door { font-size: 3rem; }
+    .bk-out-label { margin-top: 4px; }
+    .bk-out-name { font-size: 2.2rem; }
+    .bk-out-sub { margin-top: 4px; }
+}
+
+/* Лобби: QR рядом с кодом — плитки чуть меньше, отдельная кнопка «QR» не нужна */
+.lobby-room:has(.room-qr-mini) #btn-qr { display: none; }
+@media (min-width: 1024px) {
+    .lobby-room:has(.room-qr-mini) .room-code-tile { width: 42px; height: 52px; font-size: 1.55rem; }
+    .lobby-room:has(.room-qr-mini) .room-code-tiles { gap: 6px; }
+    .lobby-room:has(.room-qr-mini) .room-icon-btn { width: 40px; height: 40px; }
+    .lobby-room:has(.room-qr-mini) .room-code-row { gap: 8px; flex-wrap: nowrap; }
+    .lobby-room { gap: 14px; }
+}
+
+/* QR комнаты в колонке участников (под реакциями) */
+.rail-qr-img { display: block; margin: 2px auto 0; padding: 0; border: none; background: none; cursor: zoom-in; border-radius: 12px; overflow: hidden; transition: transform 0.15s; }
+.rail-qr-img:hover { transform: scale(1.03); }
+.rail-qr-img svg { display: block; }
+.rail-qr-code { margin-top: 6px; text-align: center; font-size: 0.7rem; font-weight: 700; color: #8a8a9a; }
+.rail-qr-code b { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; letter-spacing: 0.1em; color: #ffc72c; }
+.rail-audience .aud-twitch, .rail-audience .aud-live { margin-top: 8px; }

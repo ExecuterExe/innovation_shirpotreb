@@ -110,16 +110,31 @@ function renderInvite() {
 // Счётчик зала в открытом окне обновляется вместе с залом
 function refreshInvite() { if (document.getElementById('invite-modal')) renderInvite(); }
 
-// ─────────── панель зала в колонке участников ───────────
+// ─────────── QR комнаты в колонке участников ───────────
+// Висит всю партию под реакциями: зритель стрима или человек в зале сканирует его сам.
+// Ведёт «смотреть» — по нему не сядут за стол в следующей партии. Ведущий выключает его
+// настройкой «QR-код комнаты на экране»; тогда здесь остаётся только кнопка с окном QR.
+// Строки под QR — сколько зрителей, Twitch-чат и идёт ли голосование зала.
 
 export function audiencePanelHtml() {
     return '<div class="rail-panel rail-audience" id="rail-audience">' + audiencePanelInner() + '</div>';
 }
 
+function qrOnScreen() {
+    return !!state.roomCode && !(state.settings && state.settings.qrOnScreen === false) && !state.codeHidden;
+}
+
 function audiencePanelInner() {
     var n = viewerCount();
     var a = state.audience;
-    var html = '<div class="rail-head"><span>👀 Зрительный зал</span><span class="rail-count">' + n + '</span></div>';
+    var qr = qrOnScreen();
+    var html = '<div class="rail-head"><span>' + (qr ? '📱 Смотреть игру' : '👀 Зрительный зал') + '</span>'
+        + '<span class="rail-count" title="Зрителей в зале">👀 ' + n + '</span></div>';
+    if (qr) {
+        html += '<button type="button" class="rail-qr-img" id="btn-aud-invite" title="Наведите камеру телефона — и смотрите игру. Нажмите, чтобы увеличить">'
+            + qrSvg(roomLink(true), { size: 150 }) + '</button>';
+        html += '<div class="rail-qr-code">Код <b>' + escapeHtml(state.roomCode || '') + '</b></div>';
+    }
     if (twitchOn()) {
         var st = state.twitch.status;
         var label = st === 'connected' ? 'чат подключён' : st === 'not-found' ? 'канал не найден' : 'подключаемся…';
@@ -132,10 +147,8 @@ function audiencePanelInner() {
             (a.candidates || []).forEach(function (c, i) { html += '<li><b>' + (i + 1) + '</b> ' + escapeHtml(c.nickname) + '</li>'; });
             html += '</ol>';
         }
-    } else if (!n && !twitchOn()) {
-        html += '<div class="aud-empty">Пока никого. Зрители ставят реакции и выбирают свой приз</div>';
     }
-    html += '<button class="aud-invite-btn" id="btn-aud-invite">📱 Позвать зрителей</button>';
+    if (!qr) html += '<button class="aud-invite-btn" id="btn-aud-invite">📱 Позвать зрителей</button>';
     return html;
 }
 

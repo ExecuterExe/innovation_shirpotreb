@@ -42,6 +42,72 @@ var DECK_LOOK = {
     historicalFacts: { emoji: '🏛', color: '#a3e635' },
 };
 
+// Быстрые наборы: один клик вместо выбора по колодам. Колоды, которых нет в наборе, играют целиком.
+// Наборы собраны из тем каталога (card-categories.js); тема, которой нет, просто пропускается.
+export var CARD_PRESETS = [
+    { id: 'all', emoji: '🎲', label: 'Всё подряд', hint: 'Все темы — максимум неожиданных сочетаний', sel: {} },
+    { id: 'lesson', emoji: '🎓', label: 'Для урока', hint: 'Без смерти, криминала и мистики — для школы, вуза и корпоратива', sel: {
+        items: ['food', 'home', 'tech', 'clothes', 'tools', 'science', 'leisure'],
+        adjectives: ['character', 'material', 'tech', 'food'],
+        additions: ['feelings', 'society', 'fun', 'life', 'abstract'],
+        reviews: ['praise', 'complaints'],
+        targetAudience: ['character', 'jobs', 'family'],
+        hiddenDefects: ['quality', 'hassle'],
+        packaging: ['food', 'containers'],
+        historicalFacts: ['origin', 'fame', 'heroic'],
+    } },
+    { id: 'everyday', emoji: '🏠', label: 'Быт и повседневность', hint: 'Еда, дом, одежда — продукты, которые легко представить', sel: {
+        items: ['food', 'home', 'clothes'],
+        adjectives: ['character', 'material', 'food'],
+        features: ['wellbeing', 'life'],
+        additions: ['feelings', 'life'],
+        reviews: ['praise', 'complaints', 'drama'],
+        targetAudience: ['family', 'character'],
+        hiddenDefects: ['quality', 'hassle'],
+        packaging: ['food', 'containers'],
+        gifts: ['home', 'junk'],
+        historicalFacts: ['origin', 'fame'],
+    } },
+    { id: 'tech', emoji: '🚀', label: 'Техно и наука', hint: 'Гаджеты, инструменты, наука — для IT, инженеров и хакатонов', sel: {
+        items: ['tech', 'tools', 'science'],
+        adjectives: ['tech', 'material'],
+        features: ['gear', 'life'],
+        additions: ['fun', 'abstract'],
+        targetAudience: ['jobs', 'character'],
+        hiddenDefects: ['quality', 'danger'],
+        gifts: ['tools', 'fun'],
+        historicalFacts: ['origin', 'heroic', 'fame'],
+    } },
+    { id: 'chaos', emoji: '🌀', label: 'Хаос и мистика', hint: 'Оружие, магия, катастрофы и странности — для тех, кто любит пожёстче', sel: {
+        items: ['other', 'tools'],
+        adjectives: ['other', 'tech'],
+        features: ['weird', 'gear'],
+        additions: ['elements', 'society'],
+        reviews: ['creepy', 'drama'],
+        targetAudience: ['trouble', 'other'],
+        hiddenDefects: ['danger'],
+        gifts: ['junk', 'other'],
+        historicalFacts: ['dark', 'mystic'],
+    } },
+];
+
+// Сравниваем выборы без учёта порядка колод
+function sameSelection(a, b) {
+    var ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    if (ka.join() !== kb.join()) return false;
+    return ka.every(function (k) { return a[k].join() === b[k].join(); });
+}
+
+// Какой набор сейчас выбран (или null — свой выбор)
+export function activePreset(sel) {
+    if (!catalog) return null;
+    var cur = cleanSelection(sel || {});
+    for (var i = 0; i < CARD_PRESETS.length; i++) {
+        if (sameSelection(cur, cleanSelection(CARD_PRESETS[i].sel))) return CARD_PRESETS[i];
+    }
+    return null;
+}
+
 // Колоды, из которых раздают карты при этих настройках
 export function decksInPlay(s) {
     s = s || {};
@@ -137,17 +203,31 @@ export function cardCategoriesHtml(sel, opts) {
     if (!decks.length) return '';
 
     var custom = decks.filter(function (d) { return sel && sel[d]; });
+    var preset = activePreset(sel);
     var html = '<div class="cc' + (expanded ? ' cc-open' : '') + '" data-cc>';
     html += '<div class="cc-head">';
     html += '  <div class="cc-head-text"><b>🗂 Темы карт</b>';
-    if (custom.length) {
+    if (preset && preset.id !== 'all') {
+        html += '<span class="cc-head-sub cc-head-custom">Набор «' + escapeHtml(preset.label) + '»: ' + escapeHtml(preset.hint.charAt(0).toLowerCase() + preset.hint.slice(1)) + '</span>';
+    } else if (custom.length) {
         html += '<span class="cc-head-sub cc-head-custom">Свой набор: ' + escapeHtml(selectionSummary(sel, decks)) + '</span>';
     } else {
-        html += '<span class="cc-head-sub">Все темы включены. Можно оставить только нужные — например, «Еду» и «Быт» для урока</span>';
+        html += '<span class="cc-head-sub">Все темы включены. Выберите готовый набор или настройте колоды сами</span>';
     }
     html += '  </div>';
     html += '  <button type="button" class="cc-expand" data-cc-expand>' + (expanded ? 'Свернуть' : 'Настроить') + '</button>';
     html += '</div>';
+    // Быстрые наборы — видны и в свёрнутом блоке
+    if (!opts.readonly) {
+        html += '<div class="cc-presets" role="group" aria-label="Быстрые наборы тем">';
+        CARD_PRESETS.forEach(function (p) {
+            var on = preset ? preset.id === p.id : false;
+            html += '<button type="button" class="cc-preset' + (on ? ' cc-preset-on' : '') + '" data-cc-preset="' + p.id + '" title="' + escapeHtml(p.hint) + '" aria-pressed="' + (on ? 'true' : 'false') + '">'
+                + '<span>' + p.emoji + '</span>' + escapeHtml(p.label) + '</button>';
+        });
+        if (!preset) html += '<span class="cc-preset cc-preset-on cc-preset-custom">✏️ Свой набор</span>';
+        html += '</div>';
+    }
 
     if (expanded) {
         html += '<div class="cc-note">Карты раздаются только из включённых тем. Тема становится отдельной, когда в ней набирается ' + catalog.min + ' карт, — пока меньше, её слова лежат в «Остальном». Двойной клик (или двойное касание) по теме — оставить только её.</div>';
@@ -210,6 +290,13 @@ export function bindCardCategories(root, getSel, onChange, rerender, onEmpty) {
 function bindBox(box, getSel, onChange, rerender, onEmpty) {
     var exp = box.querySelector('[data-cc-expand]');
     if (exp) exp.addEventListener('click', function () { expanded = !expanded; rerender(); });
+    box.querySelectorAll('[data-cc-preset]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-cc-preset');
+            var p = CARD_PRESETS.filter(function (x) { return x.id === id; })[0];
+            if (p) onChange(cleanSelection(p.sel));
+        });
+    });
     box.querySelectorAll('[data-cc-all]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var next = Object.assign({}, getSel() || {});

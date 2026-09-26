@@ -66,7 +66,7 @@ export function renderPreparation(container) {
             : 'Игроки готовят питчи. Карты каждого вы увидите во время выступлений.');
     } else {
         // Title
-        html += '<div class="text-center mb-4">';
+        html += '<div class="text-center mb-4 prep-title">';
         html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Ваши карты</h2>';
         html += '  <p class="text-corp-muted">Придумайте, как объединить эти понятия в один инновационный продукт</p>';
         html += '</div>';
@@ -117,22 +117,19 @@ export function renderPreparation(container) {
     }
 
     // Order
-    html += '<div class="mt-8 text-center">';
-    html += '  <div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-4">Порядок выступлений</div>';
-    html += '  <div class="flex flex-wrap justify-center gap-3">';
+    // Порядок выступлений — одной строкой, чтобы не уезжать за экран
+    html += '<div class="prep-order">';
+    html += '  <span class="prep-order-label">Порядок выступлений</span>';
     for (var i = 0; i < order.length; i++) {
         var p = order[i];
         var isYou = p.id === state.playerId;
-        var cls = isYou ? 'bg-accent-blue text-white' : 'bg-corp-graphite text-corp-light border border-corp-border';
-        html += '<span class="px-5 py-2.5 rounded-2xl text-sm font-bold ' + cls + '">';
-        html += (i + 1) + '. ' + escapeHtml(p.nickname) + '</span>';
+        html += '<span class="prep-order-chip' + (isYou ? ' prep-order-me' : '') + '">' + (i + 1) + '. ' + escapeHtml(p.nickname) + '</span>';
     }
-    html += '  </div>';
     html += '</div>';
 
     // Host skip — ТОЛЬКО в обычном режиме (не стримерском)
     if (isHost && !streamer) {
-        html += '<div class="text-center mt-10">';
+        html += '<div class="text-center mt-5">';
         html += '  <button id="btn-skip-prep" class="btn-neon px-8 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider cursor-pointer">';
         html += '    ⏭ Пропустить подготовку</button>';
         html += '</div>';
