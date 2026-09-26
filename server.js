@@ -2582,6 +2582,10 @@ function randomDeckIndex(selection, deck) {
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function normalizeSpeechWhere(v) {
+    return v === 'screens' || v === 'all' ? v : 'host';
+}
+
 function shuffle(array) {
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
@@ -2631,6 +2635,8 @@ function createRoom(hostId, settings) {
             modifier: settings.modifier || 'none', // 'none' | 'addition' | 'metaphor'
             pseudoMode: !!settings.pseudoMode,
             useSpeech: !!settings.useSpeech,
+            // Где звучит голос игры: 'host' — только у ведущего, 'screens' — ещё у зрителей, 'all' — у всех
+            speechWhere: normalizeSpeechWhere(settings.speechWhere),
             useTargetAudience: !!settings.useTargetAudience,
             useHiddenDefects: !!settings.useHiddenDefects,
             usePackaging: !!settings.usePackaging,
@@ -5710,6 +5716,7 @@ wss.on('connection', (ws) => {
                 if (s.presentTime !== undefined) room.settings.presentTime = Math.min(600, Math.max(10, parseInt(s.presentTime) || 120));
                 if (s.useReviews !== undefined) room.settings.useReviews = !!s.useReviews;
                 if (s.useSpeech !== undefined) room.settings.useSpeech = !!s.useSpeech;
+                if (s.speechWhere !== undefined) room.settings.speechWhere = normalizeSpeechWhere(s.speechWhere);
                 if (s.investTime !== undefined) room.settings.investTime = Math.min(600, Math.max(10, parseInt(s.investTime) || 60));
                 if (s.questionsTime !== undefined) room.settings.questionsTime = normalizeQuestionsTime(s.questionsTime);
                 if (s.hostObserves !== undefined) room.settings.hostObserves = !!s.hostObserves;
@@ -6245,11 +6252,11 @@ wss.on('connection', (ws) => {
                 if (info.playerId !== room.hostId) return;
                 if (!room.settings.useSpeech) return;
 
-                // Пересылаем всем игрокам команду озвучить
-                broadcastToRoom(room, {
-                    type: 'playSpeech',
-                    texts: msg.texts || [],
-                });
+                // Только команда «повторить» или «стоп»: текст каждое устройство собирает
+                // само из карт выступающего — чужой текст сервер не пересылает
+                broadcastToRoom(room, msg.stop
+                    ? { type: 'playSpeech', stop: true }
+                    : { type: 'playSpeech', presenterIndex: room.currentPresenterIndex });
                 break;
             }
 

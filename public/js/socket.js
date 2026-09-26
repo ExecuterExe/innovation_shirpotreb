@@ -6,7 +6,7 @@ import { state, setState, navigate, startTimer, escapeHtml } from './app.js';
 import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
 import { updatePlayersList, updateStartButton, updateSettingsPanel, updateRoomHeader } from './screens/lobby.js';
-import { speakSequence, stopSpeaking } from './components/speech.js';
+import { announcePresentation, silenceAnnouncer } from './components/announcer.js';
 import { appendChatMsg, renderBunkerChat, removeChatMsgFromDom } from './components/bunker-chat.js';
 import { setPendingReveal } from './screens/bunker-game.js';
 import { resetWelcomeButtons } from './screens/welcome.js';
@@ -255,11 +255,10 @@ function handleMessage(msg) {
             playSound('start');
             break;
 
+        // Ведущий нажал «Повторить» / «Стоп»: голос звучит только на устройствах, где он включён
         case 'playSpeech':
-            stopSpeaking();
-            if (msg.texts && msg.texts.length > 0) {
-                speakSequence(msg.texts);
-            }
+            if (msg.stop) silenceAnnouncer();
+            else if (state.phase === 'presentation') announcePresentation({ force: true });
             break;
 
         case 'roundStart':
@@ -774,6 +773,8 @@ function handlePresentation(msg) {
     });
 
     navigate('presentation');
+    // Новый выступающий — голос объявляет его продукт (если озвучка включена и звучит здесь)
+    announcePresentation();
 
     if (msg.blackSwan) {
         playSound('warning');
@@ -787,6 +788,7 @@ function handlePresentation(msg) {
 function handleQuestionsPhase(msg) {
     // Фаза вопросов всегда идёт после показа выступающего; без него рисовать нечего
     if (!state.currentPresenter) return;
+    silenceAnnouncer();
     setState({
         presentationStage: 'questions',
         questionHands: msg.hands || [],

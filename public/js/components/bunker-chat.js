@@ -1,6 +1,6 @@
 import { state, escapeHtml } from '../app.js';
 import { sendMsg } from '../socket.js';
-import { speak, stopSpeaking } from './speech.js';
+import { announceChatPitch } from './announcer.js';
 
 // ═══════════════════════════════════════════
 // BUNKER CHAT COMPONENT
@@ -123,11 +123,8 @@ export function appendChatMsg(msg) {
     if (!state.chatMessages) state.chatMessages = [];
     state.chatMessages.push(msg);
 
-    // TTS for pitches if setting enabled
-    if (msg.type === 'pitch' && state.settings && state.settings.chatTTS) {
-        var textToSpeak = msg.nickname ? (msg.nickname + ': ' + msg.text) : msg.text;
-        speak(textToSpeak);
-    }
+    // !питч — голосом, в очередь (только там, где звучит голос игры)
+    if (msg.type === 'pitch') announceChatPitch(msg);
 
     // Append to DOM if chat is open
     var messagesEl = document.querySelector('#bunker-chat-messages');

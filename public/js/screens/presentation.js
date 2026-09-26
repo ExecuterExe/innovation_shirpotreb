@@ -1,6 +1,8 @@
 import { state, escapeHtml, observerHudHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { buildCrowdMeterHtml } from '../components/reactions.js';
+import { isSpeaking, isVoiceMuted, setVoiceMuted, isSpeechSupported } from '../components/speech.js';
+import { isVoiceDevice } from '../components/announcer.js';
 
 // ═══════════════════════════════════════════
 // Конфиг типов карт — легко расширяется
@@ -239,12 +241,13 @@ export function renderPresentation(container) {
 
     // ═══════ CONTROLS ═══════
     if (isHost) {
-        html += '<div class="flex flex-wrap items-center justify-center gap-4 mt-8">';
+        // Кнопки ведущего прилипают к низу экрана — не нужно листать под длинный текстовый питч
+        html += '<div class="flex flex-wrap items-center justify-center gap-4 mt-8 pres-dock">';
 
-        // Кнопка озвучки
+        // Голос: повторить объявление или остановить (у всех, где он звучит)
         if (state.settings && state.settings.useSpeech && !inQuestions) {
             html += '<button id="btn-speak" class="btn-neon px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">';
-            html += '🔊 Озвучить';
+            html += isSpeaking() ? '⏹ Стоп' : '🔊 Повторить';
             html += '</button>';
         }
 
@@ -258,6 +261,12 @@ export function renderPresentation(container) {
         html += '<div class="flex justify-center mt-8">';
         html += '<button id="btn-end-questions" class="btn-neon px-10 py-4 rounded-2xl text-sm font-black uppercase tracking-wider cursor-pointer">✅ Вопросы закончились</button>';
         html += '</div>';
+    }
+    // Голос звучит на этом устройстве — можно выключить у себя
+    if (state.settings && state.settings.useSpeech && isVoiceDevice() && isSpeechSupported()) {
+        var muted = isVoiceMuted();
+        html += '<div class="voice-mute-row"><button id="btn-voice-mute" class="voice-mute' + (muted ? ' voice-mute-off' : '') + '">'
+            + (muted ? '🔇 Голос на этом устройстве выключен' : '🔊 Голос звучит на этом устройстве') + '</button></div>';
     }
     html += '</div>'; // end main container
 
@@ -301,25 +310,23 @@ export function renderPresentation(container) {
         });
     }
 
-    container.querySelector('#btn-speak')?.addEventListener('click', function () {
-        var btn = container.querySelector('#btn-speak');
-        if (btn) {
-            btn.textContent = '🔊 Озвучивается...';
-            btn.disabled = true;
-            btn.classList.add('opacity-50');
-        }
+    var btnSpeak = container.querySelector('#btn-speak');
+    if (btnSpeak) {
+        btnSpeak.addEventListener('click', function () {
+            // Сервер разошлёт команду всем, а говорить будут только устройства с голосом
+            sendMsg({ type: 'triggerSpeech', stop: isSpeaking() });
+        });
+        // Надпись следует за голосом: «Стоп», пока звучит, «Повторить», когда замолчал
+        var speakTimer = setInterval(function () {
+            if (!document.body.contains(btnSpeak)) { clearInterval(speakTimer); return; }
+            var label = isSpeaking() ? '⏹ Стоп' : '🔊 Повторить';
+            if (btnSpeak.textContent !== label) btnSpeak.textContent = label;
+        }, 300);
+    }
 
-        var texts = buildSpeechTexts(pres, state.presenterIndex, state.totalPresenters, streamer);
-        sendMsg({ type: 'triggerSpeech', texts: texts });
-
-        // Разблокируем через время
-        setTimeout(function () {
-            if (btn) {
-                btn.textContent = '🔊 Озвучить';
-                btn.disabled = false;
-                btn.classList.remove('opacity-50');
-            }
-        }, 3000);
+    container.querySelector('#btn-voice-mute')?.addEventListener('click', function () {
+        setVoiceMuted(!isVoiceMuted());
+        renderPresentation(container);
     });
 }
 
@@ -454,67 +461,6 @@ function renderCardGrid(cards, mode) {
     return html;
 }
 
-function buildSpeechTexts(pres, presenterIndex, totalPresenters, streamerMode) {
-    var texts = [];
-
-    // Вступление
-    if (presenterIndex === 0) {
-        texts.push('Начнём выступление с первого кандидата!');
-    } else {
-        texts.push('Выступает следующий игрок.');
-    }
-
-
-    // Продукт — собираем из карточек
-    var productParts = [];
-
-    if (pres.cards.adjective) {
-        productParts.push(pres.cards.adjective.toLowerCase());
-    }
-    if (pres.cards.item) {
-        productParts.push(pres.cards.item.toLowerCase());
-    }
-    if (pres.cards.modifier) {
-        productParts.push(pres.cards.modifier.toLowerCase());
-    }
-
-    var productStr = 'Продукт: ' + productParts.join(' ');
-
-    if (pres.cards.feature) {
-        productStr += ', ' + pres.cards.feature.toLowerCase();
-    }
-
-    productStr += '.';
-    texts.push(productStr);
-
-    // Отзыв
-    if (pres.cards.review) {
-        texts.push('Первый отзыв клиента: ' + pres.cards.review);
-    }
-
-    // Целевая аудитория
-    if (pres.cards.targetAudience) {
-        texts.push('Целевая аудитория: ' + pres.cards.targetAudience.toLowerCase() + '.');
-    }
-
-    // Скрытый дефект
-    if (pres.cards.hiddenDefect) {
-        texts.push('Скрытый дефект: ' + pres.cards.hiddenDefect.toLowerCase() + '.');
-    }
-
-    // Упаковка
-    if (pres.cards.packaging) {
-        texts.push('Упаковка: ' + pres.cards.packaging.toLowerCase() + '.');
-    }
-
-    // Текст питча (стримерский режим)
-    if (streamerMode && pres.pitchText && pres.pitchText.trim()) {
-        texts.push('Текст питча.');
-        texts.push(pres.pitchText);
-    }
-
-    return texts;
-}
 
 // Экспортируем для использования в других экранах
 export { renderCardGrid, CARD_TYPES };

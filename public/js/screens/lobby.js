@@ -265,7 +265,20 @@ export function updateSettingsPanel(container) {
     html += buildSectionDivider('Чат');
     html += '<div class="space-y-1.5">';
     html += buildToggle('💬 Чат во время партии', 'В лобби чат есть всегда. Здесь — оставить ли его открытым, когда игра началась', 'set-bunker-chat', s.bunkerChat !== false, false);
-    html += buildToggle('🔉 Озвучка команды !питч', 'Сообщения с !питч зачитываются синтезатором речи для всей комнаты', 'set-chat-tts', !!s.chatTTS, false);
+    html += buildToggle('🔉 Озвучка команды !питч', 'Сообщения с !питч зачитываются голосом — там, где звучит голос игры', 'set-chat-tts', !!s.chatTTS, false);
+    html += '</div>';
+
+    // Где звучит голос игры: объявления выступающих и !питч из чата
+    var where = s.speechWhere === 'screens' || s.speechWhere === 'all' ? s.speechWhere : 'host';
+    html += buildSectionDivider('Где звучит голос');
+    html += '<div class="voice-where">';
+    [['host', '🎙', 'У ведущего', 'Экран, проектор или стрим. Телефоны игроков молчат'],
+     ['screens', '📺', 'Ведущий и зрители', 'Плюс устройства в режиме «Смотреть» — например, ноутбук у проектора'],
+     ['all', '📱', 'У всех', 'Для игры по видеосвязи, когда все в разных местах']].forEach(function (o) {
+        var on = where === o[0];
+        html += '<label class="voice-where-opt' + (on ? ' voice-where-on' : '') + '"><input type="radio" name="speech-where" value="' + o[0] + '" class="deck-toggle sr-only"' + (on ? ' checked' : '') + '>'
+            + '<b>' + o[1] + ' ' + o[2] + '</b><span>' + o[3] + '</span></label>';
+    });
     html += '</div>';
 
     html += buildSectionDivider('После игры');
@@ -340,7 +353,7 @@ export function updateSettingsPanel(container) {
     html += '<div class="space-y-1.5">';
     html += buildToggle('🎬 Текстовые питчи',        'Питч пишут текстом — для стрима и игры без микрофона', 'set-streamer', s.streamerMode,          false);
     html += buildToggle('🕶 Зашифровать участников', 'Имена → псевдонимы (только с текстовыми питчами)',    'set-anon',     s.anonymizeParticipants, !s.streamerMode);
-    html += buildToggle('🔊 Озвучка',                'Браузер зачитывает карты и питчи вслух',              'set-speech',   s.useSpeech,             false);
+    html += buildToggle('🔊 Голос объявляет выступающих', 'Зачитывает продукт каждого питча, «Чёрного лебедя», а в текстовых питчах — сам текст. Где звучит — во вкладке «Общее»', 'set-speech', s.useSpeech, false);
     html += '</div>';
     html += '</div>';
 
@@ -1286,6 +1299,7 @@ function pushSettings(container) {
         bunkerDraft: container.querySelector('#set-bunker-draft') ? container.querySelector('#set-bunker-draft').checked : (state.settings.bunkerDraft !== false),
         bunkerDraftTime: container.querySelector('input[name="draft-time"]:checked') ? parseInt(container.querySelector('input[name="draft-time"]:checked').value, 10) : (state.settings.bunkerDraftTime || 120),
         chatTTS: container.querySelector('#set-chat-tts')?.checked || false,
+        speechWhere: container.querySelector('input[name="speech-where"]:checked') ? container.querySelector('input[name="speech-where"]:checked').value : (state.settings.speechWhere || 'host'),
         qrOnScreen: container.querySelector('#set-qr-screen') ? container.querySelector('#set-qr-screen').checked : (state.settings.qrOnScreen !== false),
         roomPrivate: container.querySelector('#set-room-open') ? !container.querySelector('#set-room-open').checked : false,
         roomPassword: container.querySelector('#set-room-password')?.value || '',

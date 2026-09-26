@@ -12,6 +12,7 @@ import { renderGameOver } from './screens/gameover.js';
 import { renderCardInput } from './screens/card-input.js';
 import { renderTied, renderTiebreaker, renderTiebreakerVoting } from './screens/tiebreaker.js';
 import { initSpeech } from './components/speech.js';
+import { silenceAnnouncer } from './components/announcer.js';
 import { mountRail } from './components/players-rail.js';
 import { syncReactionFab } from './components/reactions.js';
 import { roundPathHtml, ROUND_PATH_PHASES } from './components/round-path.js';
@@ -111,6 +112,7 @@ export function navigate(phase) {
     stopTimer();
     var prevPhase = state.phase;
     state.phase = phase;
+    if (prevPhase === 'presentation' && phase !== 'presentation') silenceAnnouncer();
 
     var app = document.getElementById('app');
     if (!app) return;
