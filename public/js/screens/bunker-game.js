@@ -5,6 +5,7 @@ import { renderBunkerLegend } from '../components/bunker-legend.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { audienceResultHtml } from '../components/audience.js';
+import { askConfirm } from '../components/confirm.js';
 
 // ═══════════════════════════════════════════
 // Конфиг карт для бункера (все 9)
@@ -232,7 +233,8 @@ export function renderBunkerReveal(container) {
     html += '</div>';
 
     // ═══════ КАРТЫ ДЕЙСТВИЯ ═══════
-    var actionCards = isSpectator ? [] : (state.myActionCards || []);
+    // Выбывшие карты действия больше не играют
+    var actionCards = (isSpectator || eliminatedPlayers.includes(myId)) ? [] : (state.myActionCards || []);
     if (actionCards.length > 0) {
         html += renderActionHand(actionCards, 'reveal');
     }
@@ -257,8 +259,8 @@ export function renderBunkerReveal(container) {
     // Кнопка выхода
     var btnExitBunker = container.querySelector('#btn-exit-bunker');
     if (btnExitBunker) {
-        btnExitBunker.addEventListener('click', function () {
-            if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+        btnExitBunker.addEventListener('click', async function () {
+            if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
         });
     }
 
@@ -345,12 +347,12 @@ export function renderBunkerReveal(container) {
     var bunkerKickBtns = container.querySelectorAll('.bunker-kick-btn');
     for (var bki = 0; bki < bunkerKickBtns.length; bki++) {
         (function (btn) {
-            btn.addEventListener('click', function (e) {
+            btn.addEventListener('click', async function (e) {
                 e.stopPropagation();
                 var targetId = btn.getAttribute('data-bunker-kick');
                 var targetName = btn.getAttribute('data-bunker-kick-name') || 'игрока';
                 if (!targetId) return;
-                if (!window.confirm('Исключить «' + targetName + '» из бункера? Это действие необратимо для текущей игры.')) return;
+                if (!await askConfirm('Исключить «' + targetName + '» из бункера? Это действие необратимо для текущей игры.')) return;
                 sendMsg({ type: 'bunkerHostKick', targetPlayerId: targetId });
             });
         })(bunkerKickBtns[bki]);
@@ -527,11 +529,13 @@ function openActionCardFlow(container, card) {
     // absorb: выбрать eliminated игрока, потом targetCardKey
     if (card.cardType === 'absorb') {
         showTargetPicker(container, card, true /* onlyEliminated */, function (targetId) {
-            showCardKeyPicker(container, card, '📦 Какую карту взять?', false, function (pickedKey) {
+            // Карты выбывшего открыты — показываем, что именно можно забрать; свои открытые слоты заменить нельзя
+            var theirs = (state.bunker && state.bunker.revealedCardValues && state.bunker.revealedCardValues[targetId]) || {};
+            showCardKeyPicker(container, card, '📦 Какую карту взять? Она заменит вашу нераскрытую', true, function (pickedKey) {
                 closeActionCardModal(container);
                 sendMsg({ type: 'bunkerPlayActionCard', cardId: card.cardId, targetPlayerId: targetId, targetCardKey: pickedKey });
                 playSound('start');
-            });
+            }, theirs);
         });
         return;
     }
@@ -616,7 +620,8 @@ function showTargetPicker(container, card, onlyEliminated, onPick) {
     }
 }
 
-function showCardKeyPicker(container, card, title, skipRevealed, onPick) {
+// values — показать под категорией значение карты (например, у выбывшего в «Поглощении»)
+function showCardKeyPicker(container, card, title, skipRevealed, onPick, values) {
     var myRevealed = (state.bunker && state.bunker.revealedCards && state.bunker.revealedCards[state.playerId]) || {};
 
     var html = '';
@@ -632,6 +637,8 @@ function showCardKeyPicker(container, card, title, skipRevealed, onPick) {
         html += disabled ? ' opacity-30 pointer-events-none' : ' hover:scale-[1.02] hover:border-white/20';
         html += '" data-card-key="' + ct.key + '">';
         html += ct.emoji + ' ' + ct.label;
+        if (values && values[ct.key]) html += '<span class="bk-pick-value">' + escapeHtml(values[ct.key]) + '</span>';
+        if (disabled) html += '<span class="bk-pick-value">у вас уже открыта</span>';
         html += '</button>';
     }
 

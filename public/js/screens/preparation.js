@@ -1,6 +1,8 @@
 import { state, escapeHtml, observerHudHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { renderCardGrid, CARD_TYPES } from './presentation.js';
+import { chainProductHtml, fitProductArt } from './draw-chain.js';
+import { askConfirm } from '../components/confirm.js';
 
 export function renderPreparation(container) {
     var cards = state.myCards || {};
@@ -23,7 +25,7 @@ export function renderPreparation(container) {
     html += '<div class="max-w-5xl mx-auto px-4 py-6 min-h-screen">';
 
     // HUD
-    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
+    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 ' + (state.myProduct ? 'mb-4' : 'mb-8') + '">';
     html += '  <div>';
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
     html += '    <div class="text-3xl font-black text-corp-white">' + state.currentRound;
@@ -65,14 +67,20 @@ export function renderPreparation(container) {
             ? 'Игроки получили карты и готовят питчи. Выступления начнутся, когда все будут готовы или выйдет время' + (streamer ? '.' : ' — или раньше, если пропустите подготовку.')
             : 'Игроки готовят питчи. Карты каждого вы увидите во время выступлений.');
     } else {
-        // Title
-        html += '<div class="text-center mb-4 prep-title">';
-        html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Ваши карты</h2>';
-        html += '  <p class="text-corp-muted">Придумайте, как объединить эти понятия в один инновационный продукт</p>';
-        html += '</div>';
-
-        // Cards
-        html += renderCardGrid(cardList, 'preparation');
+        // «Испорченный прототип»: достался чужой продукт — рисунок, название и карты художника
+        var product = state.myProduct;
+        if (product) {
+            // Коротко, одной строкой: всё остальное говорит сам продукт
+            html += '<div class="dc-prep-title">📦 <b>Ваш продукт</b> — его придумали другие, а продавать вам<span class="dc-prep-more">. Свяжите рисунок, название и карты в один питч</span></div>';
+        } else {
+            html += '<div class="text-center mb-4 prep-title">';
+            html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Ваши карты</h2>';
+            html += '  <p class="text-corp-muted">Придумайте, как объединить эти понятия в один инновационный продукт</p>';
+            html += '</div>';
+        }
+        // Продукт из «Испорченного прототипа» — рисунок, тексты и карты одним компактным блоком
+        if (product) html += chainProductHtml(product, cards, false);
+        else html += renderCardGrid(cardList, 'preparation');
     }
 
     // Pitch section (streamer mode)
@@ -96,7 +104,8 @@ export function renderPreparation(container) {
     }
 
     // Шпаргалка и «Я готов» — в обычном режиме (у стримера готовность — кнопкой под текстом питча)
-    if (!streamer && !isSpectator) {
+    // Шпаргалка не нужна, когда перед глазами готовый продукт из «Испорченного прототипа» — экран должен влезть целиком
+    if (!streamer && !isSpectator && !state.myProduct) {
         html += '<div class="pitch-tips">';
         html += '  <div class="pitch-tips-title">Шпаргалка питча</div>';
         html += '  <div class="pitch-tips-grid">';
@@ -105,6 +114,8 @@ export function renderPreparation(container) {
         });
         html += '  </div>';
         html += '</div>';
+    }
+    if (!streamer && !isSpectator) {
         html += '<div id="prep-ready" class="prep-ready">' + prepReadyInner() + '</div>';
     }
 
@@ -137,11 +148,13 @@ export function renderPreparation(container) {
 
     html += '</div>';
     container.innerHTML = html;
+    // После вставки ленты раунда (navigate добавляет её сразу после отрисовки) — иначе расчёт промахнётся
+    if (state.myProduct) requestAnimationFrame(function () { fitProductArt(container); });
 
     // ═══════ LISTENERS ═══════
     var btnExitGame = container.querySelector('#btn-exit-game');
-    if (btnExitGame) btnExitGame.addEventListener('click', function () {
-        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    if (btnExitGame) btnExitGame.addEventListener('click', async function () {
+        if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
     });
 
     var textarea = container.querySelector('#pitch-textarea');

@@ -37,6 +37,7 @@ export function presentationTexts(pres, presenterIndex, streamerMode, blackSwan)
     if (blackSwan && blackSwan.label) {
         texts.push('Чёрный лебедь! ' + blackSwan.label + ' меняется: было «' + lower(blackSwan.oldValue) + '», стало «' + lower(blackSwan.newValue) + '».');
     }
+    if (pres && pres.product && pres.product.name) texts.push('Название: «' + pres.product.name + '».');
     var name = [cards.adjective, cards.item, cards.modifier].filter(Boolean).map(lower).join(' ');
     if (name) texts.push('Продукт: ' + name + (cards.feature ? ', ' + lower(cards.feature) : '') + '.');
     if (cards.targetAudience) texts.push('Целевая аудитория: ' + lower(cards.targetAudience) + '.');

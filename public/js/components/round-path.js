@@ -13,7 +13,7 @@ var STEPS = [
 ];
 
 var PHASE_STEP = {
-    cardInput: 'prep', preparation: 'prep',
+    cardInput: 'prep', productDraft: 'prep',  preparation: 'prep',
     presentation: 'pitch',
     investing: 'invest', tied: 'invest', tiebreaker: 'invest', tiebreaker_voting: 'invest',
     results: 'results',
@@ -32,7 +32,7 @@ export function roundPathHtml(phase) {
     var last = round >= total && total > 1;
 
     // На подготовке, питчах и инвестициях номер раунда уже есть в шапке экрана — не дублируем
-    var hasHud = phase === 'preparation' || phase === 'presentation' || phase === 'investing';
+    var hasHud = phase === 'productDraft' || phase === 'drawing' || phase === 'naming' || phase === 'slogan' || phase === 'preparation' || phase === 'presentation' || phase === 'investing';
     var html = '<nav class="round-path" aria-label="Этапы раунда">';
     if (!hasHud || last) {
         html += '<div class="round-path-round' + (last ? ' round-path-last' : '') + '">';

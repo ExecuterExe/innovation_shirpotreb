@@ -1,6 +1,7 @@
 import { state, escapeHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
+import { askConfirm } from '../components/confirm.js';
 
 var submitted = false;
 
@@ -108,8 +109,8 @@ export function renderCardInput(container) {
         html += '</div>';
         container.innerHTML = html;
         var btnExitObs = container.querySelector('#btn-exit-game');
-        if (btnExitObs) btnExitObs.addEventListener('click', function () {
-            if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+        if (btnExitObs) btnExitObs.addEventListener('click', async function () {
+            if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
         });
         return;
     }
@@ -176,8 +177,8 @@ export function renderCardInput(container) {
 
     // ═══════ LISTENERS ═══════
     var btnExitGame = container.querySelector('#btn-exit-game');
-    if (btnExitGame) btnExitGame.addEventListener('click', function () {
-        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    if (btnExitGame) btnExitGame.addEventListener('click', async function () {
+        if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
     });
 
     var input = container.querySelector('#card-input');

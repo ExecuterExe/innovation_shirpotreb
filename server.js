@@ -2671,6 +2671,14 @@ function createRoom(hostId, settings) {
             bunkerDraft: settings.bunkerDraft !== false,
             bunkerDraftTime: normalizeDraftTime(settings.bunkerDraftTime),
             bunkerSurvivors: normalizeSurvivors(settings.bunkerSurvivors),
+            // Классика: в начале раунда каждый собирает продукт из трёх вариантов на карту
+            productDraft: !!settings.productDraft && settings.cardSource !== 'players',
+            productDraftTime: normalizeDraftTime(settings.productDraftTime, 90),
+            // «Испорченный прототип»: свои карты рисуешь, чужой рисунок называешь, третий продукт питчишь
+            drawMode: !!settings.drawMode,
+            drawTime: normalizeDrawTime(settings.drawTime),
+            // Ещё один этап цепочки: слоган к чужому рисунку и названию (нужно 4+ игрока)
+            chainSlogan: !!settings.chainSlogan,
             postGameAnalytics: !!settings.postGameAnalytics,
             // QR-код комнаты постоянно в углу экрана — зрители сканируют сами
             qrOnScreen: settings.qrOnScreen !== false,
@@ -3826,6 +3834,16 @@ function handlePlayerTimeout(room, playerId) {
             checkBunkerDraftDone(room);
             break;
 
+        case 'productDraft':
+            checkProductDraftDone(room);
+            break;
+
+        case 'drawing':
+        case 'naming':
+        case 'slogan':
+            checkChainStageDone(room);
+            break;
+
         case 'preparation':
             player.isReady = true;
             checkAllReady(room);
@@ -3917,6 +3935,10 @@ function sendCurrentStateToPlayer(room, player, ws) {
 
     if (roomState === 'bunkerDraft') {
         ws.send(JSON.stringify(Object.assign(bunkerDraftMessage(room, player), { restored: true })));
+    } else if (roomState === 'productDraft') {
+        ws.send(JSON.stringify(Object.assign(productDraftMessage(room, player), { restored: true })));
+    } else if (isChainState(roomState)) {
+        ws.send(JSON.stringify(Object.assign(chainStageMessage(room, player), { restored: true })));
     } else if (roomState === 'bunkerReveal' || roomState === 'bunkerVote' || roomState === 'bunkerTieVote') {
         // Восстанавливаем значения раскрытых карт из данных на сервере
         var revealedCardValues = {};
@@ -3973,6 +3995,7 @@ function sendCurrentStateToPlayer(room, player, ws) {
             round: room.currentRound,
             totalRounds: room.totalRounds,
             yourCards: player.cards,
+            yourProduct: chainProductPublic(room, player),
             event: room.currentEvent,
             players: getPlayersPublicInfo(room),
             presentationOrder: getPresentationOrderPublic(room),
@@ -3989,6 +4012,7 @@ function sendCurrentStateToPlayer(room, player, ws) {
                 nickname: getDisplayNickname(room, presPlayer.id),
                 cards: presPlayer.cards,
                 pitchText: presPlayer.pitchText,
+                product: chainProductPublic(room, presPlayer),
             } : null,
             presenterIndex: room.currentPresenterIndex,
             totalPresenters: room.presentationOrder.length,
@@ -4162,6 +4186,9 @@ function startNewRound(room) {
     room.tiedPlayers = [];
     room.tieInvestments.clear();
 
+    // Продукт прошлого раунда из «Испорченного прототипа» больше не действует
+    room.players.forEach(p => { p.chainProduct = null; });
+
     // Сбрасываем eliminated
     room.players.forEach(p => {
         if (!p.connected) {
@@ -4201,13 +4228,13 @@ function startNewRound(room) {
             packaging: new Map(),
         };
         startCardInputPhase(room, 'adjective');
+    } else if (room.settings.productDraft) {
+        // Сборка продукта: каждый выбирает по карте из трёх, потом подготовка
+        startProductDraft(room);
     } else {
         // Обычный режим — раздаём из базы
         dealCardsFromDatabase(room);
-        sendRoundStartToAll(room);
-        startTimer(room, room.settings.prepTime, () => {
-            startPresentations(room);
-        });
+        beginPreparation(room);
     }
 }
 
@@ -4270,6 +4297,7 @@ function showCurrentPresenter(room) {
             nickname: getDisplayNickname(room, presenterId),
             cards: presenter.cards,
             pitchText: presenter.pitchText || '',
+            product: chainProductPublic(room, presenter),
         },
         presenterIndex: room.currentPresenterIndex,
         totalPresenters: room.presentationOrder.length,
@@ -4291,7 +4319,8 @@ function showCurrentPresenter(room) {
         questionsTime: room.settings.questionsTime || 0,
     });
 
-    startTimer(room, room.settings.presentTime, () => {
+    // «Испорченный прототип»: сначала на сцене вскрывают продукт (≈10 с) — это время не отнимаем у выступающего
+    startTimer(room, room.settings.presentTime + (presenter.chainProduct ? CHAIN_REVEAL_SECONDS : 0), () => {
         advancePresentation(room);
     });
 }
@@ -4403,6 +4432,7 @@ function startInvesting(room) {
             nickname: getDisplayNickname(room, id),
             cards: p.cards,
             pitchText: p.pitchText || '',
+            product: chainProductLite(room, p),
         } : null;
     }).filter(Boolean);
 
@@ -4573,6 +4603,7 @@ function showTiebreakerPresenter(room) {
             nickname: presenter.nickname,
             cards: presenter.cards,
             pitchText: presenter.pitchText || '',
+            product: chainProductPublic(room, presenter),
         },
         presenterIndex: room.currentPresenterIndex,
         totalPresenters: room.tiedPlayers.length,
@@ -4868,7 +4899,7 @@ function recordFinishedGame(room, mode, payload) {
 // СПИСОК ОТКРЫТЫХ КОМНАТ
 // =====================================================================
 
-const TAG_PRIORITY = ['bunker', 'blackSwan', 'events', 'streamer', 'pseudo', 'absurdGen', 'modifier', 'review', 'audience', 'defects', 'packaging', 'chat', 'questions', 'hostObserves'];
+const TAG_PRIORITY = ['bunker', 'productDraft', 'blackSwan', 'events', 'streamer', 'pseudo', 'absurdGen', 'modifier', 'review', 'audience', 'defects', 'packaging', 'chat', 'questions', 'hostObserves'];
 
 function getPublicRoomInfo(room) {
     var s = room.settings || {};
@@ -4881,6 +4912,8 @@ function getPublicRoomInfo(room) {
     if (s.streamerMode)            tags.push({ key: 'streamer',  label: '🎬 Стримерский',     tier: 'major' });
     if (s.pseudoMode)              tags.push({ key: 'pseudo',    label: '🎯 Псевдо',          tier: 'major' });
     if (s.cardSource === 'players') tags.push({ key: 'absurdGen', label: '🧟 Генератор',      tier: 'major' });
+    if (s.productDraft && !s.bunkerMode && s.cardSource !== 'players') tags.push({ key: 'productDraft', label: '🧪 Сборка', tier: 'minor' });
+    if (s.drawMode && !s.bunkerMode) tags.push({ key: 'drawMode', label: '✏️ Испорченный прототип', tier: 'major' });
     if (s.modifier && s.modifier !== 'none') tags.push({ key: 'modifier', label: s.modifier === 'addition' ? '📜 Дополнение' : '📜 Метафора', tier: 'minor' });
 
     // Дополнительные карты — мелкие теги
@@ -5098,6 +5131,91 @@ wss.on('connection', (ws) => {
                 checkBunkerDraftDone(room);
                 break;
             }
+            // ==================== ИСПОРЧЕННЫЙ ПРОТОТИП ====================
+            case 'drawSave': {
+                // Рисунок сохраняется по ходу рисования: картинка для показа и штрихи для таймлапса.
+                // done — игрок нажал «Готово»
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'drawing') return;
+                const work = room.chainWorks && room.chainWorks[info.playerId];
+                if (!work) return;
+                const img = String(msg.image || '');
+                if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > DRAWING_MAX_LENGTH) return;
+                work.image = img;
+                // Некорректные штрихи не затирают уже сохранённые — просто не принимаем их
+                if (msg.strokes !== undefined) { const clean = sanitizeStrokes(msg.strokes); if (clean) work.strokes = clean; }
+                if (msg.done !== undefined) room.chainDoneIds[info.playerId] = !!msg.done;
+                broadcastChainProgress(room);
+                checkChainStageDone(room);
+                break;
+            }
+            case 'drawEdit': {
+                // «Дорисовать»: снова рисует, пока остальные не закончили
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'drawing' || room.chainFinishing) return;
+                if (!room.chainWorks || !room.chainWorks[info.playerId]) return;
+                room.chainDoneIds[info.playerId] = false;
+                broadcastChainProgress(room);
+                break;
+            }
+            case 'chainText': {
+                // Название или слоган к чужому рисунку — в зависимости от этапа
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || (room.state !== 'naming' && room.state !== 'slogan') || !room.chainWorks) return;
+                const targetId = chainTargetOf(room, info.playerId);
+                const work = targetId && room.chainWorks[targetId];
+                if (!work) return;
+                const text = String(msg.text || '').replace(/\s+/g, ' ').trim().substring(0, CHAIN_TEXT_MAX[room.state]);
+                if (room.state === 'naming') { work.name = text; work.namerId = info.playerId; }
+                else { work.slogan = text; work.sloganId = info.playerId; }
+                if (msg.done !== undefined) room.chainDoneIds[info.playerId] = !!msg.done && !!text;
+                broadcastChainProgress(room);
+                checkChainStageDone(room);
+                break;
+            }
+            case 'chainFinish': {
+                // Ведущий не ждёт отстающих
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.hostId !== info.playerId) return;
+                if (isChainState(room.state)) finishChainStage(room);
+                break;
+            }
+            case 'productDraftPick': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'productDraft') return;
+                const player = room.players.get(info.playerId);
+                if (!player || !player.productDraft) return;
+                const d = player.productDraft;
+                const key = String(msg.cardKey || '');
+                const pos = parseInt(msg.option, 10);
+                if (d.order.indexOf(key) === -1) return;
+                if (!(pos >= 0 && pos < d.options[key].length)) return;
+                if ((key === 'adjective' || key === 'feature') && d.picks.item === undefined) return;
+                d.picks[key] = pos;
+                sendToPlayer(room, player.id, productDraftMessage(room, player, 'productDraftState'));
+                broadcastProductDraftProgress(room);
+                checkProductDraftDone(room);
+                break;
+            }
+            case 'productDraftFinish': {
+                // Ведущий начинает подготовку, не дожидаясь всех: недобранное выберется случайно
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'productDraft' || room.hostId !== info.playerId) return;
+                finishProductDraft(room);
+                break;
+            }
             case 'bunkerDraftFinish': {
                 // Хост запускает партию, не дожидаясь всех: недобранное выберется случайно
                 const info = playerRooms.get(ws);
@@ -5210,6 +5328,10 @@ wss.on('connection', (ws) => {
                 const player = room.players.get(info.playerId);
                 if (!player || !player.actionCards) return;
                 if (room.state !== 'bunkerReveal' && room.state !== 'bunkerVote') return;
+                if (room.bunker.eliminatedPlayers.includes(player.id)) {
+                    ws.send(JSON.stringify({ type: 'error', message: 'Вы выбыли из бункера — карты действия больше не играют.' }));
+                    return;
+                }
                 var acType = (player.actionCards.find(c => c.id === msg.cardId) || {}).type;
                 var acResult = handleBunkerActionCard(room, player, msg);
                 if (acResult && acResult.error) {
@@ -5719,6 +5841,11 @@ wss.on('connection', (ws) => {
                 if (s.bunkerDraft !== undefined) room.settings.bunkerDraft = !!s.bunkerDraft;
                 if (s.bunkerDraftTime !== undefined) room.settings.bunkerDraftTime = normalizeDraftTime(s.bunkerDraftTime);
                 if (s.bunkerSurvivors !== undefined) room.settings.bunkerSurvivors = normalizeSurvivors(s.bunkerSurvivors);
+                if (s.productDraft !== undefined) room.settings.productDraft = !!s.productDraft;
+                if (s.productDraftTime !== undefined) room.settings.productDraftTime = normalizeDraftTime(s.productDraftTime, 90);
+                if (s.drawMode !== undefined) room.settings.drawMode = !!s.drawMode;
+                if (s.drawTime !== undefined) room.settings.drawTime = normalizeDrawTime(s.drawTime);
+                if (s.chainSlogan !== undefined) room.settings.chainSlogan = !!s.chainSlogan;
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
                 if (s.postGameAnalytics !== undefined) room.settings.postGameAnalytics = !!s.postGameAnalytics;
@@ -5769,6 +5896,7 @@ wss.on('connection', (ws) => {
                     if (room.settings.cardSource === 'players') {
                         room.settings.blackSwan = false;
                         room.settings.modifier = 'none';
+                        room.settings.productDraft = false;
                     }
                 }
                 if (!room.settings.streamerMode) {
@@ -6038,6 +6166,7 @@ wss.on('connection', (ws) => {
                             nickname: getDisplayNickname(room, id),
                             cards: p.cards,
                             pitchText: p.pitchText || '',
+                            product: chainProductLite(room, p),
                         } : null;
                     }).filter(Boolean);
 
@@ -6631,6 +6760,65 @@ const BUNKER_ACTION_CARDS = [
     { type: 'removeDefect',  name: 'Донат',               emoji: '💊', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Навсегда удали «Скрытый дефект» другого игрока.' },
 ];
 
+// ─── Согласование карт с предметом ───
+// Прилагательное и особенность хранятся уже склонёнными. Когда предмет меняется (обмен, перемешивание,
+// поглощение), слово должно остаться тем же, а род — подстроиться: «КРАСНЫЙ ЧАЙНИК» → «КРАСНАЯ ЛАМПА».
+var declinedIndex = null;
+function baseWordOf(key, text) {
+    if (!declinedIndex) {
+        declinedIndex = { adjective: new Map(), feature: new Map() };
+        ['m', 'f', 'n'].forEach(g => {
+            ADJECTIVES.forEach(a => { var t = declineAdjective(a, g); if (!declinedIndex.adjective.has(t)) declinedIndex.adjective.set(t, a); });
+            FEATURES.forEach(f => { var t = declineFeature(f, g); if (!declinedIndex.feature.has(t)) declinedIndex.feature.set(t, f); });
+        });
+    }
+    return (declinedIndex[key] && declinedIndex[key].get(text)) || null;
+}
+
+function genderOfItemWord(word) {
+    for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].word === word) return ITEMS[i].gender;
+    return null;
+}
+
+// Подгоняет прилагательное и особенность (и копию особенности из «Общих ресурсов») под род предмета.
+// Возвращает ключи карт, которые изменились
+function agreeWithItem(room, p) {
+    if (!p || !p.cards) return [];
+    var g = genderOfItemWord(p.cards.item) || p.itemGender || 'm';
+    p.itemGender = g;
+    var changed = [];
+    [['adjective', declineAdjective], ['feature', declineFeature]].forEach(pair => {
+        var key = pair[0];
+        var cur = p.cards[key];
+        var base = cur && baseWordOf(key, cur);
+        if (!base) return;
+        var next = pair[1](base, g);
+        if (next !== cur) { p.cards[key] = next; changed.push(key); }
+    });
+    var extra = room.bunker.extraCards && room.bunker.extraCards[p.id];
+    if (extra && extra.feature) {
+        var fb = baseWordOf('feature', extra.feature);
+        if (fb) extra.feature = declineFeature(fb, g);
+    }
+    return changed;
+}
+
+// Карта уже открыта всем, а её значение поменялось — все должны увидеть новое
+function syncRevealedCards(room, playerId, keys) {
+    var p = room.players.get(playerId);
+    var revealed = room.bunker.revealedCards[playerId] || {};
+    var values = {};
+    var any = false;
+    (keys || []).forEach(k => {
+        if (revealed[k] && p && p.cards) { values[k] = p.cards[k]; any = true; }
+    });
+    if (!any) return;
+    broadcastToRoom(room, { type: 'bunkerRevealedUpdate', playerId: playerId, values: values });
+}
+
+// Текст вместо удалённого «Донатом» дефекта — чтобы в досье не было пустой карты
+var DEFECT_REMOVED = 'ДЕФЕКТ УСТРАНЁН ДОНАТОМ 💊';
+
 function drawBunkerCard(room, cardKey, itemGender) {
     if (!bunkerDeckSource(cardKey)) return null;
     var idx = drawBunkerIndexes(room, cardKey, 1)[0];
@@ -6679,19 +6867,19 @@ function handleBunkerActionCard(room, player, msg) {
             nickname: player.nickname,
             cardName: cardDef.name,
             emoji: cardDef.emoji,
+            cardType: cardDef.type,
+            cardKey: cardDef.cardKey || null,
             effect: effect,
             cardId: cardId,
+            targetPlayerId: targetPlayerId,
         }, extra || {}));
     }
-    function redeclineForItem(p, newGender) {
-        p.itemGender = newGender;
-        var pRevealed = room.bunker.revealedCards[p.id] || {};
-        if (!pRevealed['adjective']) {
-            var a = drawBunkerCard(room, 'adjective', newGender); if (a) p.cards.adjective = a.value;
-        }
-        if (!pRevealed['feature']) {
-            var f = drawBunkerCard(room, 'feature', newGender); if (f) p.cards.feature = f.value;
-        }
+    // Поменялись карты игрока: согласовать с предметом, открытые — показать всем. Возвращает изменённые ключи
+    function settle(p, keys) {
+        var changed = (keys || []).slice();
+        agreeWithItem(room, p).forEach(k => { if (changed.indexOf(k) === -1) changed.push(k); });
+        syncRevealedCards(room, p.id, changed);
+        return changed;
     }
 
     switch (cardDef.type) {
@@ -6701,11 +6889,11 @@ function handleBunkerActionCard(room, player, msg) {
             var drawn = drawBunkerCard(room, key, myGender);
             if (!drawn) return { error: 'Не удалось вытянуть карту.' };
             player.cards[key] = drawn.value;
-            if (key === 'item' && drawn.gender) redeclineForItem(player, drawn.gender);
+            var selfChanged = settle(player, [key]);
             markUsed();
             sendMyUpdate({
-                ownerEffect: 'Ваш(а) «' + (CARD_KEY_LABELS[key] || key) + '» теперь: ' + drawn.value,
-                changedCards: [key],
+                ownerEffect: 'Ваш(а) «' + (CARD_KEY_LABELS[key] || key) + '» теперь: ' + player.cards[key],
+                changedCards: selfChanged,
             });
             broadcastPlayed(player.nickname + ' сыграл «' + cardDef.name + '»');
             return { ok: true };
@@ -6724,11 +6912,7 @@ function handleBunkerActionCard(room, player, msg) {
             eligible.forEach((id, i) => {
                 var p = room.players.get(id);
                 p.cards[key] = values[i];
-                if (key === 'item') {
-                    var itemObj = null;
-                    for (var ii = 0; ii < ITEMS.length; ii++) { if (ITEMS[ii].word === values[i]) { itemObj = ITEMS[ii]; break; } }
-                    if (itemObj) redeclineForItem(p, itemObj.gender);
-                }
+                var shuffledChanged = settle(p, [key]);
                 var isOwner = id === player.id;
                 sendToPlayer(room, id, {
                     type: 'bunkerActionCardUpdate',
@@ -6737,9 +6921,9 @@ function handleBunkerActionCard(room, player, msg) {
                     cardName: cardDef.name,
                     emoji: cardDef.emoji,
                     ownerEffect: isOwner
-                        ? ('Все получили новую «' + keyLabel + '». Ваша: ' + values[i])
-                        : ('Ваш(а) «' + keyLabel + '» изменился(-ась) на: ' + values[i]),
-                    changedCards: [key],
+                        ? ('Все получили новую «' + keyLabel + '». Ваша: ' + p.cards[key])
+                        : ('Ваш(а) «' + keyLabel + '» изменился(-ась) на: ' + p.cards[key]),
+                    changedCards: shuffledChanged,
                     fromPlayer: isOwner ? null : player.nickname,
                 });
             });
@@ -6755,15 +6939,8 @@ function handleBunkerActionCard(room, player, msg) {
             if (!target || !target.cards) return { error: 'Игрок не найден.' };
             if (room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Нельзя меняться с выбывшим игроком.' };
             var tmp = player.cards[key]; player.cards[key] = target.cards[key]; target.cards[key] = tmp;
-            if (key === 'item') {
-                var myItem = null, theirItem = null;
-                for (var ii = 0; ii < ITEMS.length; ii++) {
-                    if (ITEMS[ii].word === player.cards.item) myItem = ITEMS[ii];
-                    if (ITEMS[ii].word === target.cards.item) theirItem = ITEMS[ii];
-                }
-                if (myItem) redeclineForItem(player, myItem.gender);
-                if (theirItem) redeclineForItem(target, theirItem.gender);
-            }
+            var mySwapChanged = settle(player, [key]);
+            var theirSwapChanged = settle(target, [key]);
             markUsed();
             var swapLabel = CARD_KEY_LABELS[key] || key;
             sendToPlayer(room, player.id, {
@@ -6773,7 +6950,7 @@ function handleBunkerActionCard(room, player, msg) {
                 cardName: cardDef.name,
                 emoji: cardDef.emoji,
                 ownerEffect: 'Обмен с ' + target.nickname + '! Ваш(а) новый(-ая) «' + swapLabel + '»: ' + player.cards[key],
-                changedCards: [key],
+                changedCards: mySwapChanged,
             });
             sendToPlayer(room, targetPlayerId, {
                 type: 'bunkerActionCardUpdate',
@@ -6782,7 +6959,7 @@ function handleBunkerActionCard(room, player, msg) {
                 cardName: cardDef.name,
                 emoji: cardDef.emoji,
                 ownerEffect: player.nickname + ' поменялся с вами! Ваш(а) новый(-ая) «' + swapLabel + '»: ' + target.cards[key],
-                changedCards: [key],
+                changedCards: theirSwapChanged,
                 fromPlayer: player.nickname,
             });
             broadcastPlayed(player.nickname + ' поменялся «' + swapLabel + '» с ' + target.nickname, { targetNickname: target.nickname });
@@ -6794,7 +6971,8 @@ function handleBunkerActionCard(room, player, msg) {
             var target = room.players.get(targetPlayerId);
             if (!target || !target.cards || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
             if (!room.bunker.extraCards[player.id]) room.bunker.extraCards[player.id] = {};
-            room.bunker.extraCards[player.id].feature = target.cards.feature;
+            var sharedBase = baseWordOf('feature', target.cards.feature);
+            room.bunker.extraCards[player.id].feature = sharedBase ? declineFeature(sharedBase, player.itemGender || 'm') : target.cards.feature;
             markUsed();
             sendToPlayer(room, player.id, {
                 type: 'bunkerActionCardUpdate',
@@ -6815,7 +6993,7 @@ function handleBunkerActionCard(room, player, msg) {
             var target = room.players.get(targetPlayerId);
             if (!target || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
             if ((room.bunker.revealedCards[targetPlayerId] || {})['feature']) return { error: 'Особенность этого игрока уже раскрыта.' };
-            bunkerRevealCard(room, targetPlayerId, 'feature', false);
+            bunkerRevealCard(room, targetPlayerId, 'feature', false, player.nickname);
             markUsed();
             sendMyUpdate({
                 ownerEffect: 'Вы вскрыли «Особенность» игрока ' + target.nickname + '. Смотрите её карточку!',
@@ -6879,11 +7057,12 @@ function handleBunkerActionCard(room, player, msg) {
             if (!sourceVal) return { error: 'Карта не найдена у выбывшего игрока.' };
             if ((room.bunker.revealedCards[player.id] || {})[targetCardKey]) return { error: 'Ваша карта уже раскрыта.' };
             player.cards[targetCardKey] = sourceVal;
+            var absorbChanged = settle(player, [targetCardKey]);
             markUsed();
             var absorbLabel = CARD_KEY_LABELS[targetCardKey] || targetCardKey;
             sendMyUpdate({
-                ownerEffect: 'Поглощено у ' + target.nickname + '. Ваш(а) новый(-ая) «' + absorbLabel + '»: ' + sourceVal,
-                changedCards: [targetCardKey],
+                ownerEffect: 'Поглощено у ' + target.nickname + '. Ваш(а) новый(-ая) «' + absorbLabel + '»: ' + player.cards[targetCardKey],
+                changedCards: absorbChanged,
             });
             broadcastPlayed(player.nickname + ' поглотил карту «' + absorbLabel + '» у ' + target.nickname, { targetNickname: target.nickname });
             return { ok: true };
@@ -6897,6 +7076,7 @@ function handleBunkerActionCard(room, player, msg) {
             var drawn = drawBunkerCard(room, randomKey, myGender);
             if (!drawn) return { error: 'Не удалось вытянуть карту.' };
             player.cards[myCardKey] = drawn.value;
+            var wcChanged = settle(player, [myCardKey]);
             markUsed();
             var wcMyLabel = CARD_KEY_LABELS[myCardKey] || myCardKey;
             var wcFromLabel = CARD_KEY_LABELS[randomKey] || randomKey;
@@ -6908,7 +7088,7 @@ function handleBunkerActionCard(room, player, msg) {
                 emoji: cardDef.emoji,
                 wildcardNote: { slot: myCardKey, fromDeck: randomKey },
                 ownerEffect: 'Ваш(а) «' + wcMyLabel + '» заменён(-а) картой из колоды «' + wcFromLabel + '»: ' + drawn.value,
-                changedCards: [myCardKey],
+                changedCards: wcChanged,
             });
             broadcastPlayed(player.nickname + ' сыграл «Биткоин-прыжок»: случайная карта вместо «' + wcMyLabel + '»!');
             return { ok: true };
@@ -6918,8 +7098,9 @@ function handleBunkerActionCard(room, player, msg) {
             if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
             var target = room.players.get(targetPlayerId);
             if (!target || !target.cards || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
-            if (!target.cards.hiddenDefect) return { error: 'У этого игрока нет скрытого дефекта.' };
-            target.cards.hiddenDefect = null;
+            if (!target.cards.hiddenDefect || target.cards.hiddenDefect === DEFECT_REMOVED) return { error: 'У этого игрока дефект уже устранён.' };
+            target.cards.hiddenDefect = DEFECT_REMOVED;
+            syncRevealedCards(room, targetPlayerId, ['hiddenDefect']);
             markUsed();
             sendMyUpdate({
                 ownerEffect: 'Вы удалили «Скрытый дефект» у ' + target.nickname + '!',
@@ -6950,9 +7131,9 @@ var BUNKER_DRAFT_ORDER = ['item', 'adjective', 'modifier', 'feature', 'gift', 'h
 var BUNKER_DRAFT_OPTIONS = 3;
 var BUNKER_DRAFT_TIMES = [60, 90, 120, 180, 240];
 
-function normalizeDraftTime(v) {
+function normalizeDraftTime(v, def) {
     var n = parseInt(v, 10);
-    return BUNKER_DRAFT_TIMES.indexOf(n) !== -1 ? n : 120;
+    return BUNKER_DRAFT_TIMES.indexOf(n) !== -1 ? n : (def || 120);
 }
 
 // Категория → колода комнаты и список карт
@@ -7283,7 +7464,7 @@ function getBunkerActivePlayers(room) {
 // Состояния активной игры (не лобби и не уже завершённая игра) —
 // именно в них нужно следить, что игроков не осталось слишком мало.
 var BUNKER_ACTIVE_STATES = ['bunkerReveal', 'bunkerVote', 'bunkerTieVote'];
-var REGULAR_ACTIVE_STATES = ['cardInput', 'preparation', 'presentation', 'investing', 'roundResults', 'tiebreaker_prep', 'tiebreaker', 'tiebreaker_voting'];
+var REGULAR_ACTIVE_STATES = ['cardInput', 'productDraft', 'drawing', 'naming', 'slogan', 'preparation', 'presentation', 'investing', 'roundResults', 'tiebreaker_prep', 'tiebreaker', 'tiebreaker_voting'];
 
 // Если во время игры (уход по кнопке «Выйти», кик хостом и т.п.) активных игроков
 // осталось 1 или меньше — продолжать нечего, завершаем партию и показываем итоги.
@@ -7299,6 +7480,9 @@ function maybeEndGameForLowPlayerCount(room, leavingPlayerId) {
         checkBunkerDraftDone(room);
         return false;
     }
+
+    if (room.state === 'productDraft') checkProductDraftDone(room);
+    if (isChainState(room.state)) checkChainStageDone(room);
 
     if (BUNKER_ACTIVE_STATES.includes(room.state)) {
         // Игрок, покинувший комнату посреди бункера, считается выбывшим —
@@ -7366,7 +7550,7 @@ var CARD_KEY_LABELS = {
     packaging: 'Упаковка', review: 'Отзыв', historicalFact: 'Исторический факт',
 };
 
-function bunkerRevealCard(room, playerId, cardKey, isAuto) {
+function bunkerRevealCard(room, playerId, cardKey, isAuto, forcedBy) {
     if (!room.bunker.revealedCards[playerId]) return;
     if (room.bunker.revealedCards[playerId][cardKey]) return; // уже раскрыта
 
@@ -7386,6 +7570,7 @@ function bunkerRevealCard(room, playerId, cardKey, isAuto) {
         cardValue: cardValue,
         revealedCards: room.bunker.revealedCards,
         isAuto: !!isAuto,
+        forcedBy: forcedBy || null,   // вскрыли картой «Анонс продукта» — это не ход игрока
     });
 
     sendChatMsg(room, 'system', nick + ' открыл ' + cardLabel + ': ' + cardValue);
@@ -8185,12 +8370,7 @@ function dealCustomCards(room) {
         player.isReady = false;
     }
 
-    room.state = 'preparation';
-    sendRoundStartToAll(room);
-
-    startTimer(room, room.settings.prepTime, () => {
-        startPresentations(room);
-    });
+    beginPreparation(room);
 }
 
 function dealCardsFromDatabase(room) {
@@ -8252,6 +8432,424 @@ function dealCardsFromDatabase(room) {
     });
 }
 
+// ═══════════════════════════════════════════
+// КЛАССИКА: СБОРКА ПРОДУКТА — в начале раунда каждый выбирает 1 карту из 3 в каждой категории.
+// Категории те же, что при обычной раздаче: предмет, прилагательное, особенность
+// и дополнительные карты, включённые в настройках. Чёрный лебедь потом меняет
+// уже собранный продукт — так же, как розданный.
+// ═══════════════════════════════════════════
+
+// Какие карты собираем в этой комнате — в порядке шагов (предмет первым: от него род)
+function productDraftOrder(room) {
+    var s = room.settings;
+    var order = ['item', 'adjective'];
+    if (s.modifier === 'addition' || s.modifier === 'metaphor') order.push('modifier');
+    if (!s.pseudoMode) order.push('feature');
+    if (s.useTargetAudience) order.push('targetAudience');
+    if (s.useHiddenDefects) order.push('hiddenDefect');
+    if (s.usePackaging) order.push('packaging');
+    if (s.useReviews) order.push('review');
+    return order;
+}
+
+var PRODUCT_DRAFT_DECKS = {
+    item: 'items', adjective: 'adjectives', feature: 'features', modifier: 'additions',
+    targetAudience: 'targetAudience', hiddenDefect: 'hiddenDefects', packaging: 'packaging', review: 'reviews',
+};
+
+function productDraftList(key) {
+    switch (key) {
+        case 'modifier': return ADDITIONS;
+        case 'targetAudience': return TARGET_AUDIENCE;
+        case 'hiddenDefect': return HIDDEN_DEFECTS;
+        case 'packaging': return PACKAGING;
+        case 'review': return REVIEWS;
+    }
+    return [];
+}
+
+// Три разных варианта. Предмет, прилагательное и особенность храним индексами — склоняем
+// по выбранному предмету; остальное сразу текстом (у метафоры нет колоды, она генерируется)
+function drawProductDraftOptions(room, key) {
+    var out = [];
+    var seen = {};
+    for (var guard = 0; out.length < BUNKER_DRAFT_OPTIONS && guard < 30; guard++) {
+        var v;
+        if (key === 'modifier' && room.settings.modifier === 'metaphor') v = generateMetaphor();
+        else {
+            var idx = drawDeckIndex(room, PRODUCT_DRAFT_DECKS[key]);
+            v = (key === 'adjective' || key === 'feature' || key === 'item') ? idx : productDraftList(key)[idx];
+        }
+        var mark = String(key === 'item' ? ITEMS[v].word : v);
+        if (seen[mark]) continue;
+        seen[mark] = true;
+        out.push(v);
+    }
+    return out;
+}
+
+function productDraftText(key, v, gender) {
+    if (key === 'item') return ITEMS[v].word;
+    if (key === 'adjective') return declineAdjective(ADJECTIVES[v], gender);
+    if (key === 'feature') return declineFeature(FEATURES[v], gender);
+    return v;
+}
+
+function isProductDraftDone(p) {
+    if (!p.productDraft) return true;
+    return p.productDraft.order.every(k => p.productDraft.picks[k] !== undefined);
+}
+
+// Что видит игрок: варианты уже склонены по выбранному предмету
+function productDraftView(p) {
+    var d = p.productDraft;
+    if (!d) return { order: [], options: {}, picks: {} };
+    var gender = d.picks.item !== undefined ? ITEMS[d.options.item[d.picks.item]].gender : null;
+    var options = {};
+    d.order.forEach(key => {
+        options[key] = d.options[key].map(v => {
+            if ((key === 'adjective' || key === 'feature') && !gender) return null; // сначала предмет
+            return productDraftText(key, v, gender);
+        });
+    });
+    return { order: d.order, options: options, picks: Object.assign({}, d.picks) };
+}
+
+function getProductDraftDoneIds(room) {
+    var ids = [];
+    room.players.forEach(p => { if (isProductDraftDone(p)) ids.push(p.id); });
+    return ids;
+}
+
+function productDraftMessage(room, p, type) {
+    var view = p ? productDraftView(p) : { order: productDraftOrder(room), options: {}, picks: {} };
+    return {
+        type: type || 'productDraftStart',
+        round: room.currentRound,
+        totalRounds: room.totalRounds,
+        event: room.currentEvent,
+        modifierKind: room.settings.modifier,
+        order: view.order,
+        options: view.options,
+        picks: view.picks,
+        doneIds: getProductDraftDoneIds(room),
+        total: room.players.size,
+        duration: room.settings.productDraftTime || 90,
+        players: getPlayersPublicInfo(room),
+    };
+}
+
+function broadcastProductDraftProgress(room) {
+    broadcastToRoom(room, {
+        type: 'productDraftProgress',
+        doneIds: getProductDraftDoneIds(room),
+        total: room.players.size,
+    });
+}
+
+function startProductDraft(room) {
+    room.productDraftFinishing = false;
+    var order = productDraftOrder(room);
+    room.players.forEach(p => {
+        var options = {};
+        order.forEach(key => { options[key] = drawProductDraftOptions(room, key); });
+        p.productDraft = { order: order, options: options, picks: {} };
+        p.cards = null;
+        p.pitchText = '';
+        p.isReady = false;
+        p.draftAutoPicked = 0;
+    });
+    room.state = 'productDraft';
+    room.players.forEach(p => sendToPlayer(room, p.id, productDraftMessage(room, p)));
+    sendToSpectators(room, productDraftMessage(room, null));
+    startTimer(room, room.settings.productDraftTime || 90, () => finishProductDraft(room));
+}
+
+// Все, кто на связи, собрали продукт → подготовка (с паузой, чтобы последний выбор успел мелькнуть)
+function checkProductDraftDone(room) {
+    if (room.state !== 'productDraft' || room.productDraftFinishing) return;
+    var waiting = 0;
+    room.players.forEach(p => {
+        if (p.eliminated || p.connected === false) return;
+        if (!isProductDraftDone(p)) waiting++;
+    });
+    if (waiting > 0) return;
+    room.productDraftFinishing = true;
+    clearTimer(room);
+    setTimeout(() => finishProductDraft(room), 1200);
+}
+
+function finishProductDraft(room) {
+    if (room.state !== 'productDraft') return;
+    clearTimer(room);
+    room.players.forEach(p => {
+        var d = p.productDraft;
+        if (!d) return;
+        var auto = 0;
+        d.order.forEach(key => {
+            if (d.picks[key] === undefined) { d.picks[key] = Math.floor(Math.random() * d.options[key].length); auto++; }
+        });
+        var gender = ITEMS[d.options.item[d.picks.item]].gender;
+        var cards = {};
+        // Порядок ключей — как при обычной раздаче: от него зависит порядок карт на экранах
+        ['adjective', 'item', 'feature', 'modifier', 'review', 'targetAudience', 'hiddenDefect', 'packaging'].forEach(key => {
+            if (d.order.indexOf(key) === -1) return;
+            cards[key] = productDraftText(key, d.options[key][d.picks[key]], gender);
+        });
+        p.cards = cards;
+        p.draftAutoPicked = auto;
+        p.productDraft = null;
+    });
+    beginPreparation(room);
+}
+
+// Карты розданы (из базы, от игроков или собраны) — дальше подготовка,
+// а в «Испорченном прототипе» сначала рисунки и названия
+function beginPreparation(room) {
+    if (room.settings.drawMode && !room.chainDone && countChainPlayers(room) >= 3) {
+        startDrawingStage(room);
+        return;
+    }
+    room.chainDone = false;
+    room.state = 'preparation';
+    sendRoundStartToAll(room);
+    room.players.forEach(p => { p.draftAutoPicked = 0; });
+    startTimer(room, room.settings.prepTime, () => {
+        startPresentations(room);
+    });
+}
+
+// ═══════════════════════════════════════════
+// «ИСПОРЧЕННЫЙ ПРОТОТИП» — надстройка над классикой: продукт портится по цепочке игроков.
+// Игроки стоят по кругу (room.chain), продукт каждого проходит этапы (room.chainStages):
+//   рисунок (сам художник) → название (следующий по кругу, видит только рисунок)
+//   → слоган (ещё следующий, если включён: видит рисунок и название) → питч (следующий за ними).
+// На каждом этапе работа сдвигается на одного игрока, поэтому у продукта все авторы разные.
+// Рисунок хранится списком штрихов — по ним на сцене проигрывается таймлапс.
+// ═══════════════════════════════════════════
+var DRAW_TIMES = [60, 90, 120, 180];
+var CHAIN_TEXT_TIME = 45;
+var CHAIN_TEXT_MAX = { naming: 60, slogan: 90 };
+var DRAWING_MAX_LENGTH = 1500000;   // картинка рисунка ~1,1 МБ — с запасом для 800×600
+var STROKES_MAX_POINTS = 120000;    // координат во всём рисунке — хватает на очень подробный рисунок
+var STROKES_MAX_ITEMS = 4000;
+
+function normalizeDrawTime(v) {
+    var n = parseInt(v, 10);
+    return DRAW_TIMES.indexOf(n) !== -1 ? n : 90;
+}
+
+function countChainPlayers(room) {
+    var n = 0;
+    room.players.forEach(p => { if (!p.eliminated) n++; });
+    return n;
+}
+
+// Этапы партии: слоган — только если включён и игроков хватает, чтобы питчил не автор
+function chainStagesFor(room, n) {
+    var stages = ['drawing', 'naming'];
+    if (room.settings.chainSlogan && n >= 4) stages.push('slogan');
+    return stages;
+}
+
+// Штрихи от клиента: { t: 's'|'f'|'c', c: '#rrggbb', w: толщина, p: [x, y, x, y, …] }.
+// Пересобираем с проверкой — в рисунок не попадёт ничего, кроме чисел и цветов.
+function sanitizeStrokes(list) {
+    if (!Array.isArray(list) || list.length > STROKES_MAX_ITEMS) return null;
+    var out = [];
+    var total = 0;
+    for (var i = 0; i < list.length; i++) {
+        var s = list[i] || {};
+        if (s.t === 'c') { out.push({ t: 'c' }); continue; }
+        if (s.t !== 's' && s.t !== 'f') return null;
+        var c = String(s.c || '');
+        if (!/^#[0-9a-fA-F]{6}$/.test(c)) return null;
+        if (!Array.isArray(s.p) || s.p.length < 2 || s.p.length % 2) return null;
+        total += s.p.length;
+        if (total > STROKES_MAX_POINTS) return null;
+        var p = new Array(s.p.length);
+        for (var j = 0; j < s.p.length; j++) {
+            var v = Math.round(Number(s.p[j]));
+            if (!isFinite(v)) return null;
+            p[j] = Math.max(-50, Math.min(850, v));
+        }
+        var item = { t: s.t, c: c, p: s.t === 'f' ? p.slice(0, 2) : p };
+        if (s.t === 's') item.w = Math.max(1, Math.min(80, Math.round(Number(s.w) || 6)));
+        out.push(item);
+    }
+    return out;
+}
+
+function chainStage(room) { return (room.chainStages || [])[room.chainStageIdx || 0] || null; }
+function isChainState(state) { return state === 'drawing' || state === 'naming' || state === 'slogan'; }
+
+// Над чьим продуктом игрок работает на текущем этапе
+function chainTargetOf(room, workerId) {
+    var c = room.chain || [];
+    var i = c.indexOf(workerId);
+    if (i === -1) return null;
+    var k = room.chainStageIdx || 0;
+    return c[(i - k + c.length * 4) % c.length];
+}
+
+function chainStageMessage(room, p) {
+    var stage = chainStage(room);
+    var base = {
+        type: 'chainStage',
+        stage: stage,
+        stageIndex: room.chainStageIdx || 0,
+        stagesTotal: (room.chainStages || []).length,
+        round: room.currentRound,
+        totalRounds: room.totalRounds,
+        event: room.currentEvent,
+        duration: stage === 'drawing' ? room.settings.drawTime : CHAIN_TEXT_TIME,
+        doneIds: getChainDoneIds(room),
+        total: (room.chain || []).length,
+        players: getPlayersPublicInfo(room),
+    };
+    var targetId = p ? chainTargetOf(room, p.id) : null;
+    if (!targetId) return base; // зритель или выбывший
+    var w = room.chainWorks[targetId];
+    base.done = !!(room.chainDoneIds || {})[p.id];
+    if (stage === 'drawing') {
+        base.cards = p.cards || {};
+        base.strokes = w.strokes || null;
+        base.drawing = w.image || null;
+    } else {
+        base.drawing = w.image || null;
+        base.productName = stage === 'slogan' ? (w.name || '') : undefined;
+        base.text = (stage === 'naming' ? w.name : w.slogan) || '';
+    }
+    return base;
+}
+
+function getChainDoneIds(room) {
+    var done = room.chainDoneIds || {};
+    return (room.chain || []).filter(id => done[id]);
+}
+
+function broadcastChainProgress(room) {
+    broadcastToRoom(room, { type: 'chainProgress', stage: chainStage(room), doneIds: getChainDoneIds(room), total: (room.chain || []).length });
+}
+
+function sendChainStage(room) {
+    room.players.forEach(p => sendToPlayer(room, p.id, chainStageMessage(room, p)));
+    sendToSpectators(room, chainStageMessage(room, null));
+    var stage = chainStage(room);
+    startTimer(room, stage === 'drawing' ? room.settings.drawTime : CHAIN_TEXT_TIME, () => finishChainStage(room));
+}
+
+function startDrawingStage(room) {
+    var ids = [];
+    room.players.forEach(p => {
+        p.chainProduct = null;
+        p.draftAutoPicked = 0; // карты уйдут другому игроку — про случайный добор ему знать незачем
+        if (!p.eliminated) ids.push(p.id);
+    });
+    room.chain = shuffle(ids);
+    room.chainStages = chainStagesFor(room, ids.length);
+    room.chainStageIdx = 0;
+    room.chainWorks = {};
+    ids.forEach(id => { room.chainWorks[id] = { strokes: null, image: null, name: '', slogan: '', namerId: null, sloganId: null }; });
+    room.chainDoneIds = {};
+    room.chainFinishing = false;
+    room.state = 'drawing';
+    sendChainStage(room);
+}
+
+// Все на связи закончили этап → следующий (с паузой, чтобы последний «Готово» успел мелькнуть)
+function checkChainStageDone(room) {
+    if (!isChainState(room.state) || room.chainFinishing) return;
+    var waiting = 0;
+    (room.chain || []).forEach(id => {
+        var p = room.players.get(id);
+        if (!p || p.eliminated || p.connected === false) return;
+        if (!room.chainDoneIds[id]) waiting++;
+    });
+    if (waiting > 0) return;
+    room.chainFinishing = true;
+    clearTimer(room);
+    var idx = room.chainStageIdx;
+    setTimeout(() => {
+        if (!isChainState(room.state) || room.chainStageIdx !== idx) return;
+        finishChainStage(room);
+    }, 900);
+}
+
+function finishChainStage(room) {
+    if (!isChainState(room.state)) return;
+    clearTimer(room);
+    room.chainFinishing = false;
+    room.chainDoneIds = {};
+    room.chainStageIdx++;
+    var next = chainStage(room);
+    if (next) {
+        room.state = next;
+        sendChainStage(room);
+        return;
+    }
+    assembleChainProducts(room);
+}
+
+// Собираем продукты: питчит следующий за последним автором — рисунок, тексты и карты художника
+function assembleChainProducts(room) {
+    var c = room.chain || [];
+    var K = (room.chainStages || []).length;
+    var products = {};
+    c.forEach((artistId, i) => {
+        var artist = room.players.get(artistId);
+        var w = room.chainWorks[artistId] || {};
+        products[c[(i + K) % c.length]] = {
+            cards: Object.assign({}, (artist && artist.cards) || {}),
+            product: {
+                image: w.image || null,
+                strokes: w.strokes || null,
+                name: w.name || '',
+                slogan: w.slogan || '',
+                artistId: artistId,
+                namerId: w.namerId,
+                sloganId: w.sloganId,
+                withSlogan: K > 2,
+            },
+        };
+    });
+    Object.keys(products).forEach(pitcherId => {
+        var p = room.players.get(pitcherId);
+        if (!p) return;
+        p.cards = products[pitcherId].cards;
+        p.chainProduct = products[pitcherId].product;
+    });
+    room.chainWorks = null;
+    room.chainDone = true;
+    beginPreparation(room);
+}
+
+// Для инвестиций хватит картинки — штрихи для таймлапса не шлём
+function chainProductLite(room, p) {
+    var pub = chainProductPublic(room, p);
+    if (pub) delete pub.strokes;
+    return pub;
+}
+
+var CHAIN_REVEAL_SECONDS = 11;
+
+// Что показываем про продукт: рисунок (картинка и штрихи для таймлапса), тексты и их авторы
+function chainProductPublic(room, p) {
+    if (!p || !p.chainProduct) return null;
+    var cp = p.chainProduct;
+    var nick = id => id ? getDisplayNickname(room, id) : '';
+    return {
+        drawing: cp.image,
+        strokes: cp.strokes,
+        name: cp.name || '',
+        slogan: cp.slogan || '',
+        withSlogan: !!cp.withSlogan,
+        artist: nick(cp.artistId),
+        namer: nick(cp.namerId),
+        sloganAuthor: nick(cp.sloganId),
+    };
+}
+
 function sendRoundStartToAll(room) {
     statsPrepStart(room);
     room.players.forEach(p => {
@@ -8260,6 +8858,8 @@ function sendRoundStartToAll(room) {
             round: room.currentRound,
             totalRounds: room.totalRounds,
             yourCards: p.cards,
+            yourProduct: chainProductPublic(room, p),
+            autoPicked: p.draftAutoPicked || 0,
             event: room.currentEvent,
             phase: 'preparation',
             players: getPlayersPublicInfo(room),

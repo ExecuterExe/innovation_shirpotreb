@@ -224,7 +224,9 @@ document.addEventListener('keydown', function (e) {
 export function syncReactionFab() {
     var fab = document.getElementById('rx-fab');
     // В лобби панель реакций и так на странице
-    if (!reactionsAvailable() || state.phase === 'lobby') {
+    // На этапах «Испорченного прототипа» кнопка висела бы над холстом и ловила палец вместо рисунка
+    var drawingNow = state.phase === 'drawing' || state.phase === 'naming' || state.phase === 'slogan';
+    if (!reactionsAvailable() || state.phase === 'lobby' || drawingNow) {
         if (fab) fab.remove();
         return;
     }

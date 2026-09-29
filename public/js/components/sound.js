@@ -12,10 +12,57 @@ export function initAudio() {
     }
 }
 
+// Общий контекст — им пользуется и фоновая музыка (music.js)
+export function getAudioCtx() {
+    return audioCtx;
+}
+
+// Барабанная дробь перед разоблачением: частые глухие удары с нарастанием
+function drumroll() {
+    var t0 = audioCtx.currentTime;
+    for (var i = 0; i < 18; i++) {
+        var t = t0 + i * 0.065;
+        var osc = audioCtx.createOscillator();
+        var g = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140 + (i % 2) * 12, t);
+        osc.frequency.exponentialRampToValueAtTime(70, t + 0.05);
+        g.gain.setValueAtTime(0.03 + i * 0.004, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(t); osc.stop(t + 0.07);
+    }
+}
+
+// Удар печати: низкий «бум» и щелчок
+function stamp() {
+    var t = audioCtx.currentTime;
+    var boom = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    boom.type = 'sine';
+    boom.frequency.setValueAtTime(160, t);
+    boom.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+    g.gain.setValueAtTime(0.28, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    boom.connect(g); g.connect(audioCtx.destination);
+    boom.start(t); boom.stop(t + 0.26);
+    var click = audioCtx.createOscillator();
+    var cg = audioCtx.createGain();
+    click.type = 'square';
+    click.frequency.setValueAtTime(1800, t);
+    cg.gain.setValueAtTime(0.04, t);
+    cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    click.connect(cg); cg.connect(audioCtx.destination);
+    click.start(t); click.stop(t + 0.04);
+}
+
 export function playSound(type) {
     if (!audioCtx) return;
 
     try {
+        if (type === 'drumroll') { drumroll(); return; }
+        if (type === 'stamp') { stamp(); return; }
+
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
@@ -73,6 +120,16 @@ export function playSound(type) {
                 gain.gain.setValueAtTime(0.15, t);
                 gain.gain.linearRampToValueAtTime(0, t + 0.7);
                 osc.start(t); osc.stop(t + 0.7);
+                break;
+            case 'whoosh':
+                // Занавес поднимается
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(220, t);
+                osc.frequency.exponentialRampToValueAtTime(1100, t + 0.3);
+                gain.gain.setValueAtTime(0.0001, t);
+                gain.gain.linearRampToValueAtTime(0.07, t + 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+                osc.start(t); osc.stop(t + 0.36);
                 break;
             case 'invest':
                 osc.type = 'sine';

@@ -5,6 +5,23 @@ import { playSound } from '../components/sound.js';
 import { CARD_TYPES } from './presentation.js';
 import { coinBurst } from '../components/fx.js';
 import { audienceVoteHtml, bindAudienceVote } from '../components/audience.js';
+import { chainThumbHtml, bindArtLightbox } from './draw-chain.js';
+import { askConfirm } from '../components/confirm.js';
+
+// «Испорченный прототип»: вкладываются в продукт — рисунок, название и слоган крупно, питчивший мельче
+function productHeadHtml(p, kickHtml) {
+    var pr = p.product;
+    var html = '<div class="inv-product" data-product-name="' + escapeHtml(pr.name || 'Без названия') + '" data-product-slogan="' + escapeHtml(pr.slogan || '') + '">';
+    html += chainThumbHtml(pr);
+    html += '<div class="flex-1 min-w-0">';
+    html += '  <div class="inv-product-name">' + escapeHtml(pr.name || 'Без названия') + '</div>';
+    if (pr.slogan) html += '  <div class="inv-product-slogan">«' + escapeHtml(pr.slogan) + '»</div>';
+    html += '  <div class="inv-product-by">питчил <b>' + escapeHtml(p.nickname) + '</b> · 🎨 ' + escapeHtml(pr.artist || '—') + ' · 🏷 ' + escapeHtml(pr.namer || '—') + (pr.withSlogan ? ' · 📣 ' + escapeHtml(pr.sloganAuthor || '—') : '') + '</div>';
+    html += '</div>';
+    html += kickHtml || '';
+    html += '</div>';
+    return html;
+}
 
 export function renderInvesting(container) {
     var presentations = (state.presentations || []).filter(function (p) { return p.id !== state.playerId; });
@@ -21,8 +38,10 @@ export function renderInvesting(container) {
         return;
     }
 
+    // «Испорченный прототип»: карточки компактнее — рисунок, название, карты и ставка на одном экране
+    var chainMode = presentations.some(function (pp) { return !!pp.product; });
     var html = '';
-    html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen inv-page">';
+    html += '<div class="max-w-4xl mx-auto px-4 py-6 min-h-screen inv-page' + (chainMode ? ' inv-chain-mode' : '') + '">';
 
     // ═══════ HUD ═══════
     html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 mb-8">';
@@ -85,12 +104,15 @@ export function renderInvesting(container) {
 
         // Top section — name + cards
         html += '<div class="px-6 py-5 inv-top">';
-        html += '  <div class="flex items-center justify-between gap-3 mb-3">';
-        html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
-        if (isHost) {
-            html += '    <button class="kick-player-btn w-8 h-8 rounded-lg border border-accent-red/25 text-accent-red hover:bg-accent-red/10 transition-colors text-sm font-black cursor-pointer" title="Исключить игрока" data-player-id="' + p.id + '" data-player-name="' + escapeHtml(p.nickname) + '">✕</button>';
+        var kickBtn = isHost ? '<button class="kick-player-btn w-8 h-8 flex-shrink-0 rounded-lg border border-accent-red/25 text-accent-red hover:bg-accent-red/10 transition-colors text-sm font-black cursor-pointer" title="Исключить игрока" data-player-id="' + p.id + '" data-player-name="' + escapeHtml(p.nickname) + '">✕</button>' : '';
+        if (p.product) {
+            html += productHeadHtml(p, kickBtn);
+        } else {
+            html += '  <div class="flex items-center justify-between gap-3 mb-3">';
+            html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
+            html += kickBtn;
+            html += '  </div>';
         }
-        html += '  </div>';
 
         // Card tags
         html += '  <div class="flex flex-wrap gap-2">';
@@ -198,20 +220,21 @@ export function renderInvesting(container) {
     html += '</div>'; // end main
 
     container.innerHTML = html;
+    bindArtLightbox(container);
 
     var btnExitGame = container.querySelector('#btn-exit-game');
-    if (btnExitGame) btnExitGame.addEventListener('click', function () {
-        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    if (btnExitGame) btnExitGame.addEventListener('click', async function () {
+        if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
     });
 
     var kickBtns = container.querySelectorAll('.kick-player-btn');
     for (var kk = 0; kk < kickBtns.length; kk++) {
         (function (btn) {
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', async function () {
                 var targetId = btn.getAttribute('data-player-id');
                 var targetName = btn.getAttribute('data-player-name') || 'игрока';
                 if (!targetId) return;
-                if (!window.confirm('Исключить игрока «' + targetName + '» из партии?')) return;
+                if (!await askConfirm('Исключить игрока «' + targetName + '» из партии?')) return;
                 sendMsg({ type: 'kickPlayer', targetPlayerId: targetId });
             });
         })(kickBtns[kk]);
@@ -436,12 +459,15 @@ function renderInvestingObserver(container, presentations, isHost) {
     for (var i = 0; i < presentations.length; i++) {
         var p = presentations[i];
         html += '<div class="corp-card px-6 py-5">';
-        html += '  <div class="flex items-center justify-between gap-3 mb-3">';
-        html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
-        if (isHost) {
-            html += '    <button class="kick-player-btn w-8 h-8 rounded-lg border border-accent-red/25 text-accent-red hover:bg-accent-red/10 transition-colors text-sm font-black cursor-pointer" title="Исключить игрока" data-player-id="' + p.id + '" data-player-name="' + escapeHtml(p.nickname) + '">✕</button>';
+        var kick = isHost ? '<button class="kick-player-btn w-8 h-8 flex-shrink-0 rounded-lg border border-accent-red/25 text-accent-red hover:bg-accent-red/10 transition-colors text-sm font-black cursor-pointer" title="Исключить игрока" data-player-id="' + p.id + '" data-player-name="' + escapeHtml(p.nickname) + '">✕</button>' : '';
+        if (p.product) {
+            html += productHeadHtml(p, kick);
+        } else {
+            html += '  <div class="flex items-center justify-between gap-3 mb-3">';
+            html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
+            html += kick;
+            html += '  </div>';
         }
-        html += '  </div>';
         html += '  <div class="flex flex-wrap gap-2">';
         for (var ct = 0; ct < CARD_TYPES.length; ct++) {
             var cval = p.cards && p.cards[CARD_TYPES[ct].key];
@@ -455,16 +481,17 @@ function renderInvestingObserver(container, presentations, isHost) {
 
     container.innerHTML = html;
     bindAudienceVote(container);
+    bindArtLightbox(container);
 
     var btnExitGame = container.querySelector('#btn-exit-game');
-    if (btnExitGame) btnExitGame.addEventListener('click', function () {
-        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    if (btnExitGame) btnExitGame.addEventListener('click', async function () {
+        if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
     });
     container.querySelectorAll('.kick-player-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', async function () {
             var targetId = btn.getAttribute('data-player-id');
             if (!targetId) return;
-            if (!window.confirm('Исключить игрока «' + (btn.getAttribute('data-player-name') || 'игрока') + '» из партии?')) return;
+            if (!await askConfirm('Исключить игрока «' + (btn.getAttribute('data-player-name') || 'игрока') + '» из партии?')) return;
             sendMsg({ type: 'kickPlayer', targetPlayerId: targetId });
         });
     });

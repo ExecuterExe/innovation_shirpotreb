@@ -4,6 +4,7 @@ import { CARD_TYPES } from './presentation.js';
 import { countUp, burst } from '../components/fx.js';
 import { reactionEmoji } from '../components/reactions.js';
 import { audienceResultHtml } from '../components/audience.js';
+import { askConfirm } from '../components/confirm.js';
 
 export function renderResults(container) {
     var winners = state.roundWinners || [];
@@ -223,8 +224,8 @@ export function renderResults(container) {
 
     // ═══════ LISTENERS ═══════
     var btnExitGame = container.querySelector('#btn-exit-game');
-    if (btnExitGame) btnExitGame.addEventListener('click', function () {
-        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    if (btnExitGame) btnExitGame.addEventListener('click', async function () {
+        if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
     });
 
     var btnDetails = container.querySelector('#btn-toggle-details');

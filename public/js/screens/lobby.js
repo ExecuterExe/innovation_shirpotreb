@@ -8,6 +8,7 @@ import { openInviteModal, viewerCount } from '../components/audience.js';
 import { lobbyQrHtml, bindLobbyQr } from '../components/room-qr.js';
 import { syncLobbyTeaser } from '../components/lobby-teaser.js';
 import { loadCardCatalog, cardCatalog, cardCatalogFailed, cardCategoriesHtml, bindCardCategories, decksInPlay, selectionSummary } from '../components/card-categories.js';
+import { askConfirm } from '../components/confirm.js';
 
 var MAX_PLAYERS_MIN = 3;
 var MAX_PLAYERS_MAX = 18;
@@ -151,11 +152,11 @@ export function updatePlayersList(container) {
     var kickBtns = container.querySelectorAll('#players-list .kick-player-btn');
     for (var kb = 0; kb < kickBtns.length; kb++) {
         (function (btn) {
-            btn.addEventListener('click', function () {
+            btn.addEventListener('click', async function () {
                 var targetId = btn.getAttribute('data-player-id');
                 var targetName = btn.getAttribute('data-player-name') || 'игрока';
                 if (!targetId) return;
-                if (!window.confirm('Исключить игрока «' + targetName + '» из комнаты?')) return;
+                if (!await askConfirm('Исключить игрока «' + targetName + '» из комнаты?')) return;
                 sendMsg({ type: 'kickPlayer', targetPlayerId: targetId });
             });
         })(kickBtns[kb]);
@@ -326,6 +327,8 @@ export function updateSettingsPanel(container) {
     // ═══ КЛАССИКА · ПРАВИЛА ═══
     html += show('classic-rules');
     html += scope('classic');
+    html += buildSectionDivider('Режим');
+    html += buildDrawModeSetting(s);
     html += buildSectionDivider('Раунды и капитал');
     html += '<div class="set-tiles set-tiles-2">';
     html += buildStatTile('🔁', 'Раундов', 'rounds', 'set-rounds', 1, 7, s.rounds || 3, 1, 'в партии');
@@ -370,6 +373,9 @@ export function updateSettingsPanel(container) {
     html += buildRadioCard('database', 'card-source-radio', isDb,      '🗃', 'Наша база',         '240 млн+ комбинаций', 'blue');
     html += buildRadioCard('players',  'card-source-radio', isPlayers, '🧟', 'Генератор абсурда', 'Карты придумывают игроки', 'gold');
     html += '</div>';
+
+    // Сборка продукта: в начале каждого раунда выбор 1 карты из 3 (только карты из базы)
+    if (!isPlayers) html += buildProductDraftSetting(s);
 
     // Колода: живой пример продукта → быстрые наборы → из чего собрать руку
     html += buildDeckPreview(s);
@@ -765,6 +771,70 @@ function buildSurvivorsSetting(s) {
     return html;
 }
 
+// «Испорченный прототип»: надстройка над классикой — продукт портится по цепочке игроков
+function buildDrawModeSetting(s) {
+    var on = !!s.drawMode;
+    var time = parseInt(s.drawTime, 10) || 90;
+    var html = '<div class="draft-setting' + (on ? ' draft-setting-on' : '') + ' mb-4">';
+    html += '<label for="set-draw-mode" class="flex items-center justify-between cursor-pointer">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-sm font-black ' + (on ? 'text-accent-gold' : 'text-corp-light') + '">✏️ Испорченный прототип</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">Каждый рисует продукт по своим картам, сосед по рисунку (карт он не видит) придумывает название, а питчит этот монструозный продукт другой игрок. На сцене рисунок оживает штрих за штрихом, рядом — название и карты.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-draw-mode" class="toggle-corp flex-shrink-0"' + (on ? ' checked' : '') + '>';
+    html += '</label>';
+    if (on) {
+        html += '<div class="draft-time">';
+        html += '  <span class="draft-time-label">⏱ Время на рисунок</span>';
+        html += '  <div class="draft-time-opts">';
+        [60, 90, 120, 180].forEach(function (sec) {
+            var sel = sec === time;
+            html += '<label class="draft-time-opt' + (sel ? ' draft-time-opt-on' : '') + '"><input type="radio" name="draw-time" value="' + sec + '" class="deck-toggle sr-only"' + (sel ? ' checked' : '') + '>' + fmtDraftTime(sec) + '</label>';
+        });
+        html += '  </div>';
+        html += '  <div class="text-[0.6rem] text-corp-dim mt-2">На название — 45 секунд. Потом обычная подготовка и питчи.</div>';
+        html += '</div>';
+        var sloganOn = !!s.chainSlogan;
+        html += '<label for="set-chain-slogan" class="draft-sub flex items-center justify-between cursor-pointer">';
+        html += '  <div class="flex-1 mr-4">';
+        html += '    <div class="text-[0.8rem] font-black ' + (sloganOn ? 'text-accent-gold' : 'text-corp-light') + '">📣 Ещё и слоган</div>';
+        html += '    <div class="text-[0.65rem] text-corp-dim mt-0.5">Ещё один игрок видит рисунок и название и пишет слоган, а питчит уже четвёртый. Нужно от 4 игроков — если меньше, этап пропускается.</div>';
+        html += '  </div>';
+        html += '  <input type="checkbox" id="set-chain-slogan" class="toggle-corp flex-shrink-0"' + (sloganOn ? ' checked' : '') + '>';
+        html += '</label>';
+    }
+    html += '</div>';
+    return html;
+}
+
+// Классика: сборка продукта в начале раунда — как в «Бункере», но из карт этой партии
+function buildProductDraftSetting(s) {
+    var on = !!s.productDraft;
+    var time = parseInt(s.productDraftTime, 10) || 90;
+    var html = '<div class="draft-setting' + (on ? ' draft-setting-on' : '') + ' mb-4">';
+    html += '<label for="set-product-draft" class="flex items-center justify-between cursor-pointer">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-sm font-black ' + (on ? 'text-accent-gold' : 'text-corp-light') + '">🧪 Сборка продукта</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">В начале каждого раунда игроки не получают карты вслепую, а выбирают по 1 из 3 в каждой категории: предмет, прилагательное, особенность и все включённые ниже дополнительные карты. Чёрный лебедь потом всё равно может вмешаться.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-product-draft" class="toggle-corp flex-shrink-0"' + (on ? ' checked' : '') + '>';
+    html += '</label>';
+    if (on) {
+        html += '<div class="draft-time">';
+        html += '  <span class="draft-time-label">⏱ Время на сборку</span>';
+        html += '  <div class="draft-time-opts">';
+        [60, 90, 120, 180, 240].forEach(function (sec) {
+            var sel = sec === time;
+            html += '<label class="draft-time-opt' + (sel ? ' draft-time-opt-on' : '') + '"><input type="radio" name="product-draft-time" value="' + sec + '" class="deck-toggle sr-only"' + (sel ? ' checked' : '') + '>' + fmtDraftTime(sec) + '</label>';
+        });
+        html += '  </div>';
+        html += '  <div class="text-[0.6rem] text-corp-dim mt-2">Отдельно от времени на подготовку: сначала сборка, потом подготовка питча.</div>';
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
 function fmtDraftTime(sec) {
     return sec % 60 === 0 ? (sec / 60) + ' мин' : Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60);
 }
@@ -780,11 +850,13 @@ function summaryChips(s) {
         if (s.bunkerActionCards !== false) chips.push(['⚡', 'карты действий', '']);
     } else {
         chips.push(['📣', 'Классика', 'gold']);
+        if (s.drawMode) chips.push(['✏️', 'испорченный прототип' + (s.chainSlogan ? ' + слоган' : ''), 'gold']);
         var r = s.rounds || 3;
         chips.push(['🔁', r + ' ' + (r === 1 ? 'раунд' : r < 5 ? 'раунда' : 'раундов'), '']);
         chips.push(['🎤', 'питч ' + fmtTime(s.presentTime || 120).replace(' мин', ''), '']);
         chips.push(['🃏', countHandCards(s) + ' ' + pluralCards(countHandCards(s)), '']);
         if (s.cardSource === 'players') chips.push(['🧟', 'генератор абсурда', '']);
+        else if (s.productDraft) chips.push(['🧪', 'сборка 1 из 3', '']);
         if (s.useEvents) chips.push(['🎲', 'события', '']);
         if (s.blackSwan) chips.push(['🦢', 'чёрный лебедь', '']);
         if (s.questionsTime) chips.push(['🙋', 'вопросы', '']);
@@ -1172,6 +1244,9 @@ function attachSettingsListeners(container) {
                     // Выключаем модификатор
                     var noneRadio = container.querySelector('input[name="modifier"][value="none"]');
                     if (noneRadio) noneRadio.checked = true;
+                    // Сборка продукта — только из карт базы
+                    var pdToggle = container.querySelector('#set-product-draft');
+                    if (pdToggle) pdToggle.checked = false;
                 }
                 pushSettings(container);
             });
@@ -1304,6 +1379,11 @@ function pushSettings(container) {
         bunkerSurvivors: container.querySelector('input[name="survivors"]:checked') ? parseInt(container.querySelector('input[name="survivors"]:checked').value, 10) : (parseInt(state.settings.bunkerSurvivors, 10) || 0),
         bunkerDraft: container.querySelector('#set-bunker-draft') ? container.querySelector('#set-bunker-draft').checked : (state.settings.bunkerDraft !== false),
         bunkerDraftTime: container.querySelector('input[name="draft-time"]:checked') ? parseInt(container.querySelector('input[name="draft-time"]:checked').value, 10) : (state.settings.bunkerDraftTime || 120),
+        productDraft: container.querySelector('#set-product-draft') ? container.querySelector('#set-product-draft').checked : !!(state.settings && state.settings.productDraft),
+        productDraftTime: container.querySelector('input[name="product-draft-time"]:checked') ? parseInt(container.querySelector('input[name="product-draft-time"]:checked').value, 10) : ((state.settings && state.settings.productDraftTime) || 90),
+        drawMode: container.querySelector('#set-draw-mode') ? container.querySelector('#set-draw-mode').checked : !!(state.settings && state.settings.drawMode),
+        chainSlogan: container.querySelector('#set-chain-slogan') ? container.querySelector('#set-chain-slogan').checked : !!(state.settings && state.settings.chainSlogan),
+        drawTime: container.querySelector('input[name="draw-time"]:checked') ? parseInt(container.querySelector('input[name="draw-time"]:checked').value, 10) : ((state.settings && state.settings.drawTime) || 90),
         chatTTS: container.querySelector('#set-chat-tts')?.checked || false,
         speechWhere: container.querySelector('input[name="speech-where"]:checked') ? container.querySelector('input[name="speech-where"]:checked').value : (state.settings.speechWhere || 'host'),
         qrOnScreen: container.querySelector('#set-qr-screen') ? container.querySelector('#set-qr-screen').checked : (state.settings.qrOnScreen !== false),
@@ -1361,13 +1441,13 @@ function bindLobbyHall(container) {
     var take = container.querySelector('#btn-take-seat');
     if (take) take.addEventListener('click', function () { sendMsg({ type: 'takeSeat' }); });
     var leave = container.querySelector('#btn-leave-seat');
-    if (leave) leave.addEventListener('click', function () {
-        if (window.confirm('Перейти в зрительный зал? Вы будете смотреть игру, а не играть.')) sendMsg({ type: 'leaveSeat' });
+    if (leave) leave.addEventListener('click', async function () {
+        if (await askConfirm('Перейти в зрительный зал? Вы будете смотреть игру, а не играть.')) sendMsg({ type: 'leaveSeat' });
     });
     container.querySelectorAll('.lobby-hall-kick').forEach(function (btn) {
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', async function () {
             var id = btn.getAttribute('data-player-id');
-            if (!window.confirm('Удалить «' + (btn.getAttribute('data-player-name') || 'зрителя') + '» из зала?')) return;
+            if (!await askConfirm('Удалить «' + (btn.getAttribute('data-player-name') || 'зрителя') + '» из зала?')) return;
             sendMsg({ type: 'kickPlayer', targetPlayerId: id });
         });
     });

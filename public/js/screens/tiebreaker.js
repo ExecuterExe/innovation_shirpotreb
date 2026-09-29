@@ -3,11 +3,12 @@ import { sendMsg, leaveRoom } from '../socket.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
 import { CARD_TYPES, renderCardGrid } from './presentation.js';
+import { askConfirm } from '../components/confirm.js';
 
 function bindExitButton(container) {
     var btn = container.querySelector('#btn-exit-game');
-    if (btn) btn.addEventListener('click', function () {
-        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    if (btn) btn.addEventListener('click', async function () {
+        if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
     });
 }
 

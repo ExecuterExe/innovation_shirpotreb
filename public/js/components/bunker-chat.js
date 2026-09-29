@@ -1,6 +1,7 @@
 import { state, escapeHtml } from '../app.js';
 import { sendMsg } from '../socket.js';
 import { announceChatPitch } from './announcer.js';
+import { askConfirm } from './confirm.js';
 
 // ═══════════════════════════════════════════
 // BUNKER CHAT COMPONENT
@@ -212,12 +213,12 @@ function bindChatEvents(container) {
 
     // Ведущий: удалить сообщение (делегирование — кнопки добавляются динамически)
     if (messagesEl) {
-        messagesEl.addEventListener('click', function (e) {
+        messagesEl.addEventListener('click', async function (e) {
             var btn = e.target.closest('[data-delete-msg]');
             if (!btn) return;
             var msgId = btn.getAttribute('data-delete-msg');
             if (!msgId) return;
-            if (!window.confirm('Удалить это сообщение для всех?')) return;
+            if (!await askConfirm('Удалить это сообщение для всех?')) return;
             sendMsg({ type: 'deleteChatMessage', messageId: msgId });
         });
     }

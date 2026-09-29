@@ -2,6 +2,7 @@ import { refreshAudience } from './components/audience.js';
 import { twitchStatusHtml } from './screens/lobby.js';
 import { refreshPrepReady } from './screens/preparation.js';
 import { refreshBunkerDraft, resetBunkerDraftStep, updateBunkerDraftProgress } from './screens/bunker-draft.js';
+import { resetChainPad, updateChainProgress } from './screens/draw-chain.js';
 import { state, setState, navigate, startTimer, escapeHtml } from './app.js';
 import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
@@ -571,6 +572,30 @@ function handleMessage(msg) {
             handleBunkerDraftStart(msg);
             break;
 
+        // ═══════ КЛАССИКА: СБОРКА ПРОДУКТА ═══════
+
+        case 'productDraftStart':
+            handleProductDraftStart(msg);
+            break;
+
+        // ═══════ ИСПОРЧЕННЫЙ ПРОТОТИП ═══════
+
+        case 'chainStage':
+            handleChainStage(msg);
+            break;
+
+        case 'chainProgress':
+            handleChainProgress(msg);
+            break;
+
+        case 'productDraftState':
+            handleProductDraftState(msg);
+            break;
+
+        case 'productDraftProgress':
+            handleProductDraftProgress(msg);
+            break;
+
         case 'bunkerDraftState':
             handleBunkerDraftState(msg);
             break;
@@ -649,6 +674,10 @@ function handleMessage(msg) {
             handleBunkerActionCardPlayed(msg);
             break;
 
+        case 'bunkerRevealedUpdate':
+            handleBunkerRevealedUpdate(msg);
+            break;
+
         case 'bunkerActionCardUpdate':
             handleBunkerActionCardUpdate(msg);
             break;
@@ -700,6 +729,8 @@ function handleLobbyUpdate(msg) {
 }
 
 function handleRoundStart(msg) {
+    var fromDraft = state.phase === 'productDraft';
+    var fromChain = state.phase === 'naming' || state.phase === 'slogan';
     // Заставка только при настоящем переходе между раундами, не при переподключении
     if (state.phase === 'results' && msg.round > 1) {
         showStageOverlay({
@@ -728,10 +759,25 @@ function handleRoundStart(msg) {
         readyIds: msg.readyIds || [],
         // Состав партии — от сервера: без ведущего-наблюдателя, с актуальным капиталом
         players: msg.players || state.players,
+        productDraft: null,
+        myProduct: msg.yourProduct || null,
+        chain: null,
     });
 
+    if (fromChain && msg.yourProduct) {
+        showStageOverlay({
+            emoji: '📦',
+            title: 'ВАШ ПРОДУКТ<span class="stage-accent">!</span>',
+            subtitle: 'Рисовал ' + escapeHtml(msg.yourProduct.artist || '—') + ', назвал ' + escapeHtml(msg.yourProduct.namer || '—') + ' — питчить вам',
+            duration: 1600,
+        });
+    }
     navigate('preparation');
     playSound('start');
+    if (fromDraft && msg.autoPicked > 0) {
+        var n = msg.autoPicked;
+        showNotification('Время вышло — ' + n + ' ' + (n === 1 ? 'карта выбрана' : n < 5 ? 'карты выбраны' : 'карт выбрано') + ' случайно из ваших трёх вариантов', 'info');
+    }
 }
 
 function handlePresentation(msg) {
@@ -773,8 +819,17 @@ function handlePresentation(msg) {
     });
 
     navigate('presentation');
-    // Новый выступающий — голос объявляет его продукт (если озвучка включена и звучит здесь)
-    announcePresentation();
+    // Новый выступающий — голос объявляет его продукт (если озвучка включена и звучит здесь).
+    // В «Испорченном прототипе» — после разоблачения на сцене, чтобы голос не выдал название раньше времени
+    var cp = msg.currentPresenter;
+    if (cp && cp.product && !msg.restored) {
+        var idxAtStart = state.presenterIndex;
+        setTimeout(function () {
+            if (state.phase === 'presentation' && state.presenterIndex === idxAtStart) announcePresentation();
+        }, 10500);
+    } else {
+        announcePresentation();
+    }
 
     if (msg.blackSwan) {
         playSound('warning');
@@ -933,6 +988,132 @@ function handleGameOver(msg) {
 // BUNKER HANDLERS
 // ═══════════════════════════════════════════
 
+// ═══════ «Испорченный прототип»: рисунок → название → питч третьего ═══════
+function handleChainStage(msg) {
+    var drawing = msg.stage === 'drawing';
+    if (!msg.restored) {
+        if (drawing && (msg.round || 1) > 1 && state.phase !== 'productDraft') {
+            showStageOverlay({
+                title: 'РАУНД <span class="stage-accent">' + msg.round + '</span>',
+                subtitle: (msg.round === msg.totalRounds ? 'Последний раунд' : 'из ' + msg.totalRounds) + ' · берите карандаши',
+                duration: 1400,
+            });
+        } else {
+            var intro = {
+                drawing: ['🎨', 'РИСУЕМ<span class="stage-accent">!</span>', 'Нарисуйте продукт по своим картам'],
+                naming: ['🏷', 'КАК ЭТО НАЗЫВАЕТСЯ<span class="stage-accent">?</span>', 'Вам достался чужой рисунок'],
+                slogan: ['📣', 'НУЖЕН СЛОГАН<span class="stage-accent">!</span>', 'Рисунок и название есть — продайте их одной фразой'],
+            }[msg.stage] || ['🎨', '', ''];
+            showStageOverlay({ emoji: intro[0], title: intro[1], subtitle: intro[2], duration: 1300 });
+        }
+        playSound('start');
+    }
+    if (drawing) resetChainPad(msg.strokes || null, msg.drawing || null);
+    // Раунд в шапке и событие — как на подготовке
+    var patch = {
+        players: msg.players || state.players,
+        currentRound: msg.round || state.currentRound,
+        totalRounds: msg.totalRounds || state.totalRounds,
+        currentEvent: msg.event || null,
+        chain: {
+            stage: msg.stage,
+            stageIndex: msg.stageIndex || 0,
+            stagesTotal: msg.stagesTotal || 2,
+            productName: msg.productName,
+            text: msg.text || '',
+            round: msg.round,
+            totalRounds: msg.totalRounds,
+            event: msg.event || null,
+            cards: msg.cards,
+            drawing: msg.drawing,
+            done: !!msg.done,
+            doneIds: msg.doneIds || [],
+            total: msg.total || 0,
+        },
+    };
+    if (drawing) {
+        patch.myCards = {};
+        patch.myProduct = null;
+        patch.pitchText = '';
+        patch.investmentConfirmed = false;
+        patch.readyIds = [];
+    }
+    setState(patch);
+    navigate(msg.stage);
+}
+
+function handleChainProgress(msg) {
+    if (!state.chain || msg.stage !== state.chain.stage) return;
+    var before = (state.chain.doneIds || []).length;
+    state.chain.doneIds = msg.doneIds || [];
+    state.chain.total = msg.total || state.chain.total;
+    if (state.phase !== msg.stage) return;
+    updateChainProgress();
+    updateRail();
+    if (state.chain.doneIds.length > before) playSound('join');
+}
+
+// ═══════ Классика: сборка продукта в начале раунда ═══════
+function handleProductDraftStart(msg) {
+    if (!msg.restored) {
+        resetBunkerDraftStep();
+        // Первый раунд уже объявлен заставкой «Поехали!» — дальше объявляем каждый новый
+        if ((msg.round || 1) > 1) {
+            showStageOverlay({
+                title: 'РАУНД <span class="stage-accent">' + msg.round + '</span>',
+                subtitle: (msg.round === msg.totalRounds ? 'Последний раунд' : 'из ' + msg.totalRounds) + ' · собираем продукт',
+                duration: 1400,
+            });
+        }
+        playSound('start');
+    }
+    setState({
+        players: msg.players || state.players,
+        currentRound: msg.round || state.currentRound,
+        totalRounds: msg.totalRounds || state.totalRounds,
+        currentEvent: msg.event || null,
+        myCards: {},
+        pitchText: '',
+        investmentConfirmed: false,
+        readyIds: [],
+        productDraft: {
+            round: msg.round,
+            totalRounds: msg.totalRounds,
+            event: msg.event || null,
+            modifierKind: msg.modifierKind,
+            order: msg.order || [],
+            options: msg.options || {},
+            picks: msg.picks || {},
+            doneIds: msg.doneIds || [],
+            total: msg.total || 0,
+        },
+    });
+    navigate('productDraft');
+}
+
+function handleProductDraftState(msg) {
+    var d = Object.assign({}, state.productDraft || {});
+    d.options = msg.options || d.options;
+    d.picks = msg.picks || d.picks;
+    d.order = msg.order || d.order;
+    d.doneIds = msg.doneIds || d.doneIds;
+    d.total = msg.total || d.total;
+    setState({ productDraft: d });
+    if (state.phase === 'productDraft') refreshBunkerDraft();
+}
+
+function handleProductDraftProgress(msg) {
+    var d = Object.assign({}, state.productDraft || {});
+    var before = (d.doneIds || []).length;
+    d.doneIds = msg.doneIds || [];
+    d.total = msg.total || d.total;
+    setState({ productDraft: d });
+    if (state.phase !== 'productDraft' || d.doneIds.length === before) return;
+    updateBunkerDraftProgress();
+    updateRail();
+    if (d.doneIds.length > before) playSound('join');
+}
+
 // ═══════ Сборка продукта перед «Бункером» ═══════
 function handleBunkerDraftStart(msg) {
     if (!msg.restored) {
@@ -1071,7 +1252,8 @@ function handleBunkerCardRevealed(msg) {
     if (!bunker.revealedCardValues[msg.playerId]) bunker.revealedCardValues[msg.playerId] = {};
     bunker.revealedCardValues[msg.playerId][msg.cardKey] = msg.cardValue;
 
-    if (msg.playerId === state.playerId) {
+    // Вскрыли чужой картой «Анонс продукта» — это не ход игрока: свою карту он откроет как обычно
+    if (msg.playerId === state.playerId && !msg.forcedBy) {
         bunker.hasRevealedThisTurn = true;
     }
     // Последняя открытая карта — показывается на сцене хода
@@ -1114,6 +1296,7 @@ function handleBunkerVotePhase(msg) {
     bunker.remainingKicks = msg.remainingKicks;
     bunker.revealedCards = msg.revealedCards;
     bunker.currentRound = msg.round || bunker.currentRound;
+    bunker.voteBoosts = { double: [], blackPR: [] }; // ×2 действуют только в своём голосовании
 
     setState({
         bunker: bunker,
@@ -1217,9 +1400,15 @@ function handleBunkerGameOver(msg) {
     playSound('fanfare');
 }
 
+// Звук розыгрыша — под характер карты
+var ACTION_SOUND = {
+    blackPR: 'stamp', voteDouble: 'stamp', forceReveal: 'drumroll',
+    swapWithPlayer: 'whoosh', shuffleAll: 'whoosh', selfSwap: 'whoosh', wildcard: 'whoosh', absorb: 'whoosh',
+    removeDefect: 'success', shareFeature: 'success', extraCard: 'success',
+};
+
 function handleBunkerActionCardPlayed(msg) {
-    showNotification(msg.emoji + ' ' + msg.effect, 'info');
-    playSound('start');
+    playSound(ACTION_SOUND[msg.cardType] || 'start');
 
     // Сохраняем сыгранную карту в историю этого игрока
     var pid = msg.playerId;
@@ -1228,7 +1417,16 @@ function handleBunkerActionCardPlayed(msg) {
         var played = bunker.playedActionCards || {};
         if (!played[pid]) played[pid] = [];
         played[pid] = played[pid].concat([{ name: msg.cardName, emoji: msg.emoji, effect: msg.effect }]);
-        setState({ bunker: Object.assign({}, bunker, { playedActionCards: played }) });
+        var patch = { playedActionCards: played };
+        // Карты голосования видны всем: на карточках кандидатов появятся отметки ×2
+        if (msg.cardType === 'voteDouble' || msg.cardType === 'blackPR') {
+            var boosts = Object.assign({ double: [], blackPR: [] }, bunker.voteBoosts || {});
+            if (msg.cardType === 'voteDouble') boosts.double = boosts.double.concat([pid]);
+            else if (msg.targetPlayerId) boosts.blackPR = boosts.blackPR.concat([msg.targetPlayerId]);
+            patch.voteBoosts = boosts;
+        }
+        setState({ bunker: Object.assign({}, bunker, patch) });
+        if (patch.voteBoosts) markVoteBoostsInDom();
     }
 
     // Обновляем DOM если он есть (рука карт)
@@ -1242,9 +1440,57 @@ function handleBunkerActionCardPlayed(msg) {
     // стартовать в тот же такт вёрстки — иначе первые кадры проседают и она смотрится рвано.
     requestAnimationFrame(function () {
         requestAnimationFrame(function () {
-            playActionCardFX(msg.emoji, msg.cardName, msg.nickname);
+            playActionCardFX(msg);
+            hitPlayerTile(msg.targetPlayerId);
         });
     });
+}
+
+// Открытая всем карта поменяла значение (обмен, перемешивание, «Донат») — обновляем у всех
+function handleBunkerRevealedUpdate(msg) {
+    var bunker = Object.assign({}, state.bunker || {});
+    var vals = Object.assign({}, bunker.revealedCardValues || {});
+    vals[msg.playerId] = Object.assign({}, vals[msg.playerId] || {}, msg.values || {});
+    bunker.revealedCardValues = vals;
+    setState({ bunker: bunker });
+    if (state.phase === 'bunkerReveal') {
+        var remainingTime = state.timerRemaining;
+        navigate('bunkerReveal');
+        if (remainingTime > 0) startTimer(remainingTime);
+    }
+    updateRail();
+}
+
+// Цель карты вздрагивает в колонке участников и в сетке
+function hitPlayerTile(playerId) {
+    if (!playerId) return;
+    document.querySelectorAll('[data-player-id="' + playerId + '"], [data-rail-player="' + playerId + '"]').forEach(function (el) {
+        el.classList.remove('bk-hit'); void el.offsetWidth; el.classList.add('bk-hit');
+        setTimeout(function () { el.classList.remove('bk-hit'); }, 1600);
+    });
+}
+
+// Отметки «×2» на карточках голосования — без перерисовки, чтобы не сбить выбор игрока
+function markVoteBoostsInDom() {
+    var boosts = (state.bunker && state.bunker.voteBoosts) || {};
+    document.querySelectorAll('[data-bunker-vote]').forEach(function (card) {
+        var id = card.getAttribute('data-bunker-vote');
+        var old = card.querySelector('.bk-boosts');
+        if (old) old.remove();
+        var html = voteBoostBadgesHtml(id, boosts);
+        if (!html) return;
+        var box = document.createElement('div');
+        box.className = 'bk-boosts';
+        box.innerHTML = html;
+        card.appendChild(box);
+    });
+}
+
+export function voteBoostBadgesHtml(id, boosts) {
+    var html = '';
+    if ((boosts.blackPR || []).indexOf(id) !== -1) html += '<span class="bk-boost bk-boost-pr">🗞 Чёрный пиар: голоса против ×2</span>';
+    if ((boosts.double || []).indexOf(id) !== -1) html += '<span class="bk-boost bk-boost-double">💎 Голос этого игрока ×2</span>';
+    return html;
 }
 
 function handleGameStateSync(msg) {
@@ -1442,27 +1688,73 @@ function buildActionFxSparks(count, spread) {
     return html;
 }
 
-function playActionCardFX(emoji, cardName, nickname) {
+// Характер эффекта по типу карты: цвет вспышки и движение эмодзи
+var FX_KIND = {
+    swapWithPlayer: 'swap', shuffleAll: 'swirl', selfSwap: 'swirl', wildcard: 'swirl',
+    blackPR: 'danger', voteDouble: 'gold', forceReveal: 'shout',
+    removeDefect: 'heal', shareFeature: 'heal', extraCard: 'gold', absorb: 'dark',
+};
+
+function playActionCardFX(msg) {
     var container = getActionFxContainer();
     container.innerHTML = ''; // предыдущий эффект (если ещё не успел исчезнуть) не должен мешать новому
 
+    var kind = FX_KIND[msg.cardType] || 'gold';
     var fx = document.createElement('div');
-    fx.className = 'bunker-fx-overlay';
+    fx.className = 'bunker-fx-overlay bunker-fx-' + kind;
 
+    var target = msg.targetPlayerId ? playerNickname(msg.targetPlayerId) : '';
     var html = '';
     html += '<div class="bunker-fx-ring"></div>';
     html += '<div class="bunker-fx-ring2"></div>';
-    html += buildActionFxSparks(16, 150);
-    html += '<div class="bunker-fx-emoji">' + escapeHtmlLocal(emoji || '⚡') + '</div>';
-    html += '<div class="bunker-fx-name">' + escapeHtmlLocal(cardName || 'Карта действия') + '</div>';
-    if (nickname) {
-        html += '<div class="bunker-fx-player">разыграл(а) ' + escapeHtmlLocal(nickname) + '</div>';
+    html += buildActionFxSparks(18, 160);
+    html += '<div class="bunker-fx-emoji">' + escapeHtmlLocal(msg.emoji || '⚡') + '</div>';
+    html += '<div class="bunker-fx-name">' + escapeHtmlLocal(msg.cardName || 'Карта действия') + '</div>';
+    // Кто и против кого: «Аня ⇄ Боря», «Аня → Боря»
+    if (msg.nickname) {
+        html += '<div class="bunker-fx-duel">';
+        html += '<span class="bunker-fx-who">' + escapeHtmlLocal(msg.nickname) + '</span>';
+        if (target) {
+            html += '<span class="bunker-fx-arrow">' + (kind === 'swap' ? '⇄' : '→') + '</span>';
+            html += '<span class="bunker-fx-who bunker-fx-target">' + escapeHtmlLocal(target) + '</span>';
+        }
+        html += '</div>';
     }
+    if (msg.effect) html += '<div class="bunker-fx-effect">' + escapeHtmlLocal(fxEffectText(msg, target)) + '</div>';
     fx.innerHTML = html;
     container.appendChild(fx);
 
+    // Касание — закрыть раньше: эффект не должен мешать играть
+    fx.addEventListener('click', function () { fx.classList.add('bunker-fx-overlay-out'); setTimeout(function () { if (fx.parentNode) fx.remove(); }, 300); });
     setTimeout(function () {
         fx.classList.add('bunker-fx-overlay-out');
         setTimeout(function () { if (fx.parentNode) fx.remove(); }, 380);
-    }, 1350);
+    }, 2300);
+}
+
+function playerNickname(id) {
+    var list = state.players || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].nickname;
+    return '';
+}
+
+// Короткое «что случилось» для всех — без имени игрока в начале (оно уже крупно выше)
+function fxEffectText(msg, target) {
+    var labels = { adjective: 'прилагательное', item: 'предмет', modifier: 'модификатор', feature: 'особенность', gift: 'бонус', hiddenDefect: 'скрытый дефект', packaging: 'упаковку', review: 'отзыв', historicalFact: 'исторический факт' };
+    var what = labels[msg.cardKey] || 'карту';
+    switch (msg.cardType) {
+        case 'swapWithPlayer': return 'Меняются: ' + what;
+        case 'shuffleAll': return 'У всех перемешали: ' + what;
+        case 'selfSwap': return 'Сбросил ' + what + ' и вытянул новую';
+        // Имя цели уже крупно в плашке — фразы без него, чтобы не склонять имена
+        case 'blackPR': return 'Каждый голос против — за два';
+        case 'voteDouble': return 'Голос в этом голосовании — за двоих';
+        case 'forceReveal': return 'Вскрывает «Особенность» прямо сейчас!';
+        case 'removeDefect': return 'Скрытый дефект устранён';
+        case 'shareFeature': return 'Копирует чужую «Особенность»';
+        case 'extraCard': return 'Тянет вторую карту';
+        case 'absorb': return 'Забирает карту у выбывшего';
+        case 'wildcard': return 'Одна карта — из чужой колоды';
+    }
+    return msg.effect || '';
 }

@@ -1,7 +1,9 @@
 import { connectWS, sendMsg } from './socket.js';
 import { initParticles } from './components/particles.js';
+import { initPerf, onAutoLite } from './components/perf.js';
 import { showNotification } from './components/notification.js';
 import { playSound, initAudio } from './components/sound.js';
+import { mountMusicButton, setMusicPhase, startMusic } from './components/music.js';
 import { renderWelcome } from './screens/welcome.js';
 import { renderLobby } from './screens/lobby.js';
 import { renderPreparation } from './screens/preparation.js';
@@ -17,7 +19,8 @@ import { mountRail } from './components/players-rail.js';
 import { syncReactionFab } from './components/reactions.js';
 import { roundPathHtml, ROUND_PATH_PHASES } from './components/round-path.js';
 import { renderBunkerReveal, renderBunkerVoteResult } from './screens/bunker-game.js';
-import { renderBunkerDraft } from './screens/bunker-draft.js';
+import { renderBunkerDraft, renderProductDraft } from './screens/bunker-draft.js';
+import { renderChain } from './screens/draw-chain.js';
 import { renderBunkerVote, renderBunkerTieVote, renderBunkerGameOver } from './screens/bunker-vote.js';
 import { renderSoloSettings, renderSoloCards } from './screens/solo.js';
 
@@ -72,6 +75,9 @@ export var state = {
     blackSwan: null,
     soloCards: null,
     soloEvent: null,
+    productDraft: null,   // классика: сборка продукта в начале раунда
+    chain: null,          // «Испорченный прототип»: текущий этап (рисунок / название)
+    myProduct: null,      // «Испорченный прототип»: доставшийся продукт — рисунок, название, авторы
     // Бункер
     myActionCards: [],
     myExtraCards: {},
@@ -113,6 +119,7 @@ export function navigate(phase) {
     var prevPhase = state.phase;
     state.phase = phase;
     if (prevPhase === 'presentation' && phase !== 'presentation') silenceAnnouncer();
+    setMusicPhase(phase);
 
     var app = document.getElementById('app');
     if (!app) return;
@@ -148,10 +155,17 @@ export function navigate(phase) {
         mountRail(rail);
     }
 
+    // Класс этапа ставим до отрисовки: экраны «Испорченного прототипа» подгоняют холст под экран прямо при отрисовке
+    markScreen(phase, null);
+
     switch (phase) {
         case 'welcome': renderWelcome(wrapper); break;
         case 'lobby': renderLobby(wrapper, true); break;
         case 'cardInput': renderCardInput(wrapper); break;
+        case 'productDraft': renderProductDraft(wrapper); break;
+        case 'drawing': renderChain(wrapper); break;
+        case 'naming': renderChain(wrapper); break;
+        case 'slogan': renderChain(wrapper); break;
         case 'preparation': renderPreparation(wrapper); break;
         case 'presentation': renderPresentation(wrapper); break;
         case 'investing': renderInvesting(wrapper); break;
@@ -177,6 +191,7 @@ export function navigate(phase) {
         wrapper.firstElementChild.insertAdjacentHTML('afterbegin', roundPathHtml(phase));
     }
     syncReactionFab();
+    markScreen(phase, wrapper);
     if (samePhase) {
         window.scrollTo(0, keepScrollY);
         if (rail) rail.scrollTop = keepRailScroll;
@@ -185,8 +200,18 @@ export function navigate(phase) {
     }
 }
 
+// Классы экрана на <body> — по ним CSS подстраивает раскладку.
+// Раньше для этого были селекторы :has(), но они пересчитываются на каждое изменение страницы
+var CHAIN_PHASES = ['drawing', 'naming', 'slogan'];
+export function markScreen(phase, root) {
+    var b = document.body;
+    b.classList.toggle('ui-chain', CHAIN_PHASES.indexOf(phase) !== -1);
+    b.classList.toggle('ui-product', !!(root && root.querySelector('.dc-product')));
+    b.classList.toggle('ui-product-stage', !!(root && root.querySelector('.dc-product-stage')));
+}
+
 var GAME_SHELL_PHASES = [
-    'cardInput', 'preparation', 'presentation', 'investing', 'results',
+    'cardInput', 'productDraft', 'drawing', 'naming', 'slogan', 'preparation', 'presentation', 'investing', 'results',
     'tied', 'tiebreaker', 'tiebreaker_voting', 'gameOver',
     'bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver',
 ];
@@ -294,13 +319,20 @@ export function observerNoticeHtml(text) {
 // ==================== INIT ====================
 
 function init() {
+    // Сначала решаем, сколько графики тянет устройство, — от этого зависят частицы и музыка
+    initPerf();
+    onAutoLite(function () {
+        showNotification('⚡ Включили облегчённую графику — так игра пойдёт плавнее. Вернуть: кнопка ♪', 'info');
+    });
     initParticles();
     initSpeech();
     connectWS();
+    mountMusicButton();
     navigate('welcome');
 
     document.addEventListener('click', function () {
         initAudio();
+        startMusic();
     }, { once: true });
 
     window.addEventListener('beforeunload', function (e) {

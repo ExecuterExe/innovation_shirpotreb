@@ -1,5 +1,5 @@
 import { state, escapeHtml, observerNoticeHtml } from '../app.js';
-import { sendMsg, leaveRoom } from '../socket.js';
+import { sendMsg, leaveRoom, voteBoostBadgesHtml } from '../socket.js';
 import { renderBunkerChat } from '../components/bunker-chat.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
@@ -7,6 +7,7 @@ import { BUNKER_CARD_TYPES } from './bunker-game.js';
 import { buildSurvey, setupSurvey } from './gameover.js';
 import { audienceVoteHtml, bindAudienceVote, audiencePrizeHtml } from '../components/audience.js';
 import { analyticsTeaserHtml, bindAnalyticsTeaser } from '../components/game-analytics.js';
+import { askConfirm } from '../components/confirm.js';
 
 function voteAvatarHue(id) {
     var h = 0, str = String(id || '');
@@ -133,6 +134,10 @@ export function renderBunkerVote(container) {
             }
             html += '</div>';
 
+            // Сыгранные «Голос инвестора» и «Чёрный пиар» видны всем
+            var boostHtml = voteBoostBadgesHtml(p.id, bunker.voteBoosts || {});
+            if (boostHtml) html += '<div class="bk-boosts">' + boostHtml + '</div>';
+
             html += '</div>';
         }
         html += '</div>';
@@ -200,20 +205,20 @@ export function renderBunkerVote(container) {
 
     // Выход
     var btnExitVote = container.querySelector('#btn-exit-vote');
-    if (btnExitVote) btnExitVote.addEventListener('click', function () {
-        if (window.confirm('Выйти из игры в главное меню?')) leaveRoom();
+    if (btnExitVote) btnExitVote.addEventListener('click', async function () {
+        if (await askConfirm('Выйти из игры в главное меню?')) leaveRoom();
     });
 
     // Ведущий: исключить игрока из бункера прямо во время голосования
     var bunkerKickBtns = container.querySelectorAll('.bunker-kick-btn');
     for (var bki = 0; bki < bunkerKickBtns.length; bki++) {
         (function (btn) {
-            btn.addEventListener('click', function (e) {
+            btn.addEventListener('click', async function (e) {
                 e.stopPropagation();
                 var targetId = btn.getAttribute('data-bunker-kick');
                 var targetName = btn.getAttribute('data-bunker-kick-name') || 'игрока';
                 if (!targetId) return;
-                if (!window.confirm('Исключить «' + targetName + '» из бункера? Это действие необратимо для текущей игры.')) return;
+                if (!await askConfirm('Исключить «' + targetName + '» из бункера? Это действие необратимо для текущей игры.')) return;
                 sendMsg({ type: 'bunkerHostKick', targetPlayerId: targetId });
             });
         })(bunkerKickBtns[bki]);

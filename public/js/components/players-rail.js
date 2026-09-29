@@ -9,6 +9,7 @@ import { sendMsg } from '../socket.js';
 import { buildReactionBarHtml, bindReactionButtons } from './reactions.js';
 import { audiencePanelHtml, bindAudiencePanel } from './audience.js';
 import { BUNKER_CARD_TYPES, openBunkerPlayerDetail, getBunkerRevealedValue } from '../screens/bunker-game.js';
+import { askConfirm } from './confirm.js';
 
 var BUNKER_PHASES = ['bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver'];
 
@@ -75,6 +76,16 @@ function classicStatus(p) {
             : { icon: '✍️', text: 'готовит питч', tone: 'dim' };
     }
     if (phase === 'cardInput') return { icon: '✍️', text: 'придумывает карту', tone: 'dim' };
+    if (phase === 'productDraft') {
+        return ((state.productDraft && state.productDraft.doneIds) || []).indexOf(p.id) !== -1
+            ? { icon: '✓', text: 'собрал продукт', tone: 'green' }
+            : { icon: '🧪', text: 'собирает продукт', tone: 'dim' };
+    }
+    if (phase === 'drawing' || phase === 'naming' || phase === 'slogan') {
+        var chainDone = ((state.chain && state.chain.doneIds) || []).indexOf(p.id) !== -1;
+        if (chainDone) return { icon: '✓', text: { drawing: 'нарисовал', naming: 'придумал название', slogan: 'придумал слоган' }[phase], tone: 'green' };
+        return { drawing: { icon: '🎨', text: 'рисует', tone: 'dim' }, naming: { icon: '🏷', text: 'придумывает название', tone: 'dim' }, slogan: { icon: '📣', text: 'пишет слоган', tone: 'dim' } }[phase];
+    }
     if (phase === 'presentation') {
         var order = idsOf(state.presentationOrder);
         var idx = order.indexOf(p.id);
@@ -226,10 +237,10 @@ function bindRows(root) {
         });
     });
     root.querySelectorAll('[data-rail-kick]').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
+        btn.addEventListener('click', async function (e) {
             e.stopPropagation();
             var name = btn.getAttribute('data-rail-kick-name') || 'игрока';
-            if (!window.confirm('Исключить «' + name + '» из бункера? Это действие необратимо для текущей игры.')) return;
+            if (!await askConfirm('Исключить «' + name + '» из бункера? Это действие необратимо для текущей игры.')) return;
             sendMsg({ type: 'bunkerHostKick', targetPlayerId: btn.getAttribute('data-rail-kick') });
         });
     });
