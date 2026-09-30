@@ -1,9 +1,10 @@
 // ═══════════════════════════════════════════
-// «ИСПОРЧЕННЫЙ ПРОТОТИП» — надстройка над классикой: продукт портится по цепочке игроков
+// «ИСПОРЧЕННЫЙ ПРОТОТИП» — отдельный режим: продукт портится по цепочке игроков
 //  • drawing — рисуете продукт по своим картам;
 //  • naming  — видите чужой рисунок (без карт) и придумываете ему название;
-//  • slogan  — (если включено) видите рисунок и название, пишете слоган;
-//  • дальше подготовка: питчите продукт, над которым вы не работали, — рисунок, тексты и карты.
+//  • drawFeature / drawAudience / drawPackaging — видите рисунки и название и дорисовываете кадр по одной карте;
+//  • slogan  — (если включено) видите всё и пишете слоган;
+//  • дальше галерея (комиксы и жетоны за кадры) или питч продукта, над которым вы не работали.
 // На сцене питча рисунок проигрывается таймлапсом — штрих за штрихом (это и есть «разоблачение»).
 // Холст сохраняется на сервер по ходу рисования: вышло время или обновили страницу — рисунок не пропадёт.
 // Экран обновляется «на месте» (updateChainProgress), чтобы не стирать холст и поле ввода.
@@ -32,12 +33,23 @@ var keyHandler = null;
 
 function chain() { return state.chain || { stage: 'drawing', doneIds: [], total: 0 }; }
 function amDone() { return !!chain().done; }
+// Рисовальные этапы: сам продукт и кадры по картам — у всех один экран с холстом
+export function isDrawStage(stage) { return stage === 'drawing' || !!PANEL_TASK[stage]; }
+// Экран (phase) для этапа: все рисовальные этапы — «drawing»
+export function chainPhaseOf(stage) { return isDrawStage(stage) ? 'drawing' : stage; }
 // Игрок работает на этом этапе (сервер прислал ему карты или чужой рисунок), а не смотрит со стороны
 function isWorker() {
     var c = chain();
     if (state.isSpectator) return false;
-    return c.stage === 'drawing' ? c.cards !== undefined : c.drawing !== undefined;
+    return isDrawStage(c.stage) ? c.cards !== undefined : c.drawing !== undefined;
 }
+
+// Кадры по картам: следующий игрок дорисовывает чужой продукт по одной карте
+var PANEL_TASK = {
+    drawFeature: { emoji: '⚙️', title: 'Нарисуйте особенность в действии', short: 'особенность', hint: 'Покажите, как у этого продукта работает особенность' },
+    drawAudience: { emoji: '🎯', title: 'Нарисуйте покупателя', short: 'покупатель', hint: 'Кто пользуется этим продуктом? Нарисуйте его с продуктом' },
+    drawPackaging: { emoji: '📦', title: 'Нарисуйте упаковку', short: 'упаковка', hint: 'Как продукт выглядит на полке магазина?' },
+};
 
 // Новый раунд — чистый холст (или рисунок, сохранённый на сервере, после перезагрузки)
 export function resetChainPad(strokes, image) {
@@ -73,8 +85,9 @@ function fromWire(list) {
 
 function hudHtml() {
     var c = chain();
-    var title = { drawing: '🎨 Нарисуйте свой продукт', naming: '🏷 Придумайте название', slogan: '📣 Придумайте слоган' }[c.stage] || '';
-    var what = { drawing: 'рисунок', naming: 'название', slogan: 'слоган' }[c.stage] || '';
+    var task = PANEL_TASK[c.stage];
+    var title = task ? task.emoji + ' ' + task.title : ({ drawing: '🎨 Нарисуйте свой продукт', naming: '🏷 Придумайте название', slogan: '📣 Придумайте слоган' }[c.stage] || '');
+    var what = task ? task.short : ({ drawing: 'рисунок', naming: 'название', slogan: 'слоган' }[c.stage] || '');
     var html = '<div class="bk-hud">';
     html += '  <div class="bk-hud-round"><span>Раунд</span><b>' + (c.round || state.currentRound || 1) + '<small class="bkd-of">/' + (c.totalRounds || state.totalRounds || 1) + '</small></b></div>';
     html += '  <div class="bk-hud-mid">';
@@ -132,15 +145,34 @@ function toolsHtml() {
     return html;
 }
 
+// Что уже сделано с продуктом: рисунок, название и прошлые кадры — маленькими, чтобы холст остался большим
+function refHtml(ref) {
+    if (!ref) return '';
+    var html = '<div class="dc-ref">';
+    html += '<button type="button" class="dc-ref-art" data-art-open data-product-name="' + escapeHtml(ref.name || 'Без названия') + '" title="Рассмотреть"><img src="' + (ref.image || blankDataUrl()) + '" alt="Рисунок продукта"></button>';
+    html += '<div class="dc-ref-name">«' + escapeHtml(ref.name || 'Без названия') + '»</div>';
+    (ref.panels || []).forEach(function (pn) {
+        html += '<button type="button" class="dc-ref-art dc-ref-panel" data-art-open data-product-name="' + escapeHtml(pn.emoji + ' ' + pn.label) + '" data-product-slogan="' + escapeHtml(pn.card || '') + '" title="' + escapeHtml(pn.label + ': ' + (pn.card || '')) + '"><img src="' + (pn.image || blankDataUrl()) + '" alt="' + escapeHtml(pn.label) + '"><span>' + pn.emoji + '</span></button>';
+    });
+    html += '</div>';
+    return html;
+}
+
 function drawingHtml() {
     var c = chain();
+    var task = PANEL_TASK[c.stage];
     var html = '';
-    if (c.event) html += eventHtml(c.event);
-    html += '<div class="dc-cards">' + cardsHtml(c.cards) + '<div class="dc-hint-line">Сосед увидит только рисунок, <b>без карт</b></div></div>';
+    if (c.event && !task) html += eventHtml(c.event);
+    if (task) {
+        // Кадр по карте: чужой продукт + одна карта. Исходных карт предмета не видно — гадаем по рисунку
+        html += '<div class="dc-cards dc-cards-panel">' + refHtml(c.ref) + '<div class="dc-panel-task">' + cardsHtml(c.cards) + '<div class="dc-hint-line">' + task.hint + '</div></div></div>';
+    } else {
+        html += '<div class="dc-cards">' + cardsHtml(c.cards) + '<div class="dc-hint-line">Сосед увидит только рисунок, <b>без карт</b></div></div>';
+    }
     if (amDone()) {
         html += '<div class="dc-done">';
         html += '  <img class="dc-preview" src="' + (c.drawing || blankDataUrl()) + '" alt="Ваш рисунок">';
-        html += '  <div class="bkd-done-title">Рисунок отправлен!</div>';
+        html += '  <div class="bkd-done-title">' + (task ? 'Кадр отправлен!' : 'Рисунок отправлен!') + '</div>';
         html += '  <div class="bkd-done-sub" id="chain-wait">' + waitText() + '</div>';
         html += '  <button id="btn-draw-edit" class="dc-secondary">✏️ Дорисовать</button>';
         html += '</div>';
@@ -173,7 +205,18 @@ function textStageHtml() {
     html += '  <div class="dc-text-art"><img class="dc-preview dc-preview-fit" src="' + (c.drawing || blankDataUrl()) + '" alt="Чужой рисунок"></div>';
     html += '  <div class="dc-text-side">';
     if (!c.drawing) html += '<div class="dc-empty-note">Художник не успел нарисовать — придётся по белому листу 🙈</div>';
-    if (c.stage === 'slogan') html += '<div class="dc-given-name">«' + escapeHtml(c.productName || 'Без названия') + '»</div>';
+    if (c.stage === 'slogan') {
+        html += '<div class="dc-given-name">«' + escapeHtml(c.productName || 'Без названия') + '»</div>';
+        // Кадры, которые дорисовали по картам, — тоже подсказка для слогана
+        var panels = (c.ref && c.ref.panels) || [];
+        if (panels.length) {
+            html += '<div class="dc-ref dc-ref-inline">';
+            panels.forEach(function (pn) {
+                html += '<button type="button" class="dc-ref-art dc-ref-panel" data-art-open data-product-name="' + escapeHtml(pn.emoji + ' ' + pn.label) + '" data-product-slogan="' + escapeHtml(pn.card || '') + '"><img src="' + (pn.image || blankDataUrl()) + '" alt="' + escapeHtml(pn.label) + '"><span>' + pn.emoji + '</span></button>';
+            });
+            html += '</div>';
+        }
+    }
     if (amDone()) {
         html += '<div class="dc-name-sent">' + escapeHtml(c.text || '') + '</div>';
         html += '<div class="bkd-done-sub" id="chain-wait">' + cfg.sent + '. ' + waitText() + '</div>';
@@ -209,15 +252,19 @@ function plural(n, one, few, many) {
 
 function spectatorHtml() {
     var c = chain();
+    var gallery = !state.settings || state.settings.protoFinale !== 'pitch';
     var html = observerNoticeHtml({
-        drawing: 'Игроки рисуют свои продукты. Потом каждый рисунок уйдёт соседу — он придумает название, а питчить будет другой игрок.',
+        drawing: 'Игроки рисуют свои продукты. Потом каждый рисунок уйдёт соседу — он придумает название, а дальше продукт пойдёт по цепочке.',
         naming: 'Игроки придумывают названия чужим рисункам.',
-        slogan: 'Игроки пишут слоганы к чужим рисункам и названиям. Скоро начнётся подготовка питчей.',
+        drawFeature: 'Игроки дорисовывают чужим продуктам особенность — по рисунку и названию, без исходных карт.',
+        drawAudience: 'Игроки рисуют покупателей чужих продуктов.',
+        drawPackaging: 'Игроки рисуют упаковку чужих продуктов.',
+        slogan: 'Игроки пишут слоганы к чужим продуктам. ' + (gallery ? 'Скоро галерея!' : 'Скоро начнётся подготовка питчей.'),
     }[c.stage] || '');
     html += '<div class="bkd-who">';
     (state.players || []).forEach(function (p) {
         var ok = (c.doneIds || []).indexOf(p.id) !== -1;
-        html += '<span class="bkd-who-chip' + (ok ? ' bkd-who-ok' : '') + '">' + (ok ? '✓ ' : ({ drawing: '🎨 ', naming: '🏷 ', slogan: '📣 ' }[c.stage] || '')) + escapeHtml(p.nickname) + '</span>';
+        html += '<span class="bkd-who-chip' + (ok ? ' bkd-who-ok' : '') + '">' + (ok ? '✓ ' : ({ drawing: '🎨 ', naming: '🏷 ', slogan: '📣 ' }[c.stage] || (PANEL_TASK[c.stage] ? PANEL_TASK[c.stage].emoji + ' ' : ''))) + escapeHtml(p.nickname) + '</span>';
     });
     html += '</div>';
     return html;
@@ -227,7 +274,7 @@ function hostHtml() {
     if (!state.isHost) return '';
     var c = chain();
     if ((c.doneIds || []).length >= (c.total || 0)) return '';
-    var note = { drawing: 'Недорисованное уйдёт как есть', naming: 'Без названия останется «Без названия»', slogan: 'Продукт без слогана — тоже продукт' }[c.stage] || '';
+    var note = isDrawStage(c.stage) ? 'Недорисованное уйдёт как есть' : ({ naming: 'Без названия останется «Без названия»', slogan: 'Продукт без слогана — тоже продукт' }[c.stage] || '');
     return '<button id="btn-chain-finish" class="dc-host-btn" title="Ведущий: дальше, не дожидаясь всех. ' + note + '">▶ Дальше</button>';
 }
 
@@ -235,7 +282,7 @@ function innerHtml() {
     var c = chain();
     var html = hudHtml();
     if (state.isSpectator || !isWorker()) html += spectatorHtml();
-    else html += c.stage === 'drawing' ? drawingHtml() : textStageHtml();
+    else html += isDrawStage(c.stage) ? drawingHtml() : textStageHtml();
     return html;
 }
 
@@ -639,6 +686,7 @@ function bind(root) {
     fitChain(root);
     bindFit();
     bindCanvas(root);
+    bindArtLightbox(root);
 
     var edit = root.querySelector('#btn-draw-edit');
     if (edit) edit.addEventListener('click', function () {
@@ -720,7 +768,14 @@ export function chainProductHtml(product, cards, stage) {
     html += '  <div class="dc-product-meta">';
     html += '    <div class="dc-product-name" data-seq="name">' + escapeHtml(product.name || 'Без названия') + '</div>';
     if (product.withSlogan) html += '<div class="dc-product-slogan" data-seq="slogan">' + (product.slogan ? '«' + escapeHtml(product.slogan) + '»' : '<i>без слогана</i>') + '</div>';
-    html += '    <div class="dc-product-credits" data-seq="credits">🎨 ' + escapeHtml(product.artist || '—') + ' · 🏷 ' + escapeHtml(product.namer || '—') + (product.withSlogan ? ' · 📣 ' + escapeHtml(product.sloganAuthor || '—') : '') + '</div>';
+    if (product.panels && product.panels.length) {
+        html += '<div class="dc-product-panels" data-seq="panels">';
+        product.panels.forEach(function (pn) {
+            html += '<button type="button" class="dc-ref-art dc-ref-panel" data-art-open data-product-name="' + escapeHtml(pn.emoji + ' ' + pn.label) + '" data-product-slogan="' + escapeHtml(pn.card || '') + '" title="' + escapeHtml(pn.label + ': ' + (pn.card || '') + ' — ' + (pn.author || '')) + '"><img src="' + (pn.image || blankDataUrl()) + '" alt="' + escapeHtml(pn.label) + '"><span>' + pn.emoji + '</span></button>';
+        });
+        html += '</div>';
+    }
+    html += '    <div class="dc-product-credits" data-seq="credits">🎨 ' + escapeHtml(product.artist || '—') + ' · 🏷 ' + escapeHtml(product.namer || '—') + (product.panels || []).map(function (pn) { return ' · ' + pn.emoji + ' ' + escapeHtml(pn.author || '—'); }).join('') + (product.withSlogan ? ' · 📣 ' + escapeHtml(product.sloganAuthor || '—') : '') + '</div>';
     if (!product.drawing) html += '<div class="dc-product-empty" data-seq="credits">художник не успел нарисовать</div>';
     html += '  </div>';
     // Карты — отдельной ячейкой: на компьютере под текстами справа, на телефоне лентой на всю ширину
@@ -730,7 +785,7 @@ export function chainProductHtml(product, cards, stage) {
 }
 
 // Сколько длится разоблачение — сервер добавляет примерно столько же к таймеру питча
-export var REVEAL = { intro: 1300, card: 280, draw: 4000, name: 900, slogan: 1500 };
+export var REVEAL = { intro: 1300, card: 280, draw: 4000, name: 900, panels: 1400, slogan: 1500 };
 
 // ─────────── разоблачение на сцене ───────────
 // 🥁 интрига → 🃏 карты по одной → 🎨 рисунок штрих за штрихом → 🏷 название печатью → 📣 слоган по буквам → 🎤 питч
@@ -821,6 +876,18 @@ export function startProductReplay(root, product, key) {
     });
     t += REVEAL.name;
 
+    // 4½. Кадры по картам — веером
+    var panelsBox = block.querySelector('[data-seq="panels"]');
+    if (panelsBox) {
+        at(t, function () {
+            say('🖼 А вот как это работает');
+            panelsBox.classList.remove('dc-seq-hide');
+            panelsBox.classList.add('dc-seq-in');
+            playSound('whoosh');
+        });
+        t += REVEAL.panels;
+    }
+
     // 5. Слоган — по буквам
     var slogan = block.querySelector('[data-seq="slogan"]');
     if (slogan) {
@@ -866,7 +933,7 @@ export function bindArtLightbox(root) {
     if (!root) return;
     root.querySelectorAll('[data-art-open]').forEach(function (b) {
         b.addEventListener('click', function () {
-            var card = b.closest('[data-product-name]');
+            var card = b.hasAttribute('data-product-name') ? b : b.closest('[data-product-name]');
             var title = card ? card.getAttribute('data-product-name') : '';
             var sub = card ? card.getAttribute('data-product-slogan') : '';
             var box = document.createElement('div');
@@ -883,6 +950,18 @@ export function bindArtLightbox(root) {
         });
     });
 }
+
+export function drawWireFinal(canvas, strokes) {
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    fromWire(strokes || []).forEach(function (a) { applyAction(ctx, a); });
+}
+
+export function playWireTimelapse(canvas, strokes, duration, onDone) {
+    playTimelapse(canvas, fromWire(strokes || []), duration, onDone);
+}
+
+export { blankDataUrl, cardsHtml as chainCardsHtml };
 
 function playTimelapse(canvas, actions, duration, onDone) {
     var ctx = canvas.getContext('2d');

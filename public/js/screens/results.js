@@ -16,6 +16,7 @@ export function renderResults(container) {
     var isHost = state.isHost;
     var isLast = state.isLastRound;
     var roast = !!state.roastRound;
+    var gal = state.roundGallery;   // галерея «Испорченного прототипа»: побеждает кадр
 
     var byCapital = players.slice().sort(function (a, b) { return b.capital - a.capital; });
     var byAttracted = players.slice().sort(function (a, b) { return b.attractedInvestments - a.attractedInvestments; });
@@ -25,19 +26,19 @@ export function renderResults(container) {
 
     html += '<div class="flex items-start justify-between mb-8 gap-3 res-head">';
     html += '  <div class="w-0 flex-shrink-0 sm:w-[70px]"></div>';
-    html += '  <h2 class="text-2xl font-black text-corp-white text-center flex-1">' + (roast ? '🔥 Итоги прожарки' : 'Результаты раунда ' + state.currentRound) + '</h2>';
+    html += '  <h2 class="text-2xl font-black text-corp-white text-center flex-1">' + (roast ? '🔥 Итоги прожарки' : gal ? '🖼️ Итоги галереи' : 'Результаты раунда ' + state.currentRound) + '</h2>';
     html += '  <button id="btn-exit-game" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
 
     // На широком экране — две колонки: слева кто победил, справа цифры и топы
     html += '<div class="res-grid"><div class="res-col res-col-main">';
 
-    if (winners.length > 0) {
+    if (winners.length > 0 && !gal) {
         var mvp = winners[0];
         html += '<div class="corp-card ' + (roast ? 'roast-mvp ' : '') + 'border-accent-gold/35 bg-gradient-to-r from-accent-gold-dim to-accent-blue-dim p-6 mb-8 mvp-reveal">';
         html += '<div class="flex items-center justify-between gap-4 flex-wrap">';
         html += '<div>';
-        html += '<div class="text-[0.65rem] font-black uppercase tracking-[0.12em] text-corp-muted mb-1">' + (roast ? 'Главный прожарщик' : 'MVP раунда') + '</div>';
+        html += '<div class="text-[0.65rem] font-black uppercase tracking-[0.12em] text-corp-muted mb-1">' + (roast ? 'Главный прожарщик' : gal ? 'Автор лучшего кадра' : 'MVP раунда') + '</div>';
         html += '<div class="text-2xl font-black text-accent-gold"><span class="crown-drop">' + (roast ? '🔥' : '👑') + '</span> ' + escapeHtml(mvp.nickname) + '</div>';
         if (roast) html += roastByHtml(mvp.roast, 'разнёс');
         if (bestInvestor && bestInvestor.totalSpent > 0) {
@@ -53,13 +54,14 @@ export function renderResults(container) {
     }
 
     // ═══════ TOP BANNERS ═══════
-    html += '<div class="grid md:grid-cols-2 gap-4 mb-8 res-awards">';
+    // В галерее жетонов нет — вместо инвест-итогов любимый продукт и лучший кадр по реакциям
+    html += '<div class="grid md:grid-cols-2 gap-4 mb-8 res-awards' + (gal ? ' hidden' : '') + '">';
     html += '<div class="corp-card border-accent-gold/30 bg-accent-gold-dim p-6 text-center">';
     if (winners.length > 0) {
         var winnerNames = [];
         for (var w = 0; w < winners.length; w++) winnerNames.push(escapeHtml(winners[w].nickname));
         html += '<div class="text-4xl mb-3">' + (roast ? '🔥' : '🏆') + '</div>';
-        html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">' + (roast ? 'Самая разгромная прожарка' : 'Лучший предприниматель раунда') + '</div>';
+        html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">' + (roast ? 'Самая разгромная прожарка' : gal ? 'Лучший кадр раунда' : 'Лучший предприниматель раунда') + '</div>';
         html += '<div class="text-xl font-black text-accent-gold">' + winnerNames.join(', ') + '</div>';
     } else {
         html += '<div class="text-4xl mb-3">😬</div>';
@@ -81,11 +83,14 @@ export function renderResults(container) {
     html += '</div>';
     html += '</div>';
 
-    html += crowdFavoriteHtml(state.roundCrowdFavorite, 'раунда');
+    if (!gal) html += crowdFavoriteHtml(state.roundCrowdFavorite, 'раунда');
     html += audienceResultHtml(state.roundAudience);
 
+    // ═══════ ГАЛЕРЕЯ: лучший кадр и кто что сделал ═══════
+    if (gal) html += galleryResultsHtml(gal);
+
     // ═══════ WINNER RECAP ═══════
-    if (winners.length > 0) {
+    if (winners.length > 0 && !gal) {
         html += '<div class="mb-8">';
         html += '<h3 class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-4">' + (roast ? '🔥 Что разнёс победитель' : '🎤 Что представил победитель') + '</h3>';
         html += '<div class="space-y-4">';
@@ -318,4 +323,79 @@ function isWinnerTarget(targetId, winners) {
         if (winners[i].id === targetId) return true;
     }
     return false;
+}
+
+// Галерея: любимый продукт зала, лучший кадр по реакциям и раскрытие авторов всех кадров
+var EMO = { laugh: '😂', fire: '🔥', clap: '👏', mindblown: '🤯', scared: '😱', think: '🤔', money: '💸', tomato: '🍅', love: '❤️' };
+
+function reactionsWord(n) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return 'реакция';
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'реакции';
+    return 'реакций';
+}
+
+function galleryResultsHtml(gal) {
+    var html = '';
+    var items = gal.items || [];
+    var credit = {};
+    (gal.credits || []).forEach(function (c) { credit[c.id] = c; });
+    var drawingOf = function (it) { var f = it && it.frames.find(function (x) { return x.stage === 'drawing'; }); return f && f.image; };
+
+    if (!gal.favorite && !(gal.winners && gal.winners.length)) {
+        html += '<div class="corp-card p-6 mb-8 text-center"><div class="text-4xl mb-2">🤫</div><div class="text-sm font-bold text-corp-dim">Зал молчал — реакций не было. В следующий раз жмите эмодзи во время показа!</div></div>';
+    }
+
+    html += '<div class="gr-awards">';
+    if (gal.favorite) {
+        var fav = gal.favorite;
+        var it = items[fav.index];
+        html += '<div class="gr-best-card gr-fav">';
+        html += '<div class="gr-award-kick">❤️ Любимый продукт зала</div>';
+        html += '<img class="gr-best-art" src="' + (drawingOf(it) || '') + '" alt="">';
+        html += '<div class="gr-best-meta"><b>' + (fav.name ? '«' + escapeHtml(fav.name) + '»' : 'Без названия') + '</b>';
+        html += '<span>' + (EMO[fav.topEmotion] || '❤️') + ' ' + fav.likes + ' ' + reactionsWord(fav.likes) + ' · делали: ' + (fav.authors || []).map(function (a) { return a.emoji + ' <em>' + escapeHtml(a.author) + '</em>'; }).join(', ') + '</span></div>';
+        html += '</div>';
+    }
+    (gal.winners || []).forEach(function (w) {
+        html += '<div class="gr-best-card">';
+        html += '<div class="gr-award-kick">🏆 Лучший кадр</div>';
+        if (w.kind === 'draw') html += '<img class="gr-best-art" src="' + (w.image || '') + '" alt="' + escapeHtml(w.label) + '">';
+        else html += '<div class="gr-best-text">«' + escapeHtml(w.text || '') + '»</div>';
+        html += '<div class="gr-best-meta"><b>' + w.emoji + ' ' + escapeHtml(w.label) + (w.card ? ': ' + escapeHtml(w.card) : '') + '</b>';
+        html += '<span>' + (w.productName ? '«' + escapeHtml(w.productName) + '» · ' : '') + 'автор <em>' + escapeHtml(w.author || '—') + '</em> · ' + (EMO[w.topEmotion] || '❤️') + ' ' + w.likes + '</span></div>';
+        html += '</div>';
+    });
+    html += '</div>';
+
+    // Кто собрал больше реакций за раунд
+    if (gal.board && gal.board.length) {
+        html += '<div class="gr-board mb-8">';
+        gal.board.forEach(function (b, i) {
+            html += '<span class="gr-board-row' + (b.id === state.playerId ? ' gr-board-me' : '') + '">' + (i === 0 && b.likes > 0 ? '👑 ' : '') + escapeHtml(b.nickname) + ' <b>❤️ ' + b.likes + '</b></span>';
+        });
+        html += '</div>';
+    }
+
+    if (items.length) {
+        html += '<details class="gr-credits mb-8" open>';
+        html += '<summary>🕵️ Кто что сделал — раскрываем авторов</summary>';
+        items.forEach(function (it) {
+            var name = (it.frames.find(function (f) { return f.stage === 'naming'; }) || {}).text || '';
+            html += '<div class="gr-credits-product"><div class="gr-credits-name">' + (name ? '«' + escapeHtml(name) + '»' : '<i>Без названия</i>') + '</div><div class="gr-credits-frames">';
+            it.frames.forEach(function (f) {
+                var c = credit[f.id] || {};
+                html += '<div class="gr-credit' + (c.likes ? ' gr-credit-hit' : '') + '">';
+                if (f.kind === 'draw') html += '<img src="' + (f.image || '') + '" alt="">';
+                else html += '<div class="gr-credit-text">' + (f.text ? '«' + escapeHtml(f.text) + '»' : '—') + '</div>';
+                html += '<span>' + f.emoji + ' ' + escapeHtml(c.author || '—') + (c.likes ? ' · ❤️ ' + c.likes : '') + '</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+            html += '<div class="gr-credits-truth">🃏 ' + ['adjective', 'item', 'modifier', 'feature', 'targetAudience', 'packaging'].map(function (k) { return it.cards && it.cards[k]; }).filter(Boolean).map(escapeHtml).join(' · ') + '</div>';
+            html += '</div>';
+        });
+        html += '</details>';
+    }
+    return html;
 }

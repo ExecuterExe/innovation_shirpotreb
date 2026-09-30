@@ -26,7 +26,33 @@ export function renderGameOver(container) {
     // На широком экране — две колонки: слева победители и таблица, справа опрос, разбор и кнопки
     html += '<div class="go-grid"><div class="go-col">';
 
+    // Галерея «Испорченного прототипа»: жетонов не было — побеждает тот, чьи кадры собрали больше реакций зала
+    var board = state.galleryBoard;
+    if (board && board.length) {
+        var top = board[0];
+        html += '<div class="corp-card-elevated max-w-sm mx-auto p-8 mb-8 border-accent-gold/20">';
+        html += '<div class="text-5xl mb-4">🎨</div>';
+        html += '<h3 class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-1">Любимец зала</h3>';
+        html += '<div class="text-[0.65rem] text-corp-dim mb-3">Больше всего реакций на свои кадры</div>';
+        html += top.likes > 0
+            ? '<div class="text-2xl font-black text-accent-gold mb-1">' + escapeHtml(top.nickname) + '</div><div class="text-sm font-bold text-accent-gold">❤️ ' + top.likes + '</div>'
+            : '<div class="text-corp-muted">Зал был скромен — реакций нет</div>';
+        html += '</div>';
+        html += '<div class="text-left mb-8">';
+        html += '<h3 class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-4 text-center">📊 Реакции зала за игру</h3>';
+        html += '<div class="space-y-1.5">';
+        board.forEach(function (b, i) {
+            var medal = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : '';
+            html += '<div class="corp-card flex justify-between px-5 py-3.5 items-center' + (b.id === state.playerId ? ' border-accent-gold/20' : '') + ' scoreboard-row-enter" style="animation-delay: ' + (i * 0.1) + 's">';
+            html += '<span class="font-bold text-sm text-corp-light">' + medal + escapeHtml(b.nickname) + (b.id === state.playerId ? ' <span class="text-accent-blue text-xs">(Вы)</span>' : '') + '</span>';
+            html += '<span class="font-mono font-bold text-accent-gold text-sm" data-countup="' + b.likes + '">' + b.likes + '</span>';
+            html += '</div>';
+        });
+        html += '</div></div>';
+    }
+
     // Winner cards
+    html += '<div' + (board && board.length ? ' class="hidden"' : '') + '>';
     html += '<div class="flex flex-col md:flex-row gap-6 justify-center mb-10 go-winners">';
 
     // Best Investor
@@ -89,6 +115,7 @@ export function renderGameOver(container) {
     }
     html += '</div>';
     html += '</div>'; // end scoreboard
+    html += '</div>'; // обычные итоги (в галерее скрыты)
     html += '</div><div class="go-col go-col-side">';
 
     // Разбор партии — если ведущий включил его в настройках
@@ -96,7 +123,8 @@ export function renderGameOver(container) {
 
     // Мини-опрос. Это единственное место, где можно поймать эффект игры
     // по горячим следам — через пять минут человек уже закроет вкладку.
-    html += buildSurvey();
+    // В галерее никто не выступал — вопросы про выступления не к месту
+    if (!(board && board.length)) html += buildSurvey();
 
     // Controls
     html += '<div class="flex flex-col items-center gap-4">';

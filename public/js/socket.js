@@ -2,7 +2,8 @@ import { refreshAudience } from './components/audience.js';
 import { twitchStatusHtml } from './screens/lobby.js';
 import { refreshPrepReady } from './screens/preparation.js';
 import { refreshBunkerDraft, resetBunkerDraftStep, updateBunkerDraftProgress } from './screens/bunker-draft.js';
-import { resetChainPad, updateChainProgress } from './screens/draw-chain.js';
+import { resetChainPad, updateChainProgress, isDrawStage, chainPhaseOf } from './screens/draw-chain.js';
+import { onGalleryReaction } from './screens/gallery.js';
 import { state, setState, navigate, startTimer, escapeHtml } from './app.js';
 import { showNotification } from './components/notification.js';
 import { playSound } from './components/sound.js';
@@ -498,6 +499,7 @@ function handleMessage(msg) {
 
         case 'playerEmotion':
             showIncomingReaction(msg);
+            onGalleryReaction(msg);
             break;
 
         case 'kicked':
@@ -583,6 +585,10 @@ function handleMessage(msg) {
 
         case 'chainStage':
             handleChainStage(msg);
+            break;
+
+        case 'galleryShow':
+            handleGalleryShow(msg);
             break;
 
         case 'chainProgress':
@@ -969,6 +975,7 @@ function handleRoundResults(msg) {
         currentRound: msg.round,
         totalRounds: msg.totalRounds || state.totalRounds,
         roastRound: !!msg.roastRound,
+        roundGallery: msg.gallery || null,
     });
 
     navigate('results');
@@ -1027,6 +1034,7 @@ function handleGameOver(msg) {
         bestInvestor: msg.bestInvestor,
         bestEntrepreneur: msg.bestEntrepreneur,
         gameCrowdFavorite: msg.crowdFavorite || null,
+        galleryBoard: msg.galleryBoard || null,
         audiencePrize: msg.audiencePrize || null,
         gameAnalytics: msg.analytics || null,
     });
@@ -1053,13 +1061,17 @@ function handleChainStage(msg) {
             var intro = {
                 drawing: ['🎨', 'РИСУЕМ<span class="stage-accent">!</span>', 'Нарисуйте продукт по своим картам'],
                 naming: ['🏷', 'КАК ЭТО НАЗЫВАЕТСЯ<span class="stage-accent">?</span>', 'Вам достался чужой рисунок'],
+                drawFeature: ['⚙️', 'КАК ЭТО РАБОТАЕТ<span class="stage-accent">?</span>', 'Чужой продукт и одна карта — дорисуйте особенность'],
+                drawAudience: ['🎯', 'КТО ЭТО КУПИТ<span class="stage-accent">?</span>', 'Нарисуйте покупателя этого продукта'],
+                drawPackaging: ['📦', 'В ЧЁМ ПРОДАЁМ<span class="stage-accent">?</span>', 'Нарисуйте упаковку этого продукта'],
                 slogan: ['📣', 'НУЖЕН СЛОГАН<span class="stage-accent">!</span>', 'Рисунок и название есть — продайте их одной фразой'],
             }[msg.stage] || ['🎨', '', ''];
             showStageOverlay({ emoji: intro[0], title: intro[1], subtitle: intro[2], duration: 1300 });
         }
         playSound('start');
     }
-    if (drawing) resetChainPad(msg.strokes || null, msg.drawing || null);
+    // Холст — на каждом рисовальном этапе свой: продукт или кадр по карте
+    if (isDrawStage(msg.stage)) resetChainPad(msg.strokes || null, msg.drawing || null);
     // Раунд в шапке и событие — как на подготовке
     var patch = {
         players: msg.players || state.players,
@@ -1077,6 +1089,7 @@ function handleChainStage(msg) {
             event: msg.event || null,
             cards: msg.cards,
             drawing: msg.drawing,
+            ref: msg.ref || null,
             done: !!msg.done,
             doneIds: msg.doneIds || [],
             total: msg.total || 0,
@@ -1090,7 +1103,7 @@ function handleChainStage(msg) {
         patch.readyIds = [];
     }
     setState(patch);
-    navigate(msg.stage);
+    navigate(chainPhaseOf(msg.stage));
 }
 
 function handleChainProgress(msg) {
@@ -1098,10 +1111,28 @@ function handleChainProgress(msg) {
     var before = (state.chain.doneIds || []).length;
     state.chain.doneIds = msg.doneIds || [];
     state.chain.total = msg.total || state.chain.total;
-    if (state.phase !== msg.stage) return;
+    if (state.phase !== chainPhaseOf(msg.stage)) return;
     updateChainProgress();
     updateRail();
     if (state.chain.doneIds.length > before) playSound('join');
+}
+
+// ═══════ Галерея «Испорченного прототипа»: продукты комиксом, потом жетоны в кадры ═══════
+function handleGalleryShow(msg) {
+    var first = state.phase !== 'gallery';
+    if (!msg.restored && first) {
+        showStageOverlay({ emoji: '🖼️', title: 'ГАЛЕРЕЯ<span class="stage-accent">!</span>', subtitle: 'Смотрим, что получилось у каждого продукта', duration: 1500 });
+        playSound('fanfare');
+    }
+    setState({
+        players: msg.players || state.players,
+        currentRound: msg.round || state.currentRound,
+        totalRounds: msg.totalRounds || state.totalRounds,
+        chain: null,
+        // Заставка перекрывает первый продукт — показ начинается после неё
+        gallery: { index: msg.index, total: msg.total, item: msg.item, likes: msg.likes || {}, productLikes: msg.productLikes || 0, restored: !!msg.restored, delay: !msg.restored && first ? 1400 : 0 },
+    });
+    navigate('gallery');
 }
 
 // ═══════ Классика: сборка продукта в начале раунда ═══════

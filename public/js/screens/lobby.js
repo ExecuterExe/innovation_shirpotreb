@@ -180,8 +180,9 @@ export function updateStartButton(container) {
     var html = buildGameSummary(state.settings || {});
     if (isHost && canStart) {
         var isBunker = state.settings && state.settings.bunkerMode;
-        var btnText = isBunker ? 'Начать выживание' : 'Начать питчинг';
-        var btnEmoji = isBunker ? '🏠' : '📣';
+        var isProto = !isBunker && state.settings && state.settings.drawMode;
+        var btnText = isBunker ? 'Начать выживание' : isProto ? 'Начать рисовать' : 'Начать питчинг';
+        var btnEmoji = isBunker ? '🏠' : isProto ? '✏️' : '📣';
         html += '<button id="btn-start" class="btn-neon-solid lobby-start-btn w-full py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">' + btnEmoji + ' ' + btnText + '</button>';
     } else if (isHost) {
         html += '<div class="text-center py-4"><div class="text-xs font-black text-corp-muted uppercase tracking-[0.14em] mb-1">Ожидание игроков</div><div class="text-sm font-bold text-corp-dim">' + needText + '</div></div>';
@@ -209,6 +210,9 @@ export function updateSettingsPanel(container) {
 
     var s = state.settings || {};
     var bunkerOn = !!s.bunkerMode;
+    // «Испорченный прототип» — отдельный режим, но правила и карты у него из классики
+    var protoOn = !bunkerOn && !!s.drawMode;
+    var galleryOn = protoOn && s.protoFinale !== 'pitch';
     if (['common', 'rules', 'cards'].indexOf(SETTINGS_TAB) === -1) SETTINGS_TAB = 'rules';
     var tab = SETTINGS_TAB;
     // Панели обоих режимов лежат в разметке всегда (pushSettings читает поля из DOM),
@@ -223,7 +227,9 @@ export function updateSettingsPanel(container) {
     };
     var scope = function (kind) {
         if (kind === 'common') return '<div class="set-scope set-scope-common">⚙️ Действует в обоих режимах</div>';
-        if (kind === 'classic') return '<div class="set-scope set-scope-classic">📣 Только для классики</div>';
+        if (kind === 'classic') return protoOn
+            ? '<div class="set-scope set-scope-proto">✏️ Для «Испорченного прототипа»</div>'
+            : '<div class="set-scope set-scope-classic">📣 Только для классики</div>';
         return '<div class="set-scope set-scope-bunker">🏠 Только для «Бункера»</div>';
     };
 
@@ -231,15 +237,18 @@ export function updateSettingsPanel(container) {
 
     // ─── ШАПКА: РЕЖИМ + ВКЛАДКИ (не прокручивается) ───
     html += '<div class="set-head">';
-    html += '<div class="mode-switch" role="radiogroup" aria-label="Режим игры">';
-    html += '<label class="mode-opt mode-opt-classic' + (!bunkerOn ? ' mode-opt-on' : '') + '"><input type="radio" name="game-mode" value="classic" class="sr-only"' + (!bunkerOn ? ' checked' : '') + '>'
+    html += '<div class="mode-switch mode-switch-3" role="radiogroup" aria-label="Режим игры">';
+    var classicOn = !bunkerOn && !protoOn;
+    html += '<label class="mode-opt mode-opt-classic' + (classicOn ? ' mode-opt-on' : '') + '"><input type="radio" name="game-mode" value="classic" class="sr-only"' + (classicOn ? ' checked' : '') + '>'
         + '<span class="mode-emoji">📣</span><span class="mode-body"><b>Классика</b><span>Питчи и инвестиции по раундам</span></span></label>';
+    html += '<label class="mode-opt mode-opt-proto' + (protoOn ? ' mode-opt-on' : '') + '"><input type="radio" name="game-mode" value="prototype" class="sr-only"' + (protoOn ? ' checked' : '') + '>'
+        + '<span class="mode-emoji">✏️</span><span class="mode-body"><b>Прототип</b><span>Рисуем продукт по цепочке — можно без микрофона</span></span></label>';
     html += '<label class="mode-opt mode-opt-bunker' + (bunkerOn ? ' mode-opt-on' : '') + '"><input type="radio" name="game-mode" value="bunker" class="sr-only"' + (bunkerOn ? ' checked' : '') + '>'
         + '<span class="mode-emoji">🏠</span><span class="mode-body"><b>Бункер</b><span>Раскрываем карты и голосуем за вылет</span></span></label>';
     html += '</div>';
     html += '<div class="set-tabs">';
     html += '<button id="settings-tab-common" class="set-tab' + (tab === 'common' ? ' set-tab-active' : '') + '"><span class="set-tab-emoji">⚙️</span><span>Общее</span></button>';
-    html += '<button id="settings-tab-rules" class="set-tab' + (bunkerOn ? ' set-tab-bunker' : '') + (tab === 'rules' ? ' set-tab-active' : '') + '"><span class="set-tab-emoji">' + (bunkerOn ? '🏠' : '📣') + '</span><span>Правила</span></button>';
+    html += '<button id="settings-tab-rules" class="set-tab' + (bunkerOn ? ' set-tab-bunker' : '') + (tab === 'rules' ? ' set-tab-active' : '') + '"><span class="set-tab-emoji">' + (bunkerOn ? '🏠' : protoOn ? '✏️' : '📣') + '</span><span>Правила</span></button>';
     html += '<button id="settings-tab-cards" class="set-tab' + (bunkerOn ? ' set-tab-bunker' : '') + (tab === 'cards' ? ' set-tab-active' : '') + '"><span class="set-tab-emoji">🃏</span><span>Карты</span></button>';
     html += '</div>';
     html += '</div>';
@@ -327,20 +336,28 @@ export function updateSettingsPanel(container) {
     // ═══ КЛАССИКА · ПРАВИЛА ═══
     html += show('classic-rules');
     html += scope('classic');
-    html += buildSectionDivider('Режим');
-    html += buildDrawModeSetting(s);
-    html += buildRoastSetting(s);
+    if (protoOn) {
+        html += buildSectionDivider('Прототип');
+        html += buildDrawModeSetting(s);
+    } else {
+        html += buildSectionDivider('Режим');
+        html += buildRoastSetting(s);
+    }
     html += buildSectionDivider('Раунды и капитал');
     html += '<div class="set-tiles set-tiles-2">';
     html += buildStatTile('🔁', 'Раундов', 'rounds', 'set-rounds', 1, 7, s.rounds || 3, 1, 'в партии');
     html += buildStatTile('💰', 'Капитал', 'capital', 'set-capital', 3, 30, s.startCapital || 10, 1, 'жетонов на старте');
     html += '</div>';
     html += buildSectionDivider('Тайминги');
-    html += '<div class="set-tiles">';
+    // В галерее нет подготовки и питчей — их плитки прячем, но оставляем в разметке (их значения читает pushSettings)
+    html += '<div class="set-tiles' + (galleryOn ? ' set-tiles-solo' : '') + '">';
+    html += '<div' + (galleryOn ? ' class="hidden"' : ' style="display:contents"') + '>';
     html += buildStatTile('⏱', 'Подготовка', 'prep', 'set-prep', 30, 300, s.prepTime || 60, 15, fmtTime(s.prepTime || 60));
     html += buildStatTile('🎤', 'Питч', 'present', 'set-present', 60, 300, s.presentTime || 120, 15, fmtTime(s.presentTime || 120));
-    html += buildStatTile('📈', 'Инвестиции', 'invest', 'set-invest', 30, 120, s.investTime || 60, 10, fmtTime(s.investTime || 60));
     html += '</div>';
+    html += '</div>';
+    html += '<div' + (galleryOn ? ' class="hidden"' : '') + '>';
+    html += '<div class="set-tiles set-tiles-solo mt-2">' + buildStatTile('📈', 'Инвестиции', 'invest', 'set-invest', 30, 120, s.investTime || 60, 10, fmtTime(s.investTime || 60)) + '</div>';
 
     // Вопросы после питча — необязательная фаза, по умолчанию выключена
     var qt = parseInt(s.questionsTime, 10);
@@ -362,6 +379,7 @@ export function updateSettingsPanel(container) {
     html += buildToggle('🕶 Зашифровать участников', 'Имена → псевдонимы (только с текстовыми питчами)',    'set-anon',     s.anonymizeParticipants, !s.streamerMode);
     html += buildToggle('🔊 Голос объявляет выступающих', 'Зачитывает продукт каждого питча, «Чёрного лебедя», а в текстовых питчах — сам текст. Где звучит — во вкладке «Общее»', 'set-speech', s.useSpeech, false);
     html += '</div>';
+    html += '</div>'; // конец блока питчей
     html += '</div>';
 
     // ═══ КЛАССИКА · КАРТЫ ═══
@@ -772,38 +790,59 @@ function buildSurvivorsSetting(s) {
     return html;
 }
 
-// «Испорченный прототип»: надстройка над классикой — продукт портится по цепочке игроков
+// «Испорченный прототип»: продукт делают по цепочке разные игроки — рисунок, название, кадры по картам
+var PROTO_STAGES = [
+    { key: 'drawing', emoji: '🎨', label: 'Продукт', on: function () { return true; } },
+    { key: 'naming', emoji: '🏷', label: 'Название', on: function () { return true; } },
+    { key: 'drawFeature', emoji: '⚙️', label: 'Особенность', on: function (s) { return !s.pseudoMode; } },
+    { key: 'drawAudience', emoji: '🎯', label: 'Аудитория', on: function (s) { return !!s.useTargetAudience; } },
+    { key: 'drawPackaging', emoji: '📦', label: 'Упаковка', on: function (s) { return !!s.usePackaging; } },
+    { key: 'slogan', emoji: '📣', label: 'Слоган', on: function (s) { return !!s.chainSlogan; } },
+];
+
 function buildDrawModeSetting(s) {
-    var on = !!s.drawMode;
     var time = parseInt(s.drawTime, 10) || 90;
-    var html = '<div class="draft-setting' + (on ? ' draft-setting-on' : '') + ' mb-4">';
-    html += '<label for="set-draw-mode" class="flex items-center justify-between cursor-pointer">';
-    html += '  <div class="flex-1 mr-4">';
-    html += '    <div class="text-sm font-black ' + (on ? 'text-accent-gold' : 'text-corp-light') + '">✏️ Испорченный прототип</div>';
-    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">Каждый рисует продукт по своим картам, сосед по рисунку (карт он не видит) придумывает название, а питчит этот монструозный продукт другой игрок. На сцене рисунок оживает штрих за штрихом, рядом — название и карты.</div>';
+    var gallery = s.protoFinale !== 'pitch';
+    var html = '<div class="proto-intro">Продукт проходит по цепочке: каждый следующий видит <b>только рисунки</b> — без исходных карт — и добавляет свою часть. К финалу выходит монстр.</div>';
+
+    // Этапы — из карт в игре: включили колоду «Аудитория» — появился кадр аудитории
+    html += '<div class="proto-stages">';
+    PROTO_STAGES.forEach(function (st, i) {
+        var on = st.on(s);
+        html += (i ? '<span class="proto-arrow">→</span>' : '') + '<span class="proto-stage' + (on ? '' : ' proto-stage-off') + '">' + st.emoji + ' ' + st.label + '</span>';
+    });
+    html += '</div>';
+    html += '<div class="proto-note">Кадры по картам включаются во вкладке «Карты» (особенность, аудитория, упаковка). Этапов не больше, чем игроков' + (gallery ? '' : ', а при питче — на один меньше') + ': лишние пропустим сами.</div>';
+
+    html += buildSectionDivider('Финал');
+    html += '<div class="proto-finale">';
+    [['gallery', '🖼️', 'Галерея', 'Без микрофона и жетонов: продукты выходят комиксом, лучший кадр выбирает зал реакциями'],
+     ['pitch', '🎤', 'Питч', 'Собранного монстра защищает тот, кто его не делал, — ему и вкладывают жетоны']].forEach(function (o) {
+        var on = (o[0] === 'gallery') === gallery;
+        html += '<label class="proto-finale-opt' + (on ? ' proto-finale-on' : '') + '"><input type="radio" name="proto-finale" value="' + o[0] + '" class="deck-toggle sr-only"' + (on ? ' checked' : '') + '>'
+            + '<b>' + o[1] + ' ' + o[2] + '</b><span>' + o[3] + '</span></label>';
+    });
+    html += '</div>';
+
+    html += '<div class="draft-setting draft-setting-on mb-4 mt-3">';
+    html += '<div class="draft-time" style="margin-top:0">';
+    html += '  <span class="draft-time-label">⏱ Время на рисунок</span>';
+    html += '  <div class="draft-time-opts">';
+    [60, 90, 120, 180].forEach(function (sec) {
+        var sel = sec === time;
+        html += '<label class="draft-time-opt' + (sel ? ' draft-time-opt-on' : '') + '"><input type="radio" name="draw-time" value="' + sec + '" class="deck-toggle sr-only"' + (sel ? ' checked' : '') + '>' + fmtDraftTime(sec) + '</label>';
+    });
     html += '  </div>';
-    html += '  <input type="checkbox" id="set-draw-mode" class="toggle-corp flex-shrink-0"' + (on ? ' checked' : '') + '>';
+    html += '  <div class="text-[0.6rem] text-corp-dim mt-2">На название и слоган — 45 секунд.</div>';
+    html += '</div>';
+    var sloganOn = !!s.chainSlogan;
+    html += '<label for="set-chain-slogan" class="draft-sub flex items-center justify-between cursor-pointer">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-[0.8rem] font-black ' + (sloganOn ? 'text-accent-gold' : 'text-corp-light') + '">📣 Слоган в конце цепочки</div>';
+    html += '    <div class="text-[0.65rem] text-corp-dim mt-0.5">Последний игрок видит все кадры и название и пишет слоган.</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-chain-slogan" class="toggle-corp flex-shrink-0"' + (sloganOn ? ' checked' : '') + '>';
     html += '</label>';
-    if (on) {
-        html += '<div class="draft-time">';
-        html += '  <span class="draft-time-label">⏱ Время на рисунок</span>';
-        html += '  <div class="draft-time-opts">';
-        [60, 90, 120, 180].forEach(function (sec) {
-            var sel = sec === time;
-            html += '<label class="draft-time-opt' + (sel ? ' draft-time-opt-on' : '') + '"><input type="radio" name="draw-time" value="' + sec + '" class="deck-toggle sr-only"' + (sel ? ' checked' : '') + '>' + fmtDraftTime(sec) + '</label>';
-        });
-        html += '  </div>';
-        html += '  <div class="text-[0.6rem] text-corp-dim mt-2">На название — 45 секунд. Потом обычная подготовка и питчи.</div>';
-        html += '</div>';
-        var sloganOn = !!s.chainSlogan;
-        html += '<label for="set-chain-slogan" class="draft-sub flex items-center justify-between cursor-pointer">';
-        html += '  <div class="flex-1 mr-4">';
-        html += '    <div class="text-[0.8rem] font-black ' + (sloganOn ? 'text-accent-gold' : 'text-corp-light') + '">📣 Ещё и слоган</div>';
-        html += '    <div class="text-[0.65rem] text-corp-dim mt-0.5">Ещё один игрок видит рисунок и название и пишет слоган, а питчит уже четвёртый. Нужно от 4 игроков — если меньше, этап пропускается.</div>';
-        html += '  </div>';
-        html += '  <input type="checkbox" id="set-chain-slogan" class="toggle-corp flex-shrink-0"' + (sloganOn ? ' checked' : '') + '>';
-        html += '</label>';
-    }
     html += '</div>';
     return html;
 }
@@ -867,12 +906,18 @@ function summaryChips(s) {
         chips.push([s.bunkerHostMode ? '🎙' : '⏱', s.bunkerHostMode ? 'темп ведёт хост' : 'ходы по таймеру', '']);
         if (s.bunkerActionCards !== false) chips.push(['⚡', 'карты действий', '']);
     } else {
-        chips.push(['📣', 'Классика', 'gold']);
-        if (s.drawMode) chips.push(['✏️', 'испорченный прототип' + (s.chainSlogan ? ' + слоган' : ''), 'gold']);
+        var proto = !!s.drawMode;
+        var gal = proto && s.protoFinale !== 'pitch';
+        if (proto) {
+            chips.push(['✏️', 'Испорченный прототип', 'gold']);
+            chips.push(gal ? ['🖼️', 'галерея: лучший кадр выбирает зал', ''] : ['🎤', 'финал — питч', '']);
+        } else {
+            chips.push(['📣', 'Классика', 'gold']);
+        }
         var r = s.rounds || 3;
         chips.push(['🔁', r + ' ' + (r === 1 ? 'раунд' : r < 5 ? 'раунда' : 'раундов'), '']);
-        if (s.roastFinal) chips.push(['🔥', 'прожарка в финале', 'gold']);
-        chips.push(['🎤', 'питч ' + fmtTime(s.presentTime || 120).replace(' мин', ''), '']);
+        if (s.roastFinal && !proto) chips.push(['🔥', 'прожарка в финале', 'gold']);
+        if (!gal) chips.push(['🎤', 'питч ' + fmtTime(s.presentTime || 120).replace(' мин', ''), '']);
         chips.push(['🃏', countHandCards(s) + ' ' + pluralCards(countHandCards(s)), '']);
         if (s.cardSource === 'players') chips.push(['🧟', 'генератор абсурда', '']);
         else if (s.productDraft) chips.push(['🧪', 'сборка 1 из 3', '']);
@@ -1390,6 +1435,7 @@ function pushSettings(container) {
         // Псевдоинновации = карта особенности выключена
         pseudoMode: container.querySelector('#set-feature') ? !container.querySelector('#set-feature').checked : !!(state.settings && state.settings.pseudoMode),
         bunkerMode: container.querySelector('input[name="game-mode"]:checked') ? container.querySelector('input[name="game-mode"]:checked').value === 'bunker' : !!(state.settings && state.settings.bunkerMode),
+        protoFinale: container.querySelector('input[name="proto-finale"]:checked') ? container.querySelector('input[name="proto-finale"]:checked').value : ((state.settings && state.settings.protoFinale) || 'gallery'),
         bunkerHostMode: container.querySelector('#set-bunker-hostmode')?.checked || false,
         bunkerChat: container.querySelector('#set-bunker-chat') ? container.querySelector('#set-bunker-chat').checked : true,
         postGameAnalytics: container.querySelector('#set-analytics') ? container.querySelector('#set-analytics').checked : !!(state.settings && state.settings.postGameAnalytics),
@@ -1400,7 +1446,8 @@ function pushSettings(container) {
         bunkerDraftTime: container.querySelector('input[name="draft-time"]:checked') ? parseInt(container.querySelector('input[name="draft-time"]:checked').value, 10) : (state.settings.bunkerDraftTime || 120),
         productDraft: container.querySelector('#set-product-draft') ? container.querySelector('#set-product-draft').checked : !!(state.settings && state.settings.productDraft),
         productDraftTime: container.querySelector('input[name="product-draft-time"]:checked') ? parseInt(container.querySelector('input[name="product-draft-time"]:checked').value, 10) : ((state.settings && state.settings.productDraftTime) || 90),
-        drawMode: container.querySelector('#set-draw-mode') ? container.querySelector('#set-draw-mode').checked : !!(state.settings && state.settings.drawMode),
+        // Прототип — это режим: включается выбором в переключателе режимов
+        drawMode: container.querySelector('input[name="game-mode"]:checked') ? container.querySelector('input[name="game-mode"]:checked').value === 'prototype' : !!(state.settings && state.settings.drawMode),
         roastFinal: container.querySelector('#set-roast-final') ? container.querySelector('#set-roast-final').checked : !!(state.settings && state.settings.roastFinal),
         chainSlogan: container.querySelector('#set-chain-slogan') ? container.querySelector('#set-chain-slogan').checked : !!(state.settings && state.settings.chainSlogan),
         drawTime: container.querySelector('input[name="draw-time"]:checked') ? parseInt(container.querySelector('input[name="draw-time"]:checked').value, 10) : ((state.settings && state.settings.drawTime) || 90),

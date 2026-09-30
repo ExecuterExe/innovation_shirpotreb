@@ -99,6 +99,7 @@ function classicStatus(p) {
         if (idx !== -1) return { icon: '⏳', text: (idx - cur === 1 ? 'следующий' : 'в очереди · ' + (idx + 1)), tone: 'dim' };
         return { icon: '👂', text: 'слушает', tone: 'dim' };
     }
+    if (phase === 'gallery') return { icon: '👀', text: 'смотрит галерею', tone: 'dim' };
     if (phase === 'investing') {
         return (state.votedIds || []).indexOf(p.id) !== -1
             ? { icon: '✓', text: 'вложился', tone: 'green' }
@@ -110,6 +111,13 @@ function classicStatus(p) {
         return { icon: '🗳', text: 'судит', tone: 'dim' };
     }
     if (phase === 'results' || phase === 'gameOver') {
+        // Галерея: вместо жетонов — реакции зала на кадры игрока
+        var board = phase === 'results' ? (state.roundGallery && state.roundGallery.board) : state.galleryBoard;
+        if (board) {
+            var row = board.find(function (b) { return b.id === p.id; });
+            if (phase === 'results' && idsOf(state.roundWinners).indexOf(p.id) !== -1) return { icon: '👑', text: 'лучший кадр · ❤️ ' + (row ? row.likes : 0), tone: 'gold' };
+            return { icon: '❤️', text: (row ? row.likes : 0) + ' от зала', tone: 'dim' };
+        }
         var winners = idsOf(state.roundWinners);
         if (phase === 'results' && winners.indexOf(p.id) !== -1) return { icon: '👑', text: 'MVP раунда', tone: 'gold' };
         return { icon: '📈', text: 'привлёк ' + (p.attractedInvestments || 0), tone: 'dim' };

@@ -3,7 +3,7 @@ import { sendMsg, leaveRoom } from '../socket.js';
 import { buildCrowdMeterHtml } from '../components/reactions.js';
 import { isSpeaking, isVoiceMuted, setVoiceMuted, isSpeechSupported } from '../components/speech.js';
 import { isVoiceDevice } from '../components/announcer.js';
-import { chainProductHtml, startProductReplay, fitProductArt } from './draw-chain.js';
+import { chainProductHtml, startProductReplay, fitProductArt, bindArtLightbox } from './draw-chain.js';
 import { askConfirm } from '../components/confirm.js';
 import { roastStageHtml } from '../components/roast.js';
 
@@ -284,6 +284,7 @@ export function renderPresentation(container) {
     if (pres.product) {
         startProductReplay(container, pres.product, state.currentRound + ':' + state.presenterIndex + ':' + pres.id);
         requestAnimationFrame(function () { fitProductArt(container); });
+        bindArtLightbox(container);
     }
 
     // ═══════ EVENT LISTENERS ═══════

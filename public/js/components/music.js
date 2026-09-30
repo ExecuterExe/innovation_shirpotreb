@@ -378,7 +378,7 @@ var MOODS = {
 var PHASE_MOOD = {
     welcome: 'lounge', lobby: 'lounge', soloSettings: 'lounge',
     cardInput: 'focus', productDraft: 'focus', drawing: 'lounge', naming: 'focus', slogan: 'focus', preparation: 'focus', soloCards: 'focus',
-    presentation: 'pitch',
+    presentation: 'pitch', gallery: 'pitch',
     investing: 'invest', tiebreaker_voting: 'invest',
     results: 'results', gameOver: 'results',
     tied: 'tension', tiebreaker: 'tension',

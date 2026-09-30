@@ -21,6 +21,7 @@ import { roundPathHtml, ROUND_PATH_PHASES } from './components/round-path.js';
 import { renderBunkerReveal, renderBunkerVoteResult } from './screens/bunker-game.js';
 import { renderBunkerDraft, renderProductDraft } from './screens/bunker-draft.js';
 import { renderChain } from './screens/draw-chain.js';
+import { renderGallery } from './screens/gallery.js';
 import { renderBunkerVote, renderBunkerTieVote, renderBunkerGameOver } from './screens/bunker-vote.js';
 import { renderSoloSettings, renderSoloCards } from './screens/solo.js';
 
@@ -166,6 +167,7 @@ export function navigate(phase) {
         case 'drawing': renderChain(wrapper); break;
         case 'naming': renderChain(wrapper); break;
         case 'slogan': renderChain(wrapper); break;
+        case 'gallery': renderGallery(wrapper); break;
         case 'preparation': renderPreparation(wrapper); break;
         case 'presentation': renderPresentation(wrapper); break;
         case 'investing': renderInvesting(wrapper); break;
@@ -211,7 +213,7 @@ export function markScreen(phase, root) {
 }
 
 var GAME_SHELL_PHASES = [
-    'cardInput', 'productDraft', 'drawing', 'naming', 'slogan', 'preparation', 'presentation', 'investing', 'results',
+    'cardInput', 'productDraft', 'drawing', 'naming', 'slogan', 'gallery', 'preparation', 'presentation', 'investing', 'results',
     'tied', 'tiebreaker', 'tiebreaker_voting', 'gameOver',
     'bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver',
 ];

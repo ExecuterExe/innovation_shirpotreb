@@ -143,10 +143,10 @@ export function renderWelcome(container) {
     html += welcomeFact('😂', 'Реакции зала');
     html += '</div>';
 
-    // Два режима — каждый со своими правилами
+    // Три режима — каждый со своими правилами
     html += '<div class="hero-reveal-6 mt-10">';
-    html += '<div class="text-[0.65rem] font-black text-corp-muted uppercase tracking-[0.18em] mb-4 text-center lg:text-left">🎮 Два режима</div>';
-    html += '<div class="mode-cards">';
+    html += '<div class="text-[0.65rem] font-black text-corp-muted uppercase tracking-[0.18em] mb-4 text-center lg:text-left">🎮 Три режима</div>';
+    html += '<div class="mode-cards mode-cards-3">';
     html += '<div class="mode-card mode-card-classic">';
     html += '  <div class="mode-card-emoji">📣</div>';
     html += '  <div class="mode-card-title">Классика</div>';
@@ -158,6 +158,12 @@ export function renderWelcome(container) {
     html += '  <div class="mode-card-title">Бункер</div>';
     html += '  <div class="mode-card-desc">Конец света, мест мало. Раскрывайте карты стартапа по одной и голосуйте, кто человечество не спасёт.</div>';
     html += '  <button id="btn-bunker-rules" class="mode-card-btn">📖 Правила <span id="bunker-rules-arrow" class="mode-card-arrow">▼</span></button>';
+    html += '</div>';
+    html += '<div class="mode-card mode-card-proto">';
+    html += '  <div class="mode-card-emoji">✏️</div>';
+    html += '  <div class="mode-card-title">Испорченный прототип</div>';
+    html += '  <div class="mode-card-desc">Рисуем продукт по цепочке: каждый видит только рисунки и добавляет своё. Можно без микрофона.</div>';
+    html += '  <button id="btn-proto-rules" class="mode-card-btn">📖 Правила <span id="proto-rules-arrow" class="mode-card-arrow">▼</span></button>';
     html += '</div>';
     html += '</div>';
     html += '</div>';
@@ -171,6 +177,9 @@ export function renderWelcome(container) {
     html += '</div>';
     html += '<div id="bunker-rules-panel" class="hidden w-full max-w-5xl mx-auto mt-10">';
     html += buildBunkerRulesContent();
+    html += '</div>';
+    html += '<div id="proto-rules-panel" class="hidden w-full max-w-5xl mx-auto mt-10">';
+    html += buildProtoRulesContent();
     html += '</div>';
 
     // Footer
@@ -216,8 +225,6 @@ export function renderWelcome(container) {
     setupTeacherFakeDoor(container);
     var nicknameInput = container.querySelector('#w-nickname');
     var codeInput = container.querySelector('#w-room-code');
-    var btnRules = container.querySelector('#btn-rules');
-    var btnBunkerRules = container.querySelector('#btn-bunker-rules');
 
     if (btnCreate) {
         btnCreate.addEventListener('click', function () {
@@ -255,51 +262,27 @@ export function renderWelcome(container) {
         });
     }
 
-    // Rules toggle (закрываем правила бункера, если открывали их)
-    if (btnRules) {
-        btnRules.addEventListener('click', function () {
-            var panel = container.querySelector('#rules-panel');
-            var arrow = container.querySelector('#rules-arrow');
-            var otherPanel = container.querySelector('#bunker-rules-panel');
-            var otherArrow = container.querySelector('#bunker-rules-arrow');
-            if (otherPanel && !otherPanel.classList.contains('hidden')) {
-                otherPanel.classList.add('hidden');
+    // Правила режимов: открыта одна панель — остальные закрываем
+    var RULE_PANELS = [['btn-rules', 'rules-panel', 'rules-arrow'], ['btn-bunker-rules', 'bunker-rules-panel', 'bunker-rules-arrow'], ['btn-proto-rules', 'proto-rules-panel', 'proto-rules-arrow']];
+    RULE_PANELS.forEach(function (r) {
+        var btn = container.querySelector('#' + r[0]);
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            RULE_PANELS.forEach(function (o) {
+                if (o === r) return;
+                var other = container.querySelector('#' + o[1]);
+                var otherArrow = container.querySelector('#' + o[2]);
+                if (other) other.classList.add('hidden');
                 if (otherArrow) otherArrow.style.transform = '';
-            }
-            if (panel) {
-                panel.classList.toggle('hidden');
-                if (arrow) {
-                    arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
-                }
-                if (!panel.classList.contains('hidden')) {
-                    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }
+            });
+            var panel = container.querySelector('#' + r[1]);
+            var arrow = container.querySelector('#' + r[2]);
+            if (!panel) return;
+            panel.classList.toggle('hidden');
+            if (arrow) arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
+            if (!panel.classList.contains('hidden')) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-    }
-
-    // Bunker rules toggle (закрываем основные правила, если открывали их)
-    if (btnBunkerRules) {
-        btnBunkerRules.addEventListener('click', function () {
-            var panel = container.querySelector('#bunker-rules-panel');
-            var arrow = container.querySelector('#bunker-rules-arrow');
-            var otherPanel = container.querySelector('#rules-panel');
-            var otherArrow = container.querySelector('#rules-arrow');
-            if (otherPanel && !otherPanel.classList.contains('hidden')) {
-                otherPanel.classList.add('hidden');
-                if (otherArrow) otherArrow.style.transform = '';
-            }
-            if (panel) {
-                panel.classList.toggle('hidden');
-                if (arrow) {
-                    arrow.style.transform = panel.classList.contains('hidden') ? '' : 'rotate(180deg)';
-                }
-                if (!panel.classList.contains('hidden')) {
-                    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }
-        });
-    }
+    });
 
     applyInviteLink(container);
 
@@ -526,15 +509,6 @@ function buildRulesContent() {
     // Всё, что можно включить, — свёрнуто: новичку для первой партии это не нужно
     html += '<details class="rules-extra">';
     html += '<summary class="rules-extra-head"><span class="rules-extra-title">🎛 Разнообразить игру</span><span class="rules-extra-sub">Режимы, дополнительные карты и настройки — не обязательно для первой партии</span><span class="rules-extra-arrow">▾</span></summary>';
-    // Отдельный режим классики: продукт делают по цепочке разные игроки
-    html += rulesSection('✏️ Испорченный прототип <span class="rules-where">лобби → «Правила»</span>',
-        '<p class="rules-group-lead">Продукт проходит по цепочке игроков — и к питчу превращается в монстра.</p>' + rulesFlow([
-        ['🎨', 'Рисунок', 'Рисуете продукт по своим картам'],
-        ['🏷', 'Название', 'Сосед видит только рисунок и придумывает название'],
-        ['📣', 'Слоган', 'По желанию: ещё один игрок добавляет слоган (от 4 игроков)'],
-        ['🎤', 'Питч', 'Продаёт тот, кто продукт не делал. На сцене рисунок оживает штрих за штрихом'],
-    ]));
-
     html += rulesSection('🔥 Прожарка в финале <span class="rules-where">лобби → «Правила»</span>',
         '<p class="rules-group-lead">Последний раунд наоборот: не продаём, а уничтожаем.</p>' + rulesFlow([
         ['🎯', 'Жертва', 'Вам достаётся самый успешный продукт соперника из этой партии'],
@@ -570,6 +544,43 @@ function buildRulesContent() {
     ], 3));
     html += '</details>';
 
+    html += '</div>';
+    return html;
+}
+
+function buildProtoRulesContent() {
+    var html = '<div class="rules-card rules-card-proto">';
+    html += '<div class="rules-kicker">✏️ ПРАВИЛА · ИСПОРЧЕННЫЙ ПРОТОТИП</div>';
+    html += '<h3 class="rules-title">Продукт, который делали всем офисом</h3>';
+    html += '<p class="rules-lead">У каждого — карты продукта. Но до финала его доводят другие: каждый следующий видит <b>только рисунки</b>, без исходных карт, и добавляет свою часть. Задумывали «блестящую шкатулку» — получили летающий утюг для пенсионеров.</p>';
+
+    html += rulesSection('📋 Как продукт идёт по цепочке', rulesFlow([
+        ['🎨', 'Продукт', 'Рисуете продукт по своим картам'],
+        ['🏷', 'Название', 'Сосед видит только рисунок и придумывает название'],
+        ['⚙️', 'Кадры по картам', 'Следующие дорисовывают, как работает особенность, кто покупатель, какая упаковка'],
+        ['📣', 'Слоган', 'По желанию: последний пишет слоган ко всему этому'],
+    ]));
+
+    html += rulesSection('🏁 Финал — на выбор ведущего', rulesTiles([
+        ['🖼️', 'Галерея (без микрофона)', 'Продукты выходят комиксом: рисунки оживают штрих за штрихом, в конце — настоящие карты. Зал жмёт реакции — лучший кадр выбирают эмодзи', 'purple'],
+        ['🎤', 'Питч', 'Собранного монстра защищает тот, кто его не делал. Жетоны вкладывают в того, кто лучше разгрёб, что ему подсунули', 'gold'],
+    ], 2));
+
+    var rules = [
+        ['yes', 'В галерее решает зал', 'Реакция засчитывается кадру, который сейчас на экране. Больше всех реакций на свои кадры — любимец зала.'],
+        ['no', 'Себе — не считается', 'Реакции своему кадру не засчитываются. Авторов раскрываем только в итогах.'],
+        ['yes', 'Кадры — по картам', 'Включили в «Картах» аудиторию или упаковку — появятся и такие кадры. Этапов не больше, чем игроков.'],
+    ];
+    var rh = '<div class="rules-golden">';
+    rules.forEach(function (r) {
+        rh += '<div class="rules-golden-row">';
+        rh += '<span class="rules-golden-mark rules-golden-' + r[0] + '">' + (r[0] === 'no' ? '✕' : '✓') + '</span>';
+        rh += '<div><div class="rules-golden-title">' + r[1] + '</div><div class="rules-golden-desc">' + r[2] + '</div></div>';
+        rh += '</div>';
+    });
+    rh += '</div>';
+    html += rulesSection('⚡ Главное', rh);
+    html += '<div class="rules-note">🎨 Рисовать можно пальцем с телефона: кисть, заливка, ластик, цвета и толщина. Не умеете рисовать? Отлично — так даже смешнее.</div>';
     html += '</div>';
     return html;
 }

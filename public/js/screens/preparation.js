@@ -1,7 +1,7 @@
 import { state, escapeHtml, observerHudHtml, observerNoticeHtml } from '../app.js';
 import { sendMsg, leaveRoom } from '../socket.js';
 import { renderCardGrid, CARD_TYPES } from './presentation.js';
-import { chainProductHtml, fitProductArt } from './draw-chain.js';
+import { chainProductHtml, fitProductArt, bindArtLightbox } from './draw-chain.js';
 import { askConfirm } from '../components/confirm.js';
 import { roastPrepHtml } from '../components/roast.js';
 
@@ -157,6 +157,8 @@ export function renderPreparation(container) {
     container.innerHTML = html;
     // После вставки ленты раунда (navigate добавляет её сразу после отрисовки) — иначе расчёт промахнётся
     if (state.myProduct) requestAnimationFrame(function () { fitProductArt(container); });
+    // Кадры по картам — рассмотреть крупно
+    if (state.myProduct) bindArtLightbox(container);
 
     // ═══════ LISTENERS ═══════
     var btnExitGame = container.querySelector('#btn-exit-game');

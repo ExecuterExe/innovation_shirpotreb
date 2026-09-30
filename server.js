@@ -2679,6 +2679,8 @@ function createRoom(hostId, settings) {
             drawTime: normalizeDrawTime(settings.drawTime),
             // Ещё один этап цепочки: слоган к чужому рисунку и названию (нужно 4+ игрока)
             chainSlogan: !!settings.chainSlogan,
+            // Финал «Испорченного прототипа»: галерея с инвестициями в кадры (без микрофона) или питч
+            protoFinale: settings.protoFinale === 'pitch' ? 'pitch' : 'gallery',
             // Финальный раунд-прожарка: разнести чужой продукт из этой партии
             roastFinal: !!settings.roastFinal,
             postGameAnalytics: !!settings.postGameAnalytics,
@@ -3603,6 +3605,20 @@ function emitReaction(room, sender) {
             out.presenterId = presenterId;
             out.tally = addTally(room.crowdTally, presenterId, sender.emotion);
         }
+    } else if (room.state === 'gallery' && room.gallery) {
+        // Галерея: реакция — кадру, который сейчас выходит на экран, и всему продукту.
+        // Своему кадру — не считается
+        var g = room.gallery;
+        var item = g.items[g.index];
+        var frame = galleryCurrentFrame(room);
+        if (item && !(frame && frame.authorId && frame.authorId === sender.playerId)) {
+            out.galleryProduct = item.index;
+            out.productTally = addTally(g.productTally, String(item.index), sender.emotion);
+            if (frame && frame.authorId) {
+                out.galleryFrameId = frame.id;
+                out.frameTally = addTally(g.frameTally, frame.id, sender.emotion);
+            }
+        }
     }
     broadcastToRoom(room, out);
 }
@@ -3941,6 +3957,8 @@ function sendCurrentStateToPlayer(room, player, ws) {
         ws.send(JSON.stringify(Object.assign(productDraftMessage(room, player), { restored: true })));
     } else if (isChainState(roomState)) {
         ws.send(JSON.stringify(Object.assign(chainStageMessage(room, player), { restored: true })));
+    } else if (roomState === 'gallery' && room.gallery) {
+        ws.send(JSON.stringify(Object.assign(galleryShowMessage(room), { restored: true })));
     } else if (roomState === 'bunkerReveal' || roomState === 'bunkerVote' || roomState === 'bunkerTieVote') {
         // Восстанавливаем значения раскрытых карт из данных на сервере
         var revealedCardValues = {};
@@ -4173,6 +4191,7 @@ function startGame(room) {
     room.players.forEach(p => {
         p.capital = room.settings.startCapital;
         p.attractedInvestments = 0;
+        p.galleryLikes = 0;
     });
 
     broadcastToRoom(room, {
@@ -4187,7 +4206,7 @@ function startGame(room) {
 
 // Прожарка — отдельный раунд после обычных
 function totalRoundsFor(room) {
-    return room.settings.rounds + (room.settings.roastFinal && !room.settings.bunkerMode ? 1 : 0);
+    return room.settings.rounds + (room.settings.roastFinal && !room.settings.bunkerMode && !room.settings.drawMode ? 1 : 0);
 }
 
 function startNewRound(room) {
@@ -4704,7 +4723,9 @@ function processTiebreaker(room) {
     }
 }
 
-function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) {
+function finalizeRound(room, roundWinners, roundInvestments, investmentDetails, opts) {
+    opts = opts || {};
+    const hitsWinner = inv => roundWinners.includes(inv.targetId);
     statsPhase(room, 'results');
     clearTimer(room);
     room.state = 'roundResults';
@@ -4729,7 +4750,7 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
     if (roundWinners.length > 0) {
         room.investments.forEach((investData, investorId) => {
             investData.forEach(inv => {
-                if (roundWinners.includes(inv.targetId) && inv.amount > 0) {
+                if (hitsWinner(inv) && inv.amount > 0) {
                     const investor = room.players.get(investorId);
                     if (!investor) return;
                     const reward = inv.amount * 2;
@@ -4753,7 +4774,7 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
         let investedInWinners = 0;
         investData.forEach(inv => {
             totalSpent += inv.amount;
-            if (roundWinners.includes(inv.targetId)) investedInWinners += inv.amount;
+            if (hitsWinner(inv)) investedInWinners += inv.amount;
         });
         const reward = investedInWinners * 2;
         investorRoundStats.set(investorId, {
@@ -4788,7 +4809,7 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
     });
 
     // Продукты раунда — жертвы для финальной прожарки
-    if (!room.roastRound) {
+    if (!room.roastRound && !opts.gallery) {
         if (!room.productHistory) room.productHistory = [];
         (room.presentationOrder || []).forEach(id => {
             const p = room.players.get(id);
@@ -4848,6 +4869,7 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
             roast: roastPublic(room, room.players.get(id)),
         })),
         roastRound: !!room.roastRound,
+        gallery: opts.gallery || null,
         luckyInvestors,
         roundBestInvestor,
         crowdFavorite: roundCrowdFavorite,
@@ -4898,6 +4920,10 @@ function showFinalResults(room) {
         bestEntrepreneur: bestEntrepreneur ? { nickname: bestEntrepreneur.nickname, attracted: bestEntrepreneur.attractedInvestments } : null,
         crowdFavorite: pickCrowdFavorite(room, room.crowdGame),
         audiencePrize: audiencePrize(room),
+        // Галерея без жетонов: побеждает тот, чьи кадры собрали больше реакций зала
+        galleryBoard: room.settings.drawMode && isGalleryFinale(room)
+            ? Array.from(room.players.values()).map(p => ({ id: p.id, nickname: getDisplayNickname(room, p.id), likes: p.galleryLikes || 0 })).sort((a, b) => b.likes - a.likes)
+            : null,
         analytics: room.settings.postGameAnalytics ? buildClassicAnalytics(room) : null,
         roundHistory: room.roundHistory,
     });
@@ -4955,8 +4981,9 @@ function getPublicRoomInfo(room) {
     if (s.pseudoMode)              tags.push({ key: 'pseudo',    label: '🎯 Псевдо',          tier: 'major' });
     if (s.cardSource === 'players') tags.push({ key: 'absurdGen', label: '🧟 Генератор',      tier: 'major' });
     if (s.productDraft && !s.bunkerMode && s.cardSource !== 'players') tags.push({ key: 'productDraft', label: '🧪 Сборка', tier: 'minor' });
-    if (s.roastFinal && !s.bunkerMode) tags.push({ key: 'roastFinal', label: '🔥 Прожарка', tier: 'minor' });
+    if (s.roastFinal && !s.bunkerMode && !s.drawMode) tags.push({ key: 'roastFinal', label: '🔥 Прожарка', tier: 'minor' });
     if (s.drawMode && !s.bunkerMode) tags.push({ key: 'drawMode', label: '✏️ Испорченный прототип', tier: 'major' });
+    if (s.drawMode && !s.bunkerMode && s.protoFinale !== 'pitch') tags.push({ key: 'gallery', label: '🖼️ Без микрофона', tier: 'minor' });
     if (s.modifier && s.modifier !== 'none') tags.push({ key: 'modifier', label: s.modifier === 'addition' ? '📜 Дополнение' : '📜 Метафора', tier: 'minor' });
 
     // Дополнительные карты — мелкие теги
@@ -5181,14 +5208,24 @@ wss.on('connection', (ws) => {
                 const info = playerRooms.get(ws);
                 if (!info) return;
                 const room = rooms.get(info.roomCode);
-                if (!room || room.state !== 'drawing') return;
-                const work = room.chainWorks && room.chainWorks[info.playerId];
+                if (!room || room.state !== 'drawing' || !room.chainWorks) return;
+                const stage = chainStage(room);
+                const targetId = chainTargetOf(room, info.playerId);
+                const work = targetId && room.chainWorks[targetId];
                 if (!work) return;
                 const img = String(msg.image || '');
                 if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(img) || img.length > DRAWING_MAX_LENGTH) return;
-                work.image = img;
+                // Продукт рисует сам художник, кадры по картам — следующие игроки
+                let slot = work;
+                if (stage !== 'drawing') {
+                    if (!PANEL_STAGES[stage]) return;
+                    if (!work.panels) work.panels = {};
+                    slot = work.panels[stage] || (work.panels[stage] = { image: null, strokes: null, authorId: null });
+                    slot.authorId = info.playerId;
+                }
+                slot.image = img;
                 // Некорректные штрихи не затирают уже сохранённые — просто не принимаем их
-                if (msg.strokes !== undefined) { const clean = sanitizeStrokes(msg.strokes); if (clean) work.strokes = clean; }
+                if (msg.strokes !== undefined) { const clean = sanitizeStrokes(msg.strokes); if (clean) slot.strokes = clean; }
                 if (msg.done !== undefined) room.chainDoneIds[info.playerId] = !!msg.done;
                 broadcastChainProgress(room);
                 checkChainStageDone(room);
@@ -5200,7 +5237,7 @@ wss.on('connection', (ws) => {
                 if (!info) return;
                 const room = rooms.get(info.roomCode);
                 if (!room || room.state !== 'drawing' || room.chainFinishing) return;
-                if (!room.chainWorks || !room.chainWorks[info.playerId]) return;
+                if (!room.chainWorks || !room.chainWorks[chainTargetOf(room, info.playerId)]) return;
                 room.chainDoneIds[info.playerId] = false;
                 broadcastChainProgress(room);
                 break;
@@ -5889,6 +5926,7 @@ wss.on('connection', (ws) => {
                 if (s.drawMode !== undefined) room.settings.drawMode = !!s.drawMode;
                 if (s.drawTime !== undefined) room.settings.drawTime = normalizeDrawTime(s.drawTime);
                 if (s.chainSlogan !== undefined) room.settings.chainSlogan = !!s.chainSlogan;
+                if (s.protoFinale !== undefined) room.settings.protoFinale = s.protoFinale === 'pitch' ? 'pitch' : 'gallery';
                 if (s.roastFinal !== undefined) room.settings.roastFinal = !!s.roastFinal;
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
@@ -6297,6 +6335,17 @@ wss.on('connection', (ws) => {
                 break;
             }
 
+            // ==================== ГАЛЕРЕЯ: ВЕДУЩИЙ ЛИСТАЕТ ====================
+            case 'galleryNext': {
+                const info = playerRooms.get(ws);
+                if (!info) return;
+                const room = rooms.get(info.roomCode);
+                if (!room || room.state !== 'gallery' || room.hostId !== info.playerId || !room.gallery) return;
+                // Двойное нажатие не должно перелистнуть два продукта
+                if (msg.index !== undefined && msg.index !== room.gallery.index) return;
+                nextGalleryItem(room);
+                break;
+            }
             // ==================== ТАЙБРЕЙКЕР ГОЛОСОВАНИЕ ====================
             case 'submitTieInvestment': {
                 const info = playerRooms.get(ws);
@@ -7593,7 +7642,7 @@ function getBunkerActivePlayers(room) {
 // Состояния активной игры (не лобби и не уже завершённая игра) —
 // именно в них нужно следить, что игроков не осталось слишком мало.
 var BUNKER_ACTIVE_STATES = ['bunkerReveal', 'bunkerVote', 'bunkerTieVote'];
-var REGULAR_ACTIVE_STATES = ['cardInput', 'productDraft', 'drawing', 'naming', 'slogan', 'preparation', 'presentation', 'investing', 'roundResults', 'tiebreaker_prep', 'tiebreaker', 'tiebreaker_voting'];
+var REGULAR_ACTIVE_STATES = ['cardInput', 'productDraft', 'drawing', 'naming', 'slogan', 'gallery', 'preparation', 'presentation', 'investing', 'roundResults', 'tiebreaker_prep', 'tiebreaker', 'tiebreaker_voting'];
 
 // Если во время игры (уход по кнопке «Выйти», кик хостом и т.п.) активных игроков
 // осталось 1 или меньше — продолжать нечего, завершаем партию и показываем итоги.
@@ -8826,11 +8875,29 @@ function countChainPlayers(room) {
     return n;
 }
 
-// Этапы партии: слоган — только если включён и игроков хватает, чтобы питчил не автор
-function chainStagesFor(room, n) {
+// Этапы-рисунки по картам: следующий игрок видит продукт и дорисовывает, как работает его карта.
+// Этап есть, если такая карта в игре (особенность — если не «Псевдоинновации», аудитория и упаковка — если включены колоды)
+var PANEL_STAGES = {
+    drawFeature: { card: 'feature', label: 'Особенность', emoji: '⚙️' },
+    drawAudience: { card: 'targetAudience', label: 'Аудитория', emoji: '🎯' },
+    drawPackaging: { card: 'packaging', label: 'Упаковка', emoji: '📦' },
+};
+var STAGE_LABELS = { drawing: 'Продукт', naming: 'Название', slogan: 'Слоган' };
+
+function isDrawStage(stage) { return stage === 'drawing' || !!PANEL_STAGES[stage]; }
+// Все рисовальные этапы — одно состояние комнаты «drawing», тексты — свои
+function stateOfStage(stage) { return isDrawStage(stage) ? 'drawing' : stage; }
+function isGalleryFinale(room) { return room.settings.protoFinale !== 'pitch'; }
+
+// Этапы партии. У каждого этапа продукта свой автор, поэтому этапов не больше, чем игроков,
+// а при финале-питче — на один меньше: питчит тот, кто продукт не делал
+function chainStagesFor(room, ids) {
+    var everyoneHas = key => ids.every(id => { var p = room.players.get(id); return !!(p && p.cards && p.cards[key]); });
     var stages = ['drawing', 'naming'];
-    if (room.settings.chainSlogan && n >= 4) stages.push('slogan');
-    return stages;
+    Object.keys(PANEL_STAGES).forEach(st => { if (everyoneHas(PANEL_STAGES[st].card)) stages.push(st); });
+    if (room.settings.chainSlogan) stages.push('slogan');
+    var max = isGalleryFinale(room) ? ids.length : ids.length - 1;
+    return stages.slice(0, Math.max(2, max));
 }
 
 // Штрихи от клиента: { t: 's'|'f'|'c', c: '#rrggbb', w: толщина, p: [x, y, x, y, …] }.
@@ -8883,7 +8950,7 @@ function chainStageMessage(room, p) {
         round: room.currentRound,
         totalRounds: room.totalRounds,
         event: room.currentEvent,
-        duration: stage === 'drawing' ? room.settings.drawTime : CHAIN_TEXT_TIME,
+        duration: isDrawStage(stage) ? room.settings.drawTime : CHAIN_TEXT_TIME,
         doneIds: getChainDoneIds(room),
         total: (room.chain || []).length,
         players: getPlayersPublicInfo(room),
@@ -8893,15 +8960,45 @@ function chainStageMessage(room, p) {
     var w = room.chainWorks[targetId];
     base.done = !!(room.chainDoneIds || {})[p.id];
     if (stage === 'drawing') {
-        base.cards = p.cards || {};
+        // Карты, у которых дальше свой кадр (особенность, аудитория, упаковка), на первом рисунке не показываем —
+        // их нарисует следующий игрок
+        var cards = Object.assign({}, p.cards || {});
+        (room.chainStages || []).forEach(st => { if (PANEL_STAGES[st]) delete cards[PANEL_STAGES[st].card]; });
+        base.cards = cards;
         base.strokes = w.strokes || null;
         base.drawing = w.image || null;
+    } else if (PANEL_STAGES[stage]) {
+        // Дорисовать продукт по одной карте: карт предмета и прилагательного не видно — только рисунки
+        var def = PANEL_STAGES[stage];
+        var owner = room.players.get(targetId);
+        var panel = (w.panels || {})[stage] || {};
+        base.cards = {};
+        base.cards[def.card] = owner && owner.cards ? owner.cards[def.card] || '' : '';
+        base.strokes = panel.strokes || null;
+        base.drawing = panel.image || null;
+        base.ref = { image: w.image || null, name: w.name || '', panels: chainPanelsBefore(room, targetId, stage) };
     } else {
         base.drawing = w.image || null;
         base.productName = stage === 'slogan' ? (w.name || '') : undefined;
         base.text = (stage === 'naming' ? w.name : w.slogan) || '';
+        if (stage === 'slogan') base.ref = { image: w.image || null, name: w.name || '', panels: chainPanelsBefore(room, targetId, stage) };
     }
     return base;
+}
+
+// Уже нарисованные кадры продукта до текущего этапа — как подсказка следующему
+function chainPanelsBefore(room, ownerId, stage) {
+    var w = room.chainWorks[ownerId] || {};
+    var owner = room.players.get(ownerId);
+    var out = [];
+    var stages = room.chainStages || [];
+    for (var i = 0; i < stages.length && stages[i] !== stage; i++) {
+        var def = PANEL_STAGES[stages[i]];
+        if (!def) continue;
+        var pn = (w.panels || {})[stages[i]] || {};
+        out.push({ stage: stages[i], label: def.label, emoji: def.emoji, card: owner && owner.cards ? owner.cards[def.card] || '' : '', image: pn.image || null });
+    }
+    return out;
 }
 
 function getChainDoneIds(room) {
@@ -8917,7 +9014,7 @@ function sendChainStage(room) {
     room.players.forEach(p => sendToPlayer(room, p.id, chainStageMessage(room, p)));
     sendToSpectators(room, chainStageMessage(room, null));
     var stage = chainStage(room);
-    startTimer(room, stage === 'drawing' ? room.settings.drawTime : CHAIN_TEXT_TIME, () => finishChainStage(room));
+    startTimer(room, isDrawStage(stage) ? room.settings.drawTime : CHAIN_TEXT_TIME, () => finishChainStage(room));
 }
 
 function startDrawingStage(room) {
@@ -8928,10 +9025,11 @@ function startDrawingStage(room) {
         if (!p.eliminated) ids.push(p.id);
     });
     room.chain = shuffle(ids);
-    room.chainStages = chainStagesFor(room, ids.length);
+    room.chainStages = chainStagesFor(room, ids);
     room.chainStageIdx = 0;
     room.chainWorks = {};
-    ids.forEach(id => { room.chainWorks[id] = { strokes: null, image: null, name: '', slogan: '', namerId: null, sloganId: null }; });
+    room.gallery = null;
+    ids.forEach(id => { room.chainWorks[id] = { strokes: null, image: null, name: '', slogan: '', namerId: null, sloganId: null, panels: {} }; });
     room.chainDoneIds = {};
     room.chainFinishing = false;
     room.state = 'drawing';
@@ -8965,7 +9063,7 @@ function finishChainStage(room) {
     room.chainStageIdx++;
     var next = chainStage(room);
     if (next) {
-        room.state = next;
+        room.state = stateOfStage(next);
         sendChainStage(room);
         return;
     }
@@ -8975,7 +9073,12 @@ function finishChainStage(room) {
 // Собираем продукты: питчит следующий за последним автором — рисунок, тексты и карты художника
 function assembleChainProducts(room) {
     var c = room.chain || [];
-    var K = (room.chainStages || []).length;
+    var stages = room.chainStages || [];
+    var K = stages.length;
+    if (isGalleryFinale(room)) {
+        startGallery(room);
+        return;
+    }
     var products = {};
     c.forEach((artistId, i) => {
         var artist = room.players.get(artistId);
@@ -8990,7 +9093,11 @@ function assembleChainProducts(room) {
                 artistId: artistId,
                 namerId: w.namerId,
                 sloganId: w.sloganId,
-                withSlogan: K > 2,
+                withSlogan: stages.indexOf('slogan') !== -1,
+                panels: stages.filter(st => PANEL_STAGES[st]).map(st => {
+                    var pn = (w.panels || {})[st] || {};
+                    return { stage: st, card: PANEL_STAGES[st].card, image: pn.image || null, strokes: pn.strokes || null, authorId: pn.authorId || null };
+                }),
             },
         };
     });
@@ -9008,7 +9115,10 @@ function assembleChainProducts(room) {
 // Для инвестиций хватит картинки — штрихи для таймлапса не шлём
 function chainProductLite(room, p) {
     var pub = chainProductPublic(room, p);
-    if (pub) delete pub.strokes;
+    if (pub) {
+        delete pub.strokes;
+        (pub.panels || []).forEach(pn => { delete pn.strokes; });
+    }
     return pub;
 }
 
@@ -9028,7 +9138,186 @@ function chainProductPublic(room, p) {
         artist: nick(cp.artistId),
         namer: nick(cp.namerId),
         sloganAuthor: nick(cp.sloganId),
+        panels: (cp.panels || []).map(pn => ({
+            stage: pn.stage,
+            label: PANEL_STAGES[pn.stage] ? PANEL_STAGES[pn.stage].label : '',
+            emoji: PANEL_STAGES[pn.stage] ? PANEL_STAGES[pn.stage].emoji : '',
+            card: p.cards ? p.cards[pn.card] || '' : '',
+            image: pn.image || null,
+            strokes: pn.strokes || null,
+            author: nick(pn.authorId),
+        })),
     };
+}
+
+// ═══════════════════════════════════════════
+// ГАЛЕРЕЯ — финал «Испорченного прототипа» без микрофона и без жетонов.
+// Каждый продукт показывается рекламным комиксом: кадры выходят по одному, рисунки оживают штрих за штрихом,
+// в конце — настоящие карты. Пока идёт показ, зал жмёт реакции: реакция засчитывается кадру,
+// который сейчас на экране (своему — нет). В итогах — любимый продукт зала и лучший кадр, авторы раскрываются.
+// ═══════════════════════════════════════════
+// Расписание показа — то же, что у клиента (gallery.js, T): по нему понятно, какой кадр сейчас на экране
+var GALLERY_T = { lead: 1.4, intro: 1.3, draw: 3.8, panel: 4.4, name: 1.3, slogan: 2, truth: 3, look: 7 };
+
+function startGallery(room) {
+    var c = room.chain || [];
+    var stages = room.chainStages || [];
+    var items = c.map((artistId, i) => {
+        var artist = room.players.get(artistId);
+        var cards = Object.assign({}, (artist && artist.cards) || {});
+        var w = room.chainWorks[artistId] || {};
+        var frames = [];
+        stages.forEach((st, k) => {
+            var id = i + ':' + st;
+            if (st === 'drawing') {
+                frames.push({ id, stage: st, kind: 'draw', label: STAGE_LABELS.drawing, emoji: '🎨', image: w.image || null, strokes: w.strokes || null, authorId: w.image ? artistId : null });
+            } else if (st === 'naming' || st === 'slogan') {
+                var text = st === 'naming' ? w.name : w.slogan;
+                frames.push({ id, stage: st, kind: 'text', label: STAGE_LABELS[st], emoji: st === 'naming' ? '🏷' : '📣', text: text || '', authorId: text ? (st === 'naming' ? w.namerId : w.sloganId) : null });
+            } else {
+                var def = PANEL_STAGES[st];
+                var pn = (w.panels || {})[st] || {};
+                frames.push({ id, stage: st, kind: 'draw', label: def.label, emoji: def.emoji, card: cards[def.card] || '', image: pn.image || null, strokes: pn.strokes || null, authorId: pn.image ? pn.authorId : null });
+            }
+        });
+        return { index: i, artistId, cards, name: w.name || '', frames };
+    });
+    room.chainWorks = null;
+    room.chainDone = false;
+    room.gallery = { items, index: 0, productTally: {}, frameTally: {} };
+    room.state = 'gallery';
+    statsPhase(room, 'pitch');
+    sendGalleryShow(room);
+}
+
+function galleryItemPublic(room, item, withStrokes) {
+    return {
+        index: item.index,
+        name: item.name,
+        cards: item.cards,
+        frames: item.frames.map(f => {
+            var o = { id: f.id, stage: f.stage, kind: f.kind, label: f.label, emoji: f.emoji, empty: !f.authorId };
+            if (f.card !== undefined) o.card = f.card;
+            if (f.kind === 'text') o.text = f.text;
+            else { o.image = f.image; if (withStrokes) o.strokes = f.strokes; }
+            return o;
+        }),
+    };
+}
+
+function galleryFrameSeconds(f) {
+    return f.stage === 'drawing' ? GALLERY_T.draw : f.kind === 'draw' ? GALLERY_T.panel : f.stage === 'slogan' ? GALLERY_T.slogan : GALLERY_T.name;
+}
+
+function gallerySeconds(item, lead) {
+    var t = (lead || 0) + GALLERY_T.intro + GALLERY_T.truth + GALLERY_T.look;
+    item.frames.forEach(f => { t += galleryFrameSeconds(f); });
+    return Math.ceil(t);
+}
+
+// Какой кадр сейчас выходит на экран (после всех кадров — null: реакции идут продукту целиком)
+function galleryCurrentFrame(room) {
+    var g = room.gallery;
+    if (!g || !g.shownAt) return null;
+    var item = g.items[g.index];
+    var e = (Date.now() - g.shownAt) / 1000 - (g.lead || 0) - GALLERY_T.intro;
+    if (!item || e < 0) return null;
+    for (var i = 0; i < item.frames.length; i++) {
+        var d = galleryFrameSeconds(item.frames[i]);
+        if (e < d) return item.frames[i];
+        e -= d;
+    }
+    return null;
+}
+
+function galleryShowMessage(room) {
+    var g = room.gallery;
+    var item = g.items[g.index];
+    var likes = {};
+    item.frames.forEach(f => { if (g.frameTally[f.id]) likes[f.id] = crowdScore(g.frameTally[f.id]); });
+    return {
+        type: 'galleryShow',
+        index: g.index,
+        total: g.items.length,
+        item: galleryItemPublic(room, item, true),
+        duration: gallerySeconds(item, g.lead),
+        likes,
+        productLikes: crowdScore(g.productTally[String(item.index)]),
+        round: room.currentRound,
+        totalRounds: room.totalRounds,
+        event: room.currentEvent,
+        players: getPlayersPublicInfo(room),
+    };
+}
+
+function sendGalleryShow(room) {
+    var g = room.gallery;
+    // Первый продукт у всех закрыт заставкой «Галерея!» — показ начинается чуть позже
+    g.lead = g.index === 0 ? GALLERY_T.lead : 0;
+    g.shownAt = Date.now();
+    var msg = galleryShowMessage(room);
+    broadcastToRoom(room, msg);
+    startTimer(room, msg.duration, () => nextGalleryItem(room));
+}
+
+function nextGalleryItem(room) {
+    if (room.state !== 'gallery' || !room.gallery) return;
+    clearTimer(room);
+    room.gallery.index++;
+    if (room.gallery.index < room.gallery.items.length) sendGalleryShow(room);
+    else finishGallery(room);
+}
+
+// Итоги галереи: любимый продукт зала, лучшие кадры по реакциям и авторы всех кадров
+function finishGallery(room) {
+    var g = room.gallery;
+    var nick = id => room.players.get(id) ? getDisplayNickname(room, id) : '???';
+    var frameLikes = {};
+    g.items.forEach(it => it.frames.forEach(f => { frameLikes[f.id] = crowdScore(g.frameTally[f.id]); }));
+
+    // Очки игрока — реакции на его кадры (копятся за игру)
+    var roundLikes = new Map();
+    room.players.forEach(p => roundLikes.set(p.id, 0));
+    g.items.forEach(it => it.frames.forEach(f => {
+        if (f.authorId && roundLikes.has(f.authorId)) roundLikes.set(f.authorId, roundLikes.get(f.authorId) + frameLikes[f.id]);
+    }));
+    roundLikes.forEach((n, id) => { var p = room.players.get(id); if (p) p.galleryLikes = (p.galleryLikes || 0) + n; });
+
+    var maxFrame = 0;
+    Object.keys(frameLikes).forEach(id => { if (frameLikes[id] > maxFrame) maxFrame = frameLikes[id]; });
+    var bestFrames = [];
+    if (maxFrame > 0) g.items.forEach(it => it.frames.forEach(f => { if (frameLikes[f.id] === maxFrame && f.authorId) bestFrames.push({ item: it, frame: f }); }));
+    var roundWinners = [];
+    bestFrames.forEach(b => { if (roundWinners.indexOf(b.frame.authorId) === -1) roundWinners.push(b.frame.authorId); });
+
+    var favorite = null;
+    g.items.forEach(it => {
+        var t = g.productTally[String(it.index)];
+        var score = crowdScore(t);
+        if (score > 0 && (!favorite || score > favorite.likes)) favorite = { index: it.index, likes: score, topEmotion: topEmotion(t.byEmotion) };
+    });
+
+    var gallery = {
+        items: g.items.map(it => galleryItemPublic(room, it, false)),
+        credits: [].concat.apply([], g.items.map(it => it.frames.map(f => ({ id: f.id, author: f.authorId ? nick(f.authorId) : null, authorId: f.authorId || null, likes: frameLikes[f.id] || 0 })))),
+        winners: bestFrames.map(b => ({
+            id: b.frame.id, label: b.frame.label, emoji: b.frame.emoji, kind: b.frame.kind, stage: b.frame.stage, card: b.frame.card || '',
+            image: b.frame.kind === 'draw' ? b.frame.image : null, text: b.frame.kind === 'text' ? b.frame.text : '',
+            productName: b.item.name || '', author: nick(b.frame.authorId), authorId: b.frame.authorId, likes: frameLikes[b.frame.id],
+            topEmotion: topEmotion((g.frameTally[b.frame.id] || {}).byEmotion),
+        })),
+        favorite: favorite ? Object.assign(favorite, {
+            name: g.items[favorite.index].name || '',
+            authors: g.items[favorite.index].frames.filter(f => f.authorId).map(f => ({ emoji: f.emoji, label: f.label, author: nick(f.authorId) })),
+        }) : null,
+        board: Array.from(roundLikes.entries()).map(e => ({ id: e[0], nickname: nick(e[0]), likes: e[1] })).sort((a, b) => b.likes - a.likes),
+    };
+
+    // Жетонов в галерее нет: итоги раунда без вложений
+    room.investments.clear();
+    var noMoney = new Map();
+    room.players.forEach(p => noMoney.set(p.id, 0));
+    finalizeRound(room, roundWinners, noMoney, [], { gallery });
 }
 
 // ═══════════════════════════════════════════
