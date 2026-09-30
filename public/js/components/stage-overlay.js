@@ -18,7 +18,7 @@ export function showStageOverlay(opts) {
     hideNow();
 
     var el = document.createElement('div');
-    el.className = 'stage-overlay' + (opts.tone === 'danger' ? ' stage-danger' : '');
+    el.className = 'stage-overlay' + (opts.tone === 'danger' ? ' stage-danger' : '') + (opts.tone === 'roast' ? ' stage-roast' : '');
     var html = '';
     if (opts.logo) html += '<div class="stage-logo">' + logoSvg({ size: 180, animated: true }) + '</div>';
     else if (opts.emoji) html += '<div class="stage-emoji">' + opts.emoji + '</div>';

@@ -329,6 +329,7 @@ export function updateSettingsPanel(container) {
     html += scope('classic');
     html += buildSectionDivider('Режим');
     html += buildDrawModeSetting(s);
+    html += buildRoastSetting(s);
     html += buildSectionDivider('Раунды и капитал');
     html += '<div class="set-tiles set-tiles-2">';
     html += buildStatTile('🔁', 'Раундов', 'rounds', 'set-rounds', 1, 7, s.rounds || 3, 1, 'в партии');
@@ -807,6 +808,23 @@ function buildDrawModeSetting(s) {
     return html;
 }
 
+// Финал-прожарка: дополнительный последний раунд — разносим чужие продукты из этой партии
+function buildRoastSetting(s) {
+    var on = !!s.roastFinal;
+    var r = parseInt(s.rounds, 10) || 3;
+    var html = '<div class="draft-setting roast-setting' + (on ? ' draft-setting-on roast-setting-on' : '') + ' mb-4">';
+    html += '<label for="set-roast-final" class="flex items-center justify-between cursor-pointer">';
+    html += '  <div class="flex-1 mr-4">';
+    html += '    <div class="text-sm font-black ' + (on ? 'roast-setting-title' : 'text-corp-light') + '">🔥 Прожарка в финале</div>';
+    html += '    <div class="text-[0.7rem] text-corp-dim mt-0.5">После обычных раундов — ещё один, последний: каждый получает самый успешный продукт соперника из этой партии и разносит его в пух и прах. Инвесторы вкладываются в самую разгромную прожарку.</div>';
+    if (on) html += '    <div class="roast-setting-note">+1 раунд: ' + r + ' обычн' + (r === 1 ? 'ый' : 'ых') + ' + прожарка = ' + (r + 1) + '</div>';
+    html += '  </div>';
+    html += '  <input type="checkbox" id="set-roast-final" class="toggle-corp flex-shrink-0"' + (on ? ' checked' : '') + '>';
+    html += '</label>';
+    html += '</div>';
+    return html;
+}
+
 // Классика: сборка продукта в начале раунда — как в «Бункере», но из карт этой партии
 function buildProductDraftSetting(s) {
     var on = !!s.productDraft;
@@ -853,6 +871,7 @@ function summaryChips(s) {
         if (s.drawMode) chips.push(['✏️', 'испорченный прототип' + (s.chainSlogan ? ' + слоган' : ''), 'gold']);
         var r = s.rounds || 3;
         chips.push(['🔁', r + ' ' + (r === 1 ? 'раунд' : r < 5 ? 'раунда' : 'раундов'), '']);
+        if (s.roastFinal) chips.push(['🔥', 'прожарка в финале', 'gold']);
         chips.push(['🎤', 'питч ' + fmtTime(s.presentTime || 120).replace(' мин', ''), '']);
         chips.push(['🃏', countHandCards(s) + ' ' + pluralCards(countHandCards(s)), '']);
         if (s.cardSource === 'players') chips.push(['🧟', 'генератор абсурда', '']);
@@ -1382,6 +1401,7 @@ function pushSettings(container) {
         productDraft: container.querySelector('#set-product-draft') ? container.querySelector('#set-product-draft').checked : !!(state.settings && state.settings.productDraft),
         productDraftTime: container.querySelector('input[name="product-draft-time"]:checked') ? parseInt(container.querySelector('input[name="product-draft-time"]:checked').value, 10) : ((state.settings && state.settings.productDraftTime) || 90),
         drawMode: container.querySelector('#set-draw-mode') ? container.querySelector('#set-draw-mode').checked : !!(state.settings && state.settings.drawMode),
+        roastFinal: container.querySelector('#set-roast-final') ? container.querySelector('#set-roast-final').checked : !!(state.settings && state.settings.roastFinal),
         chainSlogan: container.querySelector('#set-chain-slogan') ? container.querySelector('#set-chain-slogan').checked : !!(state.settings && state.settings.chainSlogan),
         drawTime: container.querySelector('input[name="draw-time"]:checked') ? parseInt(container.querySelector('input[name="draw-time"]:checked').value, 10) : ((state.settings && state.settings.drawTime) || 90),
         chatTTS: container.querySelector('#set-chat-tts')?.checked || false,

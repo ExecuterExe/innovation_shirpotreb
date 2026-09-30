@@ -2679,6 +2679,8 @@ function createRoom(hostId, settings) {
             drawTime: normalizeDrawTime(settings.drawTime),
             // Ещё один этап цепочки: слоган к чужому рисунку и названию (нужно 4+ игрока)
             chainSlogan: !!settings.chainSlogan,
+            // Финальный раунд-прожарка: разнести чужой продукт из этой партии
+            roastFinal: !!settings.roastFinal,
             postGameAnalytics: !!settings.postGameAnalytics,
             // QR-код комнаты постоянно в углу экрана — зрители сканируют сами
             qrOnScreen: settings.qrOnScreen !== false,
@@ -3957,7 +3959,6 @@ function sendCurrentStateToPlayer(room, player, ws) {
         var currentPlayerId = (activePlayers.length > 0 && room.bunker.currentTurnIndex < activePlayers.length)
             ? activePlayers[room.bunker.currentTurnIndex]
             : null;
-        var extraCards = ((room.bunker.extraCards || {})[player.id]) || {};
         var remaining = activePlayers.length;
 
         ws.send(JSON.stringify({
@@ -3965,7 +3966,8 @@ function sendCurrentStateToPlayer(room, player, ws) {
             roomState: roomState,
             yourCards: player.cards || {},
             yourActionCards: player.actionCards || [],
-            extraCards: extraCards,
+            playedActionCards: playedActionCardsPublic(room),
+            voteBoosts: voteBoostsPublic(room),
             revealedCards: room.bunker.revealedCards || {},
             revealedCardValues: revealedCardValues,
             players: getPlayersPublicInfo(room),
@@ -3996,6 +3998,8 @@ function sendCurrentStateToPlayer(room, player, ws) {
             totalRounds: room.totalRounds,
             yourCards: player.cards,
             yourProduct: chainProductPublic(room, player),
+            roast: roastPublic(room, player),
+            roastRound: !!room.roastRound,
             event: room.currentEvent,
             players: getPlayersPublicInfo(room),
             presentationOrder: getPresentationOrderPublic(room),
@@ -4013,6 +4017,7 @@ function sendCurrentStateToPlayer(room, player, ws) {
                 cards: presPlayer.cards,
                 pitchText: presPlayer.pitchText,
                 product: chainProductPublic(room, presPlayer),
+                roast: roastPublic(room, presPlayer),
             } : null,
             presenterIndex: room.currentPresenterIndex,
             totalPresenters: room.presentationOrder.length,
@@ -4161,8 +4166,10 @@ function startGame(room) {
     room.crowdGame = {};
     resetAudience(room);
     resetGameStats(room, 'classic');
-    room.totalRounds = room.settings.rounds;
+    room.totalRounds = totalRoundsFor(room);
     room.roundHistory = [];
+    room.productHistory = [];   // что питчили — жертвы для финальной прожарки
+    room.roastRound = false;
     room.players.forEach(p => {
         p.capital = room.settings.startCapital;
         p.attractedInvestments = 0;
@@ -4178,8 +4185,15 @@ function startGame(room) {
     setTimeout(() => { startNewRound(room); }, 2000);
 }
 
+// Прожарка — отдельный раунд после обычных
+function totalRoundsFor(room) {
+    return room.settings.rounds + (room.settings.roastFinal && !room.settings.bunkerMode ? 1 : 0);
+}
+
 function startNewRound(room) {
     room.currentRound++;
+    // Последний раунд с включённой прожаркой: карты — чужой продукт из этой партии
+    room.roastRound = !!(room.settings.roastFinal && room.currentRound === room.totalRounds && room.currentRound > 1);
     room.state = 'preparation';
     room.investments.clear();
     room.crowdTally = {};
@@ -4198,8 +4212,10 @@ function startNewRound(room) {
         }
     });
 
-    // Событие раунда
-    if (room.settings.useEvents && room.decks.events.length > 0) {
+    // Событие раунда (в прожарке событий нет — там и так есть о чём говорить)
+    if (room.roastRound) {
+        room.currentEvent = null;
+    } else if (room.settings.useEvents && room.decks.events.length > 0) {
         room.currentEvent = room.decks.events.pop();
     } else if (room.settings.useEvents && room.decks.events.length === 0) {
         room.decks.events = shuffle(EVENTS);
@@ -4216,7 +4232,10 @@ function startNewRound(room) {
     rebuildAnonAliases(room);
 
     // ═══════ ВЫБОР ИСТОЧНИКА КАРТ ═══════
-    if (room.settings.cardSource === 'players') {
+    if (room.roastRound) {
+        dealRoastTargets(room);
+        startPreparationNow(room);
+    } else if (room.settings.cardSource === 'players') {
         // Режим "Генератор абсурда" — сначала собираем карты от игроков
         room.customCards = {
             adjectives: new Map(),
@@ -4268,7 +4287,7 @@ function showCurrentPresenter(room) {
 
     // ═══════ ЧЁРНЫЙ ЛЕБЕДЬ ═══════
     var blackSwanResult = null;
-    if (room.settings.blackSwan && room.settings.cardSource === 'database') {
+    if (room.settings.blackSwan && room.settings.cardSource === 'database' && !room.roastRound) {
         if (Math.random() < 0.2) {
             blackSwanResult = applyBlackSwan(room, presenter);
         }
@@ -4298,6 +4317,7 @@ function showCurrentPresenter(room) {
             cards: presenter.cards,
             pitchText: presenter.pitchText || '',
             product: chainProductPublic(room, presenter),
+            roast: roastPublic(room, presenter),
         },
         presenterIndex: room.currentPresenterIndex,
         totalPresenters: room.presentationOrder.length,
@@ -4433,6 +4453,7 @@ function startInvesting(room) {
             cards: p.cards,
             pitchText: p.pitchText || '',
             product: chainProductLite(room, p),
+            roast: roastPublic(room, p),
         } : null;
     }).filter(Boolean);
 
@@ -4446,6 +4467,7 @@ function startInvesting(room) {
         investmentCaps: room.investmentCaps,
         round: room.currentRound,
         totalRounds: room.totalRounds,
+        roastRound: !!room.roastRound,
     });
     // Пока игроки вкладывают, зал выбирает лучший питч
     openAudienceVote(room, 'pitch', allPresentations.map(p => ({ id: p.id, nickname: p.nickname })));
@@ -4604,6 +4626,7 @@ function showTiebreakerPresenter(room) {
             cards: presenter.cards,
             pitchText: presenter.pitchText || '',
             product: chainProductPublic(room, presenter),
+            roast: roastPublic(room, presenter),
         },
         presenterIndex: room.currentPresenterIndex,
         totalPresenters: room.tiedPlayers.length,
@@ -4764,6 +4787,23 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
         if (p.capital <= 0) p.capital = 1;
     });
 
+    // Продукты раунда — жертвы для финальной прожарки
+    if (!room.roastRound) {
+        if (!room.productHistory) room.productHistory = [];
+        (room.presentationOrder || []).forEach(id => {
+            const p = room.players.get(id);
+            if (!p || !p.cards) return;
+            room.productHistory.push({
+                ownerId: id,
+                ownerName: p.nickname,
+                round: room.currentRound,
+                cards: JSON.parse(JSON.stringify(p.cards)),
+                chainProduct: p.chainProduct ? JSON.parse(JSON.stringify(p.chainProduct)) : null,
+                total: roundInvestments.get(id) || 0,
+            });
+        });
+    }
+
     // Сохраняем историю
     const capitalsAfter = {};
     room.players.forEach(p => { capitalsAfter[p.id] = p.capital; });
@@ -4805,7 +4845,9 @@ function finalizeRound(room, roundWinners, roundInvestments, investmentDetails) 
             nickname: room.players.get(id) ? room.players.get(id).nickname : '???',
             cards: room.players.get(id) ? room.players.get(id).cards : null,
             pitchText: room.players.get(id) ? room.players.get(id).pitchText || '' : '',
+            roast: roastPublic(room, room.players.get(id)),
         })),
+        roastRound: !!room.roastRound,
         luckyInvestors,
         roundBestInvestor,
         crowdFavorite: roundCrowdFavorite,
@@ -4913,6 +4955,7 @@ function getPublicRoomInfo(room) {
     if (s.pseudoMode)              tags.push({ key: 'pseudo',    label: '🎯 Псевдо',          tier: 'major' });
     if (s.cardSource === 'players') tags.push({ key: 'absurdGen', label: '🧟 Генератор',      tier: 'major' });
     if (s.productDraft && !s.bunkerMode && s.cardSource !== 'players') tags.push({ key: 'productDraft', label: '🧪 Сборка', tier: 'minor' });
+    if (s.roastFinal && !s.bunkerMode) tags.push({ key: 'roastFinal', label: '🔥 Прожарка', tier: 'minor' });
     if (s.drawMode && !s.bunkerMode) tags.push({ key: 'drawMode', label: '✏️ Испорченный прототип', tier: 'major' });
     if (s.modifier && s.modifier !== 'none') tags.push({ key: 'modifier', label: s.modifier === 'addition' ? '📜 Дополнение' : '📜 Метафора', tier: 'minor' });
 
@@ -5079,7 +5122,7 @@ wss.on('connection', (ws) => {
                 }
 
                 var cardKey = msg.cardKey;
-                if (!getBunkerCardKeys().includes(cardKey)) return;
+                if (!playerCardKeys(room.players.get(info.playerId)).includes(cardKey)) return;
 
                 if (room.bunker.revealedCards[info.playerId][cardKey]) {
                     ws.send(JSON.stringify({ type: 'error', message: 'Эта карта уже раскрыта!' }));
@@ -5846,6 +5889,7 @@ wss.on('connection', (ws) => {
                 if (s.drawMode !== undefined) room.settings.drawMode = !!s.drawMode;
                 if (s.drawTime !== undefined) room.settings.drawTime = normalizeDrawTime(s.drawTime);
                 if (s.chainSlogan !== undefined) room.settings.chainSlogan = !!s.chainSlogan;
+                if (s.roastFinal !== undefined) room.settings.roastFinal = !!s.roastFinal;
                 if (s.bunkerHostMode !== undefined) room.settings.bunkerHostMode = !!s.bunkerHostMode;
                 if (s.bunkerChat !== undefined) room.settings.bunkerChat = !!s.bunkerChat;
                 if (s.postGameAnalytics !== undefined) room.settings.postGameAnalytics = !!s.postGameAnalytics;
@@ -5902,7 +5946,7 @@ wss.on('connection', (ws) => {
                 if (!room.settings.streamerMode) {
                     room.settings.anonymizeParticipants = false;
                 }
-                room.totalRounds = room.settings.rounds;
+                room.totalRounds = totalRoundsFor(room);
 
                 broadcastToRoom(room, getLobbyState(room));
                 broadcastRoomsList();
@@ -6167,6 +6211,7 @@ wss.on('connection', (ws) => {
                             cards: p.cards,
                             pitchText: p.pitchText || '',
                             product: chainProductLite(room, p),
+                            roast: roastPublic(room, p),
                         } : null;
                     }).filter(Boolean);
 
@@ -6714,6 +6759,19 @@ function getBunkerCardKeys() {
     return ['adjective', 'item', 'modifier', 'feature', 'gift', 'hiddenDefect', 'packaging', 'review', 'historicalFact'];
 }
 
+// Дополнительные карты («Двойная порция», «Общие ресурсы») лежат в досье под ключом «x_<категория>»:
+// их раскрывают в свой ход, они видны на голосовании и попадают в финальный вердикт
+function isExtraCardKey(key) { return typeof key === 'string' && key.indexOf('x_') === 0; }
+function playerCardKeys(p) {
+    var keys = getBunkerCardKeys();
+    if (p && p.cards) Object.keys(p.cards).forEach(k => { if (isExtraCardKey(k) && p.cards[k]) keys.push(k); });
+    return keys;
+}
+function cardLabel(key) {
+    if (isExtraCardKey(key)) return (CARD_KEY_LABELS[key.slice(2)] || key) + ' (доп.)';
+    return CARD_KEY_LABELS[key] || key;
+}
+
 // ============================================================
 // КАРТЫ ДЕЙСТВИЯ БУНКЕРА
 // ============================================================
@@ -6753,11 +6811,17 @@ const BUNKER_ACTION_CARDS = [
     { type: 'shareFeature',  name: 'Общие ресурсы',      emoji: '🔗', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Скопируй «Особенность» выбранного игрока — она работает и на твой товар.' },
     { type: 'forceReveal',   name: 'Анонс продукта',     emoji: '📢', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Заставь игрока немедленно вскрыть свою «Особенность».' },
     { type: 'extraCard',     name: 'Двойная порция',      emoji: '🍕', needsTarget: false, needsCardKey: true,  phase: 'reveal', desc: 'Вытяни вторую карту любой категории на выбор.' },
-    { type: 'voteDouble',    name: 'Голос инвестора',     emoji: '💎', needsTarget: false, needsCardKey: false, phase: 'vote',   desc: 'Твой голос в этом голосовании считается за двух.' },
-    { type: 'blackPR',       name: 'Чёрный пиар',         emoji: '🗞', needsTarget: true,  needsCardKey: false, phase: 'vote',   desc: 'Выбери игрока — все голоса ПРОТИВ него в этом раунде удваиваются.' },
+    { type: 'voteDouble',    name: 'Голос инвестора',     emoji: '💎', needsTarget: false, needsCardKey: false, phase: 'vote',   desc: 'Твой голос в этом голосовании (и переголосовании) считается за двух.' },
+    { type: 'blackPR',       name: 'Чёрный пиар',         emoji: '🗞', needsTarget: true,  needsCardKey: false, phase: 'vote',   desc: 'Выбери игрока — все голоса ПРОТИВ него в этом голосовании (и переголосовании) удваиваются.' },
     { type: 'absorb',        name: 'Поглощение',          emoji: '🍴', needsTarget: true,  needsCardKey: true,  phase: 'reveal', desc: 'Забери карту у уже выбывшего игрока.' },
     { type: 'wildcard',      name: 'Биткоин-прыжок',      emoji: '🎲', needsTarget: false, needsCardKey: true,  phase: 'reveal', desc: 'Замени одну свою карту на случайную из любой другой колоды.' },
     { type: 'removeDefect',  name: 'Донат',               emoji: '💊', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Навсегда удали «Скрытый дефект» другого игрока.' },
+    // E: Защита и интриги
+    { type: 'shield',        name: 'Крыша',               emoji: '🛡', needsTarget: false, needsCardKey: false, phase: 'vote',   desc: 'Голоса против тебя в этом голосовании (и переголосовании) не считаются.' },
+    { type: 'leakDefect',    name: 'Слив компромата',     emoji: '🗞', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Вскрой всем «Скрытый дефект» выбранного игрока.' },
+    { type: 'fakeReviews',   name: 'Фейковые отзывы',     emoji: '📉', needsTarget: true,  needsCardKey: false, phase: 'reveal', desc: 'Замени «Первый отзыв» выбранного игрока на случайный. Если отзыв открыт — все увидят подмену.' },
+    { type: 'moratorium',    name: 'Мораторий',           emoji: '⏸', needsTarget: false, needsCardKey: false, phase: 'reveal', desc: 'Голосование после этого раунда отменяется — никого не выгоняют.' },
+    { type: 'crisisPR',      name: 'Кризисный PR',        emoji: '🧯', needsTarget: true,  needsCardKey: false, phase: 'vote',   desc: 'Один голос против тебя в этом голосовании уходит выбранному игроку.' },
 ];
 
 // ─── Согласование карт с предметом ───
@@ -6787,19 +6851,14 @@ function agreeWithItem(room, p) {
     var g = genderOfItemWord(p.cards.item) || p.itemGender || 'm';
     p.itemGender = g;
     var changed = [];
-    [['adjective', declineAdjective], ['feature', declineFeature]].forEach(pair => {
+    [['adjective', declineAdjective], ['feature', declineFeature], ['x_adjective', declineAdjective], ['x_feature', declineFeature]].forEach(pair => {
         var key = pair[0];
         var cur = p.cards[key];
-        var base = cur && baseWordOf(key, cur);
+        var base = cur && baseWordOf(key.replace('x_', ''), cur);
         if (!base) return;
         var next = pair[1](base, g);
         if (next !== cur) { p.cards[key] = next; changed.push(key); }
     });
-    var extra = room.bunker.extraCards && room.bunker.extraCards[p.id];
-    if (extra && extra.feature) {
-        var fb = baseWordOf('feature', extra.feature);
-        if (fb) extra.feature = declineFeature(fb, g);
-    }
     return changed;
 }
 
@@ -6861,6 +6920,7 @@ function handleBunkerActionCard(room, player, msg) {
     }
     function broadcastPlayed(effect, extra) {
         sendChatMsg(room, 'event', effect);
+        room.bunker.playedLog.push({ playerId: player.id, name: cardDef.name, emoji: cardDef.emoji, effect: effect, cardType: cardDef.type, targetPlayerId: targetPlayerId });
         broadcastToRoom(room, Object.assign({
             type: 'bunkerActionCardPlayed',
             playerId: player.id,
@@ -6970,19 +7030,18 @@ function handleBunkerActionCard(room, player, msg) {
             if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
             var target = room.players.get(targetPlayerId);
             if (!target || !target.cards || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
-            if (!room.bunker.extraCards[player.id]) room.bunker.extraCards[player.id] = {};
             var sharedBase = baseWordOf('feature', target.cards.feature);
-            room.bunker.extraCards[player.id].feature = sharedBase ? declineFeature(sharedBase, player.itemGender || 'm') : target.cards.feature;
+            player.cards.x_feature = sharedBase ? declineFeature(sharedBase, player.itemGender || 'm') : target.cards.feature;
+            syncRevealedCards(room, player.id, ['x_feature']);
             markUsed();
             sendToPlayer(room, player.id, {
                 type: 'bunkerActionCardUpdate',
                 updatedCards: player.cards,
-                extraCards: room.bunker.extraCards[player.id],
                 myActionCards: player.actionCards,
                 cardName: cardDef.name,
                 emoji: cardDef.emoji,
-                ownerEffect: 'Скопировано у ' + target.nickname + '. Их «Особенность»: ' + target.cards.feature,
-                extraSlot: 'feature',
+                ownerEffect: 'Скопировано у ' + target.nickname + '. Новая карта в досье — «Особенность (доп.)»: ' + player.cards.x_feature + '. Её можно открыть в свой ход.',
+                changedCards: ['x_feature'],
             });
             broadcastPlayed(player.nickname + ' скопировал «Особенность» у ' + target.nickname, { targetNickname: target.nickname });
             return { ok: true };
@@ -7006,19 +7065,18 @@ function handleBunkerActionCard(room, player, msg) {
             if (!targetCardKey || !getBunkerCardKeys().includes(targetCardKey)) return { error: 'Укажите категорию карты.' };
             var drawn = drawBunkerCard(room, targetCardKey, myGender);
             if (!drawn) return { error: 'Не удалось вытянуть карту.' };
-            if (!room.bunker.extraCards[player.id]) room.bunker.extraCards[player.id] = {};
-            room.bunker.extraCards[player.id][targetCardKey] = drawn.value;
+            player.cards['x_' + targetCardKey] = drawn.value;
+            syncRevealedCards(room, player.id, ['x_' + targetCardKey]);
             markUsed();
             var extraLabel = CARD_KEY_LABELS[targetCardKey] || targetCardKey;
             sendToPlayer(room, player.id, {
                 type: 'bunkerActionCardUpdate',
                 updatedCards: player.cards,
-                extraCards: room.bunker.extraCards[player.id],
                 myActionCards: player.actionCards,
                 cardName: cardDef.name,
                 emoji: cardDef.emoji,
-                ownerEffect: 'Дополнительная карта «' + extraLabel + '»: ' + drawn.value,
-                extraSlot: targetCardKey,
+                ownerEffect: 'Новая карта в досье — «' + extraLabel + ' (доп.)»: ' + drawn.value + '. Её можно открыть в свой ход.',
+                changedCards: ['x_' + targetCardKey],
             });
             broadcastPlayed(player.nickname + ' вытянул вторую карту «' + extraLabel + '»!');
             return { ok: true };
@@ -7116,6 +7174,74 @@ function handleBunkerActionCard(room, player, msg) {
                 fromPlayer: player.nickname,
             });
             broadcastPlayed(player.nickname + ' «Донатил» ' + target.nickname + ': скрытый дефект удалён!', { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        case 'shield': {
+            if (room.bunker.voteShields[player.id]) return { error: 'Крыша у вас уже есть.' };
+            room.bunker.voteShields[player.id] = true;
+            markUsed();
+            sendMyUpdate({ ownerEffect: 'Голоса против вас в этом голосовании не считаются.' });
+            broadcastPlayed(player.nickname + ' под «Крышей»: голоса против него в этом голосовании не считаются!');
+            return { ok: true };
+        }
+
+        case 'leakDefect': {
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
+            if ((room.bunker.revealedCards[targetPlayerId] || {}).hiddenDefect) return { error: 'Дефект этого игрока уже открыт.' };
+            bunkerRevealCard(room, targetPlayerId, 'hiddenDefect', false, player.nickname);
+            markUsed();
+            sendMyUpdate({ ownerEffect: 'Компромат слит: «Скрытый дефект» игрока ' + target.nickname + ' видят все.' });
+            broadcastPlayed(player.nickname + ' слил компромат на ' + target.nickname + '!', { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        case 'fakeReviews': {
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || !target.cards || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
+            var fake = drawBunkerCard(room, 'review', target.itemGender || 'm');
+            if (!fake) return { error: 'Не удалось вытянуть отзыв.' };
+            var wasOpen = !!(room.bunker.revealedCards[targetPlayerId] || {}).review;
+            target.cards.review = fake.value;
+            syncRevealedCards(room, targetPlayerId, ['review']);
+            markUsed();
+            sendMyUpdate({ ownerEffect: 'Отзыв игрока ' + target.nickname + ' подменён' + (wasOpen ? ' — все видят новый.' : '. Он узнает об этом, когда откроет карту.') });
+            sendToPlayer(room, targetPlayerId, {
+                type: 'bunkerActionCardUpdate',
+                updatedCards: target.cards,
+                myActionCards: target.actionCards || [],
+                cardName: cardDef.name,
+                emoji: cardDef.emoji,
+                ownerEffect: player.nickname + ' накрутил вам фейковый отзыв: ' + fake.value,
+                changedCards: ['review'],
+                fromPlayer: player.nickname,
+            });
+            broadcastPlayed(player.nickname + ' накрутил фейковые отзывы игроку ' + target.nickname + '!', { targetNickname: target.nickname });
+            return { ok: true };
+        }
+
+        case 'moratorium': {
+            if (room.bunker.currentRound === 0) return { error: 'В первом раунде голосования и так нет.' };
+            if (room.bunker.skipVoteRound === room.bunker.currentRound) return { error: 'Мораторий в этом раунде уже объявлен.' };
+            room.bunker.skipVoteRound = room.bunker.currentRound;
+            markUsed();
+            sendMyUpdate({ ownerEffect: 'Голосование после этого раунда отменено.' });
+            broadcastPlayed(player.nickname + ' объявил мораторий: в этом раунде никого не выгоняют!');
+            return { ok: true };
+        }
+
+        case 'crisisPR': {
+            if (!targetPlayerId || targetPlayerId === player.id) return { error: 'Выберите другого игрока.' };
+            var target = room.players.get(targetPlayerId);
+            if (!target || room.bunker.eliminatedPlayers.includes(targetPlayerId)) return { error: 'Игрок не найден или выбыл.' };
+            if (room.bunker.voteRedirects[player.id]) return { error: 'Кризисный PR уже запущен.' };
+            room.bunker.voteRedirects[player.id] = targetPlayerId;
+            markUsed();
+            sendMyUpdate({ ownerEffect: 'Один голос против вас уйдёт игроку ' + target.nickname + '.' });
+            broadcastPlayed(player.nickname + ' запустил кризисный PR: один голос против него уйдёт игроку ' + target.nickname + '!', { targetNickname: target.nickname });
             return { ok: true };
         }
 
@@ -7392,7 +7518,10 @@ function launchBunkerGame(room, presetProblem) {
         usedActionCards: new Set(),
         voteMultipliers: {},
         voteTargetMultipliers: {},
-        extraCards: {},
+        voteShields: {},        // «Крыша»: голоса против этих игроков не считаются
+        voteRedirects: {},      // «Кризисный PR»: кто → кому перекладывает один голос
+        skipVoteRound: null,    // «Мораторий»: в этом раунде голосования нет
+        playedLog: [],          // все сыгранные карты — восстанавливаются после перезагрузки
     };
 
     room.state = 'bunkerReveal';
@@ -7538,7 +7667,7 @@ function bunkerAutoAdvanceTurn(room) {
 function getUnrevealedCards(room, playerId) {
     var revealed = room.bunker.revealedCards[playerId] || {};
     var unrevealed = [];
-    getBunkerCardKeys().forEach(key => {
+    playerCardKeys(room.players.get(playerId)).forEach(key => {
         if (!revealed[key]) unrevealed.push(key);
     });
     return unrevealed;
@@ -7559,7 +7688,7 @@ function bunkerRevealCard(room, playerId, cardKey, isAuto, forcedBy) {
 
     var player = room.players.get(playerId);
     var cardValue = player && player.cards ? player.cards[cardKey] : '???';
-    var cardLabel = CARD_KEY_LABELS[cardKey] || cardKey;
+    var revealLabel = cardLabel(cardKey);
     var nick = player ? player.nickname : '???';
 
     broadcastToRoom(room, {
@@ -7573,7 +7702,7 @@ function bunkerRevealCard(room, playerId, cardKey, isAuto, forcedBy) {
         forcedBy: forcedBy || null,   // вскрыли картой «Анонс продукта» — это не ход игрока
     });
 
-    sendChatMsg(room, 'system', nick + ' открыл ' + cardLabel + ': ' + cardValue);
+    sendChatMsg(room, 'system', nick + ' открыл ' + revealLabel + ': ' + cardValue);
 }
 
 function showBunkerCurrentTurn(room) {
@@ -7630,6 +7759,8 @@ function startBunkerVoting(room) {
     room.bunker.paused = false;
     room.bunker.voteMultipliers = {};
     room.bunker.voteTargetMultipliers = {};
+    room.bunker.voteShields = {};
+    room.bunker.voteRedirects = {};
 
     var activePlayers = getBunkerActivePlayers(room);
 
@@ -7637,6 +7768,20 @@ function startBunkerVoting(room) {
     var remaining = activePlayers.length;
     if (remaining <= room.bunker.survivorsCount) {
         endBunkerGame(room);
+        return;
+    }
+
+    // «Мораторий»: в этом раунде никого не выгоняем
+    if (room.bunker.skipVoteRound === room.bunker.currentRound) {
+        room.bunker.skipVoteRound = null;
+        room.state = 'bunkerReveal';
+        sendChatMsg(room, 'event', '⏸ Мораторий: голосование этого раунда отменено.');
+        broadcastToRoom(room, {
+            type: 'bunkerSkipVote',
+            reason: '⏸ Мораторий! Голосование этого раунда отменено — никого не выгоняют.',
+            round: room.bunker.currentRound,
+        });
+        setTimeout(() => { startNextBunkerRound(room); }, 3000);
         return;
     }
 
@@ -7653,7 +7798,7 @@ function startBunkerVoting(room) {
         var player = room.players.get(id);
         var revealed = room.bunker.revealedCards[id] || {};
         var visibleCards = {};
-        getBunkerCardKeys().forEach(key => {
+        playerCardKeys(player).forEach(key => {
             if (revealed[key] && player && player.cards) {
                 visibleCards[key] = player.cards[key];
             }
@@ -7747,9 +7892,15 @@ function processBunkerVotes(room) {
         if (targetId === '__skip__') {
             activeSkipCount++;
         } else if (activeVoteCounts[targetId] !== undefined) {
-            var voterWeight = room.bunker.voteMultipliers[voterId] || 1;
-            var targetWeight = room.bunker.voteTargetMultipliers[targetId] || 1;
-            activeVoteCounts[targetId] += voterWeight * targetWeight;
+            activeVoteCounts[targetId] += voteWeight(room, voterId, targetId);
+        }
+    });
+    // «Кризисный PR»: один голос против игрока уходит выбранному
+    Object.keys(room.bunker.voteRedirects || {}).forEach(fromId => {
+        var toId = room.bunker.voteRedirects[fromId];
+        if (activeVoteCounts[fromId] >= 1 && activeVoteCounts[toId] !== undefined && !(room.bunker.voteShields || {})[toId]) {
+            activeVoteCounts[fromId] -= 1;
+            activeVoteCounts[toId] += 1;
         }
     });
 
@@ -7833,6 +7984,32 @@ function processBunkerVotes(room) {
     eliminateFromBunker(room, eliminatedId, activeVoteCounts);
 }
 
+// Вес голоса: «Голос инвестора» ×2 голосующему, «Чёрный пиар» ×2 против цели, «Крыша» — 0
+function voteWeight(room, voterId, targetId) {
+    if ((room.bunker.voteShields || {})[targetId]) return 0;
+    return (room.bunker.voteMultipliers[voterId] || 1) * (room.bunker.voteTargetMultipliers[targetId] || 1);
+}
+
+// Что уже сыграно в текущем голосовании — для отметок на карточках кандидатов
+function voteBoostsPublic(room) {
+    var b = room.bunker;
+    return {
+        double: Object.keys(b.voteMultipliers || {}),
+        blackPR: Object.keys(b.voteTargetMultipliers || {}),
+        shield: Object.keys(b.voteShields || {}),
+        crisis: Object.keys(b.voteRedirects || {}).map(from => ({ from: from, to: b.voteRedirects[from] })),
+    };
+}
+
+// История сыгранных карт по игрокам — как её копит клиент
+function playedActionCardsPublic(room) {
+    var out = {};
+    (room.bunker.playedLog || []).forEach(e => {
+        (out[e.playerId] = out[e.playerId] || []).push({ name: e.name, emoji: e.emoji, effect: e.effect });
+    });
+    return out;
+}
+
 function processBunkerTieVotes(room) {
     clearTimer(room);
 
@@ -7848,7 +8025,7 @@ function processBunkerTieVotes(room) {
     room.bunker.tieVotes.forEach((targetId, voterId) => {
         if (room.bunker.eliminatedPlayers.includes(voterId)) return;
         if (targetId !== '__skip__' && tieVoteCounts[targetId] !== undefined) {
-            tieVoteCounts[targetId]++;
+            tieVoteCounts[targetId] += voteWeight(room, voterId, targetId);
         }
     });
 
@@ -7924,7 +8101,7 @@ function eliminateFromBunker(room, eliminatedId, voteCounts) {
     // Раскрываем ВСЕ карты кикнутого
     var allCards = {};
     if (player && player.cards) {
-        getBunkerCardKeys().forEach(key => {
+        playerCardKeys(player).forEach(key => {
             room.bunker.revealedCards[eliminatedId][key] = true;
             allCards[key] = player.cards[key];
         });
@@ -7981,7 +8158,7 @@ function removeFromBunkerGame(room, targetId, reason, nicknameFallback) {
     if (room.gstats) room.gstats.bunker.elims.push({ id: targetId, round: room.bunker.currentRound + 1, via: reason || 'left' });
 
     if (room.bunker.revealedCards[targetId]) {
-        getBunkerCardKeys().forEach(key => {
+        playerCardKeys(target).forEach(key => {
             room.bunker.revealedCards[targetId][key] = true;
         });
     }
@@ -8094,7 +8271,7 @@ function endBunkerGame(room) {
     // Раскрываем ВСЕ карты ВСЕХ игроков
     room.players.forEach(p => {
         if (room.bunker.revealedCards[p.id]) {
-            getBunkerCardKeys().forEach(key => {
+            playerCardKeys(p).forEach(key => {
                 room.bunker.revealedCards[p.id][key] = true;
             });
         }
@@ -8611,6 +8788,10 @@ function beginPreparation(room) {
         return;
     }
     room.chainDone = false;
+    startPreparationNow(room);
+}
+
+function startPreparationNow(room) {
     room.state = 'preparation';
     sendRoundStartToAll(room);
     room.players.forEach(p => { p.draftAutoPicked = 0; });
@@ -8850,6 +9031,61 @@ function chainProductPublic(room, p) {
     };
 }
 
+// ═══════════════════════════════════════════
+// ФИНАЛ-ПРОЖАРКА: каждый разносит продукт соперника — тот, что уже звучал в этой партии.
+// Жертва — самый успешный продукт соседа по кругу: разносить хит смешнее всего.
+// Инвесторы вкладываются в самую разгромную прожарку (деньги — тому, кто жёг).
+// ═══════════════════════════════════════════
+function dealRoastTargets(room) {
+    var ids = [];
+    room.players.forEach(p => { if (!p.eliminated) ids.push(p.id); });
+    ids = shuffle(ids);
+    var history = room.productHistory || [];
+    ids.forEach((id, i) => {
+        var p = room.players.get(id);
+        var ownerId = ids[(i + 1) % ids.length];
+        var owner = room.players.get(ownerId);
+        // Лучший продукт владельца (при равенстве — более поздний)
+        var best = null;
+        history.forEach(h => {
+            if (h.ownerId !== ownerId) return;
+            if (!best || h.total > best.total || (h.total === best.total && h.round > best.round)) best = h;
+        });
+        if (best) {
+            p.cards = JSON.parse(JSON.stringify(best.cards));
+            p.chainProduct = best.chainProduct ? JSON.parse(JSON.stringify(best.chainProduct)) : null;
+            p.roast = { ownerId: ownerId, ownerName: owner ? owner.nickname : best.ownerName, round: best.round, total: best.total };
+        } else {
+            // Соперник ничего не питчил (зашёл позже) — жертва из колоды
+            dealCardsFromDatabaseFor(room, p);
+            p.chainProduct = null;
+            p.roast = { ownerId: null, ownerName: null, round: null, total: null };
+        }
+        p.pitchText = '';
+        p.isReady = false;
+    });
+}
+
+// Карты из базы одному игроку — как в обычной раздаче
+function dealCardsFromDatabaseFor(room, p) {
+    var itemIndex = drawDeckIndex(room, 'items');
+    var gender = ITEMS[itemIndex].gender;
+    p.cards = { adjective: declineAdjective(ADJECTIVES[drawDeckIndex(room, 'adjectives')], gender), item: ITEMS[itemIndex].word };
+    if (!room.settings.pseudoMode) p.cards.feature = declineFeature(FEATURES[drawDeckIndex(room, 'features')], gender);
+}
+
+// Что о жертве видят все: чей продукт, в каком раунде звучал и сколько собрал
+function roastPublic(room, p) {
+    if (!room.roastRound || !p || !p.roast) return null;
+    var r = p.roast;
+    return {
+        ownerId: r.ownerId,
+        ownerName: r.ownerId ? getDisplayNickname(room, r.ownerId) : null,
+        round: r.round,
+        total: r.total,
+    };
+}
+
 function sendRoundStartToAll(room) {
     statsPrepStart(room);
     room.players.forEach(p => {
@@ -8859,6 +9095,8 @@ function sendRoundStartToAll(room) {
             totalRounds: room.totalRounds,
             yourCards: p.cards,
             yourProduct: chainProductPublic(room, p),
+            roast: roastPublic(room, p),
+            roastRound: !!room.roastRound,
             autoPicked: p.draftAutoPicked || 0,
             event: room.currentEvent,
             phase: 'preparation',

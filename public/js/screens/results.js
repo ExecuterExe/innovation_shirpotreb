@@ -5,6 +5,7 @@ import { countUp, burst } from '../components/fx.js';
 import { reactionEmoji } from '../components/reactions.js';
 import { audienceResultHtml } from '../components/audience.js';
 import { askConfirm } from '../components/confirm.js';
+import { roastByHtml } from '../components/roast.js';
 
 export function renderResults(container) {
     var winners = state.roundWinners || [];
@@ -14,6 +15,7 @@ export function renderResults(container) {
     var players = state.players || [];
     var isHost = state.isHost;
     var isLast = state.isLastRound;
+    var roast = !!state.roastRound;
 
     var byCapital = players.slice().sort(function (a, b) { return b.capital - a.capital; });
     var byAttracted = players.slice().sort(function (a, b) { return b.attractedInvestments - a.attractedInvestments; });
@@ -23,7 +25,7 @@ export function renderResults(container) {
 
     html += '<div class="flex items-start justify-between mb-8 gap-3 res-head">';
     html += '  <div class="w-0 flex-shrink-0 sm:w-[70px]"></div>';
-    html += '  <h2 class="text-2xl font-black text-corp-white text-center flex-1">Результаты раунда ' + state.currentRound + '</h2>';
+    html += '  <h2 class="text-2xl font-black text-corp-white text-center flex-1">' + (roast ? '🔥 Итоги прожарки' : 'Результаты раунда ' + state.currentRound) + '</h2>';
     html += '  <button id="btn-exit-game" class="flex-shrink-0 px-2.5 py-1.5 rounded-lg border border-corp-border text-corp-muted hover:text-accent-red hover:border-accent-red/30 transition-colors text-xs font-bold cursor-pointer">✕</button>';
     html += '</div>';
 
@@ -32,11 +34,12 @@ export function renderResults(container) {
 
     if (winners.length > 0) {
         var mvp = winners[0];
-        html += '<div class="corp-card border-accent-gold/35 bg-gradient-to-r from-accent-gold-dim to-accent-blue-dim p-6 mb-8 mvp-reveal">';
+        html += '<div class="corp-card ' + (roast ? 'roast-mvp ' : '') + 'border-accent-gold/35 bg-gradient-to-r from-accent-gold-dim to-accent-blue-dim p-6 mb-8 mvp-reveal">';
         html += '<div class="flex items-center justify-between gap-4 flex-wrap">';
         html += '<div>';
-        html += '<div class="text-[0.65rem] font-black uppercase tracking-[0.12em] text-corp-muted mb-1">MVP раунда</div>';
-        html += '<div class="text-2xl font-black text-accent-gold"><span class="crown-drop">👑</span> ' + escapeHtml(mvp.nickname) + '</div>';
+        html += '<div class="text-[0.65rem] font-black uppercase tracking-[0.12em] text-corp-muted mb-1">' + (roast ? 'Главный прожарщик' : 'MVP раунда') + '</div>';
+        html += '<div class="text-2xl font-black text-accent-gold"><span class="crown-drop">' + (roast ? '🔥' : '👑') + '</span> ' + escapeHtml(mvp.nickname) + '</div>';
+        if (roast) html += roastByHtml(mvp.roast, 'разнёс');
         if (bestInvestor && bestInvestor.totalSpent > 0) {
             html += '<div class="text-xs text-corp-light mt-2">Инвест-движ раунда: <span class="font-black text-accent-blue">' + escapeHtml(bestInvestor.nickname) + '</span></div>';
         }
@@ -55,8 +58,8 @@ export function renderResults(container) {
     if (winners.length > 0) {
         var winnerNames = [];
         for (var w = 0; w < winners.length; w++) winnerNames.push(escapeHtml(winners[w].nickname));
-        html += '<div class="text-4xl mb-3">🏆</div>';
-        html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">Лучший предприниматель раунда</div>';
+        html += '<div class="text-4xl mb-3">' + (roast ? '🔥' : '🏆') + '</div>';
+        html += '<div class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-2">' + (roast ? 'Самая разгромная прожарка' : 'Лучший предприниматель раунда') + '</div>';
         html += '<div class="text-xl font-black text-accent-gold">' + winnerNames.join(', ') + '</div>';
     } else {
         html += '<div class="text-4xl mb-3">😬</div>';
@@ -84,13 +87,14 @@ export function renderResults(container) {
     // ═══════ WINNER RECAP ═══════
     if (winners.length > 0) {
         html += '<div class="mb-8">';
-        html += '<h3 class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-4">🎤 Что представил победитель</h3>';
+        html += '<h3 class="text-xs font-bold text-corp-muted uppercase tracking-widest mb-4">' + (roast ? '🔥 Что разнёс победитель' : '🎤 Что представил победитель') + '</h3>';
         html += '<div class="space-y-4">';
         for (var wr = 0; wr < winners.length; wr++) {
             var win = winners[wr];
             html += '<div class="corp-card p-5 border-accent-gold/20">';
             html += '<div class="flex items-center justify-between gap-4 flex-wrap mb-3">';
             html += '<div class="text-lg font-black text-accent-gold">' + escapeHtml(win.nickname) + '</div>';
+            if (roast) html += roastByHtml(win.roast, 'разнёс');
             html += '</div>';
             html += '<div class="flex flex-wrap gap-2">';
             var cards = win.cards || {};
@@ -201,7 +205,9 @@ export function renderResults(container) {
             html += '</button>';
         } else {
             html += '<button id="btn-next-round" class="btn-neon-solid px-12 py-5 rounded-2xl text-base font-black uppercase tracking-wider cursor-pointer">';
-            html += '⏭ Следующий раунд';
+            // Дальше — финальная прожарка: пусть все это почувствуют заранее
+            var roastNext = !!(state.settings && state.settings.roastFinal && !state.settings.bunkerMode && state.currentRound + 1 === state.totalRounds);
+            html += roastNext ? '🔥 К финальной прожарке' : '⏭ Следующий раунд';
             html += '</button>';
         }
         html += '</div>';

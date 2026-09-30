@@ -8,7 +8,7 @@ import { state, escapeHtml } from '../app.js';
 import { sendMsg } from '../socket.js';
 import { buildReactionBarHtml, bindReactionButtons } from './reactions.js';
 import { audiencePanelHtml, bindAudiencePanel } from './audience.js';
-import { BUNKER_CARD_TYPES, openBunkerPlayerDetail, getBunkerRevealedValue } from '../screens/bunker-game.js';
+import { BUNKER_CARD_TYPES, cardTypesFor, openBunkerPlayerDetail, getBunkerRevealedValue } from '../screens/bunker-game.js';
 import { askConfirm } from './confirm.js';
 
 var BUNKER_PHASES = ['bunkerDraft', 'bunkerReveal', 'bunkerVote', 'bunkerTieVote', 'bunkerVoteResult', 'bunkerGameOver'];
@@ -135,8 +135,9 @@ function bunkerRevealedChips(p) {
     // В строке — не больше трёх карт, остальное по клику (иначе строка растягивается на пол-экрана)
     var html = '';
     var count = 0;
-    for (var i = 0; i < BUNKER_CARD_TYPES.length; i++) {
-        var ct = BUNKER_CARD_TYPES[i];
+    var types = cardTypesFor(revealed);
+    for (var i = 0; i < types.length; i++) {
+        var ct = types[i];
         if (!revealed[ct.key]) continue;
         count++;
         if (count > 3) continue;
@@ -144,7 +145,7 @@ function bunkerRevealedChips(p) {
         html += '<span class="rail-chip ' + ct.color + '" title="' + escapeHtml(ct.label + ': ' + val) + '">' + ct.emoji + ' ' + escapeHtml(val) + '</span>';
     }
     if (count > 3) html += '<span class="rail-chip rail-chip-more">+' + (count - 3) + '</span>';
-    return { html: html, count: count };
+    return { html: html, count: count, total: types.length };
 }
 
 function rowHtml(p, isBunker) {
@@ -170,8 +171,8 @@ function rowHtml(p, isBunker) {
     if (isBunker && state.phase === 'bunkerDraft') {
         // на сборке продукта карт ещё нет — ни счётчика, ни кика
     } else if (isBunker) {
-        var rc = bunkerRevealedChips(p).count;
-        html += '<span class="rail-metric" title="Раскрыто карт">' + rc + '<small>/9</small></span>';
+        var chips = bunkerRevealedChips(p);
+        html += '<span class="rail-metric" title="Раскрыто карт">' + chips.count + '<small>/' + chips.total + '</small></span>';
         var eliminated = ((state.bunker && state.bunker.eliminatedPlayers) || []).indexOf(p.id) !== -1;
         if (state.isHost && !isMe && !eliminated) {
             html += '<button class="rail-kick" data-rail-kick="' + p.id + '" data-rail-kick-name="' + escapeHtml(displayName(p)) + '" title="Исключить из бункера">🚫</button>';

@@ -35,10 +35,27 @@ var BK_COLORS = {
     adjective: '#f87171', item: '#22d3ee', modifier: '#34d399', feature: '#c084fc', gift: '#f472b6',
     hiddenDefect: '#fb923c', packaging: '#2dd4bf', review: '#fbbf24', historicalFact: '#facc15',
 };
-export function bkColor(key) { return BK_COLORS[key] || '#ffc72c'; }
-function cardType(key) {
-    for (var i = 0; i < BUNKER_CARD_TYPES.length; i++) if (BUNKER_CARD_TYPES[i].key === key) return BUNKER_CARD_TYPES[i];
-    return null;
+export function bkColor(key) { return BK_COLORS[isExtraKey(key) ? key.slice(2) : key] || '#ffc72c'; }
+function cardType(key) { return cardTypeOf(key); }
+
+// ─── Дополнительные карты (от «Двойной порции» и «Общих ресурсов») ───
+// Лежат в досье рядом с обычными под ключом «x_<категория>»: их так же раскрывают в свой ход,
+// видно на голосовании и в финале. Здесь — их тип: та же категория с пометкой «доп.»
+export function isExtraKey(key) { return typeof key === 'string' && key.indexOf('x_') === 0; }
+export function cardTypeOf(key) {
+    var base = isExtraKey(key) ? key.slice(2) : key;
+    var t = null;
+    for (var i = 0; i < BUNKER_CARD_TYPES.length; i++) if (BUNKER_CARD_TYPES[i].key === base) { t = BUNKER_CARD_TYPES[i]; break; }
+    if (!t || !isExtraKey(key)) return t;
+    return Object.assign({}, t, { key: key, label: t.label + ' · доп.', extra: true });
+}
+// Все типы карт игрока: 9 обычных + его дополнительные (по ключам любого объекта карт или открытых карт)
+export function cardTypesFor(obj) {
+    var list = BUNKER_CARD_TYPES.slice();
+    Object.keys(obj || {}).forEach(function (k) {
+        if (isExtraKey(k) && obj[k]) { var t = cardTypeOf(k); if (t) list.push(t); }
+    });
+    return list;
 }
 function avatarHue(id) {
     var h = 0, str = String(id || '');
@@ -178,21 +195,22 @@ export function renderBunkerReveal(container) {
     var itemAlreadyRevealed = !!myRevealed['item'];
     if (!isSpectator) {
 
+    var myTypes = cardTypesFor(myCards);
     var openedCount = 0;
-    for (var oc = 0; oc < BUNKER_CARD_TYPES.length; oc++) if (myRevealed[BUNKER_CARD_TYPES[oc].key]) openedCount++;
+    for (var oc = 0; oc < myTypes.length; oc++) if (myRevealed[myTypes[oc].key]) openedCount++;
     var canPickNow = isMyTurn && !bunker.hasRevealedThisTurn;
 
     html += '<div class="bk-dossier">';
     html += '  <div class="bk-dossier-head">';
-    html += '    <div class="bk-dossier-title">🃏 Ваше досье <span>открыто ' + openedCount + ' из ' + BUNKER_CARD_TYPES.length + '</span></div>';
+    html += '    <div class="bk-dossier-title">🃏 Ваше досье <span>открыто ' + openedCount + ' из ' + myTypes.length + '</span></div>';
     html += '    <div class="bk-dossier-legend"><span>🔒 видите только вы</span><span>👁 видят все</span></div>';
     html += '  </div>';
     if (!itemAlreadyRevealed && canPickNow) {
         html += '  <div class="bk-dossier-tip">📦 Первым откройте предмет — это основа вашего продукта</div>';
     }
     html += '  <div class="bk-cards">';
-    for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
-        var ct = BUNKER_CARD_TYPES[ci];
+    for (var ci = 0; ci < myTypes.length; ci++) {
+        var ct = myTypes[ci];
         var cardValue = myCards[ct.key] || '???';
         var cardState = myRevealed[ct.key] ? 'open'
             : (canPickNow ? ((ct.key === 'item' || itemAlreadyRevealed) ? 'can' : 'locked') : 'hidden');
@@ -200,9 +218,8 @@ export function renderBunkerReveal(container) {
     }
     html += '  </div>';
 
-    // ═══════ ДОПОЛНИТЕЛЬНЫЕ КАРТЫ (от «Двойной порции» и др.) ═══════
-    var myExtraCards = state.myExtraCards || {};
-    var extraKeys = Object.keys(myExtraCards).filter(function(k) { return myExtraCards[k]; });
+    // Дополнительные карты теперь — обычные карты досье (x_…), отдельного блока нет
+    var extraKeys = [];
     if (extraKeys.length > 0) {
         html += '  <div class="mt-2 pt-2 border-t border-accent-gold/10">';
         html += '    <div class="text-xs font-bold text-accent-gold uppercase tracking-widest mb-1.5">🍕 Дополнительные карты</div>';
@@ -732,13 +749,7 @@ function showRevealModal(container, data) {
     if (!modal || !content) return;
 
     // Находим тип карты
-    var cardType = null;
-    for (var i = 0; i < BUNKER_CARD_TYPES.length; i++) {
-        if (BUNKER_CARD_TYPES[i].key === data.cardKey) {
-            cardType = BUNKER_CARD_TYPES[i];
-            break;
-        }
-    }
+    var cardType = cardTypeOf(data.cardKey);
     if (!cardType) return;
 
     var isMe = data.playerId === state.playerId;
@@ -838,8 +849,9 @@ function showPlayerDetailModal(container, playerId, players, revealedCards, myId
     // Карты
     html += '    <div class="grid grid-cols-2 gap-2">';
     var histFactType = null;
-    for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
-        var ct = BUNKER_CARD_TYPES[ci];
+    var detailTypes = cardTypesFor(revealed);
+    for (var ci = 0; ci < detailTypes.length; ci++) {
+        var ct = detailTypes[ci];
         if (ct.key === 'historicalFact') { histFactType = ct; continue; }
         var isCardRevealed = revealed[ct.key];
 
@@ -965,9 +977,10 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
         var isCurrent = p.id === currentPlayerId;
         var playerRevealed = revealedCards[p.id] || {};
 
+        var pTypes = cardTypesFor(playerRevealed);
         var revealedCount = 0;
-        for (var rci = 0; rci < BUNKER_CARD_TYPES.length; rci++) {
-            if (playerRevealed[BUNKER_CARD_TYPES[rci].key]) revealedCount++;
+        for (var rci = 0; rci < pTypes.length; rci++) {
+            if (playerRevealed[pTypes[rci].key]) revealedCount++;
         }
 
         // p.connected приходит с сервера; undefined у старых сообщений — считаем «на связи»
@@ -998,7 +1011,7 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
         if (isMe) html += '<span class="text-accent-blue text-[0.55rem] flex-shrink-0">(Вы)</span>';
         html += '  </div>';
         html += '  <div class="text-[0.6rem] font-mono font-bold ' + (revealedCount > 0 ? 'text-accent-blue' : 'text-corp-dim') + ' flex-shrink-0 ml-2">';
-        html += revealedCount + '/9';
+        html += revealedCount + '/' + pTypes.length;
         html += '  </div>';
         if (state.isHost && !isMe && !isEliminated) {
             html += '<button class="bunker-kick-btn flex-shrink-0 ml-2" data-bunker-kick="' + p.id + '" data-bunker-kick-name="' + escapeHtml(p.nickname) + '" title="Исключить из бункера">🚫</button>';
@@ -1008,8 +1021,8 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
         // Раскрытые карты — ЧИТАЕМЫЕ строки
         var hasRevealed = false;
         html += '<div class="space-y-1">';
-        for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
-            var ct = BUNKER_CARD_TYPES[ci];
+        for (var ci = 0; ci < pTypes.length; ci++) {
+            var ct = pTypes[ci];
             var isCardRevealed = playerRevealed[ct.key];
 
             if (isCardRevealed) {
@@ -1034,9 +1047,9 @@ function renderPlayersGrid(players, revealedCards, eliminatedPlayers, myId, myCa
 
         // Скрытые — маленькие точки
         var hiddenKeys = [];
-        for (var ci2 = 0; ci2 < BUNKER_CARD_TYPES.length; ci2++) {
-            if (!playerRevealed[BUNKER_CARD_TYPES[ci2].key]) {
-                hiddenKeys.push(BUNKER_CARD_TYPES[ci2]);
+        for (var ci2 = 0; ci2 < pTypes.length; ci2++) {
+            if (!playerRevealed[pTypes[ci2].key]) {
+                hiddenKeys.push(pTypes[ci2]);
             }
         }
         if (hiddenKeys.length > 0 && hiddenKeys.length < 8) {
@@ -1134,8 +1147,9 @@ export function renderBunkerVoteResult(container) {
             html += '  </div>';
 
             html += '  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">';
-            for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
-                var ct = BUNKER_CARD_TYPES[ci];
+            var elimTypes = cardTypesFor(result.eliminatedCards);
+            for (var ci = 0; ci < elimTypes.length; ci++) {
+                var ct = elimTypes[ci];
                 if (ct.key === 'historicalFact') continue;
                 var val = result.eliminatedCards[ct.key];
                 if (val) {

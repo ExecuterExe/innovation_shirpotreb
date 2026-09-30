@@ -3,6 +3,7 @@ import { sendMsg, leaveRoom } from '../socket.js';
 import { renderCardGrid, CARD_TYPES } from './presentation.js';
 import { chainProductHtml, fitProductArt } from './draw-chain.js';
 import { askConfirm } from '../components/confirm.js';
+import { roastPrepHtml } from '../components/roast.js';
 
 export function renderPreparation(container) {
     var cards = state.myCards || {};
@@ -11,6 +12,7 @@ export function renderPreparation(container) {
     var isHost = state.isHost;
     var isSpectator = !!state.isSpectator;
     var streamer = state.settings.streamerMode;
+    var roast = state.roastRound ? state.roast : null;
 
     var cardList = [];
     for (var t = 0; t < CARD_TYPES.length; t++) {
@@ -25,7 +27,7 @@ export function renderPreparation(container) {
     html += '<div class="max-w-5xl mx-auto px-4 py-6 min-h-screen">';
 
     // HUD
-    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 ' + (state.myProduct ? 'mb-4' : 'mb-8') + '">';
+    html += '<div class="classic-hud corp-card px-6 py-4 flex items-center justify-between flex-wrap gap-4 ' + (state.myProduct || roast ? 'mb-4' : 'mb-8') + '">';
     html += '  <div>';
     html += '    <div class="text-[0.6rem] font-bold text-corp-muted uppercase tracking-widest">Раунд</div>';
     html += '    <div class="text-3xl font-black text-corp-white">' + state.currentRound;
@@ -63,13 +65,17 @@ export function renderPreparation(container) {
     }
 
     if (isSpectator) {
-        html += observerNoticeHtml(isHost
+        html += observerNoticeHtml(state.roastRound
+            ? '🔥 Финал-прожарка: каждый получил продукт соперника из этой партии и готовит разгромный анти-питч.'
+            : isHost
             ? 'Игроки получили карты и готовят питчи. Выступления начнутся, когда все будут готовы или выйдет время' + (streamer ? '.' : ' — или раньше, если пропустите подготовку.')
             : 'Игроки готовят питчи. Карты каждого вы увидите во время выступлений.');
     } else {
         // «Испорченный прототип»: достался чужой продукт — рисунок, название и карты художника
         var product = state.myProduct;
-        if (product) {
+        if (roast) {
+            html += roastPrepHtml(roast);
+        } else if (product) {
             // Коротко, одной строкой: всё остальное говорит сам продукт
             html += '<div class="dc-prep-title">📦 <b>Ваш продукт</b> — его придумали другие, а продавать вам<span class="dc-prep-more">. Свяжите рисунок, название и карты в один питч</span></div>';
         } else {
@@ -105,7 +111,8 @@ export function renderPreparation(container) {
 
     // Шпаргалка и «Я готов» — в обычном режиме (у стримера готовность — кнопкой под текстом питча)
     // Шпаргалка не нужна, когда перед глазами готовый продукт из «Испорченного прототипа» — экран должен влезть целиком
-    if (!streamer && !isSpectator && !state.myProduct) {
+    // В прожарке подсказки уже в шапке жертвы
+    if (!streamer && !isSpectator && !state.myProduct && !roast) {
         html += '<div class="pitch-tips">';
         html += '  <div class="pitch-tips-title">Шпаргалка питча</div>';
         html += '  <div class="pitch-tips-grid">';

@@ -33,7 +33,12 @@ function lower(v) { return String(v || '').toLowerCase(); }
 export function presentationTexts(pres, presenterIndex, streamerMode, blackSwan) {
     var texts = [];
     var cards = (pres && pres.cards) || {};
-    texts.push(presenterIndex === 0 ? 'Начинаем питчи! Первый стартап.' : 'Следующий стартап.');
+    if (pres && pres.roast) {
+        var victim = pres.roast.ownerName ? 'продукт игрока ' + pres.roast.ownerName : 'продукт из колоды';
+        texts.push((presenterIndex === 0 ? 'Финал! Прожарка! ' : 'Следующая прожарка. ') + 'Под огнём — ' + victim + '.');
+    } else {
+        texts.push(presenterIndex === 0 ? 'Начинаем питчи! Первый стартап.' : 'Следующий стартап.');
+    }
     if (blackSwan && blackSwan.label) {
         texts.push('Чёрный лебедь! ' + blackSwan.label + ' меняется: было «' + lower(blackSwan.oldValue) + '», стало «' + lower(blackSwan.newValue) + '».');
     }

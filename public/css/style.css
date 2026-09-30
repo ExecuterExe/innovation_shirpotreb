@@ -4279,3 +4279,105 @@ body.ga-open { overflow: hidden; }
 .gc-ok { color: #15151e; background: linear-gradient(135deg, #ffd54a, #ffc72c); }
 .gc-ok.gc-danger { color: #fff; background: linear-gradient(135deg, #ff5a5a, #e53935); }
 .gc-btn:focus-visible { outline: 2px solid #ffc72c; outline-offset: 2px; }
+.bk-boost-shield { color: #6ee7b7; background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.4); }
+.bk-boost-crisis { color: #fdba74; background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.4); }
+
+/* ═══════ ФИНАЛ-ПРОЖАРКА ═══════ */
+.stage-overlay.stage-roast {
+    background: radial-gradient(ellipse at 50% 70%, rgba(120, 30, 0, 0.92) 0%, rgba(30, 6, 2, 0.96) 55%, rgba(8, 2, 2, 0.98) 80%);
+}
+.stage-overlay.stage-roast .stage-title { color: #fff1e0; text-shadow: 0 0 30px rgba(255, 110, 20, 0.7), 0 0 80px rgba(255, 60, 0, 0.45); }
+.stage-overlay.stage-roast .stage-title .stage-accent { color: #ff7a1a; }
+.stage-overlay.stage-roast .stage-emoji { animation: stageLogoIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both, roastFlicker 0.9s ease-in-out 0.5s infinite; }
+.stage-overlay.stage-roast .stage-sub b { color: #ffb070; }
+@keyframes roastFlicker {
+    0%, 100% { transform: scale(1) rotate(-2deg); filter: drop-shadow(0 0 18px rgba(255, 120, 20, 0.8)); }
+    50%      { transform: scale(1.12) rotate(3deg); filter: drop-shadow(0 0 34px rgba(255, 70, 0, 0.95)); }
+}
+
+/* Подготовка: чья жертва */
+.roast-prep {
+    position: relative; overflow: hidden; text-align: center; margin: 0 auto 14px; max-width: 760px;
+    padding: 14px 18px 12px; border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255, 90, 20, 0.14), rgba(255, 40, 0, 0.04));
+    border: 1px solid rgba(255, 120, 40, 0.35);
+    box-shadow: 0 0 40px rgba(255, 80, 0, 0.12) inset;
+}
+.roast-prep::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -30px; height: 60px; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 100%, rgba(255, 100, 20, 0.35), transparent 70%);
+    animation: roastGlow 2.4s ease-in-out infinite;
+}
+@keyframes roastGlow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.roast-prep-kick { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #ff8a3d; }
+.roast-flame { display: inline-block; animation: roastFlicker 1.1s ease-in-out infinite; }
+.roast-prep-title { margin: 2px 0 4px; font-size: 1.45rem; font-weight: 900; color: #fff; line-height: 1.2; }
+.roast-prep-title b { color: #ff9a4d; }
+.roast-prep-origin { font-weight: 700; letter-spacing: 0.02em; text-transform: none; color: #c9a58a; }
+.roast-prep-lead { font-size: 0.82rem; color: #b8b8c8; line-height: 1.45; max-width: 720px; margin: 0 auto; }
+.roast-prep-lead b { color: #ffb070; }
+.roast-prep-tips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; position: relative; z-index: 1; }
+.roast-prep-tip { font-size: 0.72rem; font-weight: 700; color: #f0d8c8; padding: 3px 10px; border-radius: 999px; background: rgba(255, 90, 20, 0.1); border: 1px solid rgba(255, 110, 40, 0.22); }
+
+/* Сцена */
+.roast-stage {
+    border-color: rgba(255, 110, 30, 0.4) !important;
+    background-image: radial-gradient(ellipse at 50% 120%, rgba(255, 80, 0, 0.18), transparent 60%);
+    box-shadow: 0 0 50px rgba(255, 80, 0, 0.12);
+}
+.roast-stage h2 { color: #ffb070 !important; text-shadow: 0 0 36px rgba(255, 100, 20, 0.35) !important; }
+.roast-target {
+    display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px;
+    margin: -4px auto 14px; padding: 6px 14px; border-radius: 999px;
+    background: rgba(255, 90, 20, 0.1); border: 1px solid rgba(255, 110, 40, 0.3);
+    font-size: 0.9rem; color: #f0e0d4;
+}
+.roast-target b { color: #ff9a4d; }
+.roast-target-label { font-size: 0.65rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; color: #ff8a3d; }
+.roast-target-origin { font-size: 0.75rem; color: #b09080; }
+.roast-target-compact { margin-bottom: 8px; padding: 4px 12px; font-size: 0.82rem; }
+.roast-victim-me {
+    display: block; width: fit-content; margin: 0 auto 12px; padding: 6px 14px; border-radius: 12px;
+    font-size: 0.82rem; font-weight: 900; color: #ffd0b0;
+    background: rgba(255, 50, 30, 0.14); border: 1px solid rgba(255, 70, 40, 0.35);
+    animation: roastShake 2.6s ease-in-out infinite;
+}
+@keyframes roastShake {
+    0%, 86%, 100% { transform: none; }
+    88% { transform: translateX(-3px) rotate(-1deg); }
+    92% { transform: translateX(3px) rotate(1deg); }
+    96% { transform: translateX(-2px); }
+}
+
+/* Инвестиции и итоги */
+.roast-by { margin: -4px 0 8px; font-size: 0.78rem; color: #c9a58a; }
+.roast-by b { color: #ff9a4d; }
+.roast-by-inline { display: inline; margin: 0 0 0 10px; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.roast-inv-title h2 { text-shadow: 0 0 30px rgba(255, 100, 20, 0.3); }
+.roast-inv-hint { color: #ff8a3d; }
+.roast-mvp { background-image: linear-gradient(90deg, rgba(255, 90, 20, 0.16), rgba(255, 40, 0, 0.04)) !important; border-color: rgba(255, 110, 40, 0.4) !important; }
+.roast-mvp .roast-by { margin: 6px 0 0; }
+
+/* Лобби */
+.roast-setting-on { background: rgba(255, 90, 20, 0.08); border-color: rgba(255, 110, 40, 0.3); }
+.roast-setting-title { color: #ff8a3d; }
+.roast-setting-note { margin-top: 6px; font-size: 0.65rem; font-weight: 800; color: #ff9a4d; }
+
+@media (max-width: 640px) {
+    .roast-prep { padding: 8px 12px; margin-bottom: 8px; }
+    .roast-prep-title { font-size: 1.05rem; }
+    .roast-prep-lead { font-size: 0.72rem; line-height: 1.35; }
+    .roast-prep-origin, .roast-prep-tips { display: none; }
+    .roast-target-origin { display: none; }
+}
+@media (max-height: 820px) {
+    .roast-prep { padding-top: 8px; padding-bottom: 8px; margin-bottom: 8px; }
+    .roast-prep-tips { margin-top: 5px; }
+    .roast-prep-title { font-size: 1.15rem; }
+    .roast-prep-lead { font-size: 0.72rem; line-height: 1.35; }
+}
+html.perf-lite .roast-prep::after, html.perf-lite .roast-flame, html.perf-lite .roast-victim-me { animation: none; }
+.roast-prep + .game-card-grid { margin-top: 6px; }
+@media (max-width: 640px) {
+    .roast-by-inline { display: block; margin: 2px 0 0; white-space: normal; }
+}

@@ -3,7 +3,7 @@ import { sendMsg, leaveRoom, voteBoostBadgesHtml } from '../socket.js';
 import { renderBunkerChat } from '../components/bunker-chat.js';
 import { showNotification } from '../components/notification.js';
 import { playSound } from '../components/sound.js';
-import { BUNKER_CARD_TYPES } from './bunker-game.js';
+import { BUNKER_CARD_TYPES, cardTypesFor } from './bunker-game.js';
 import { buildSurvey, setupSurvey } from './gameover.js';
 import { audienceVoteHtml, bindAudienceVote, audiencePrizeHtml } from '../components/audience.js';
 import { analyticsTeaserHtml, bindAnalyticsTeaser } from '../components/game-analytics.js';
@@ -119,8 +119,9 @@ export function renderBunkerVote(container) {
             var revealed = p.revealedCards || {};
             var hasCards = false;
             html += '<div class="flex flex-wrap gap-1.5">';
-            for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
-                var ct = BUNKER_CARD_TYPES[ci];
+            var vTypes = cardTypesFor(revealed);
+            for (var ci = 0; ci < vTypes.length; ci++) {
+                var ct = vTypes[ci];
                 var val = revealed[ct.key];
                 if (val) {
                     hasCards = true;
@@ -876,6 +877,11 @@ function formatPlayerForPrompt(player, index) {
             lines.push('  ' + PROMPT_CARD_MAP[i].label + ': ' + val);
         }
     }
+    // Дополнительные карты от карт действия («Двойная порция», «Общие ресурсы»)
+    for (var j = 0; j < PROMPT_CARD_MAP.length; j++) {
+        var extra = cards['x_' + PROMPT_CARD_MAP[j].key];
+        if (extra) lines.push('  ' + PROMPT_CARD_MAP[j].label + ' (дополнительно): ' + extra);
+    }
 
     lines.push('');
     return lines.join('\n');
@@ -1045,8 +1051,11 @@ function formatPlayerCompact(player) {
 
     var parts = ['— ' + (player.nickname || 'Неизвестный') + ': ' + productName];
     if (cards.feature) parts.push('умеет: ' + cards.feature);
+    if (cards.x_feature) parts.push('ещё умеет: ' + cards.x_feature);
     if (cards.gift) parts.push('в комплекте: ' + cards.gift);
+    if (cards.x_gift) parts.push('ещё в комплекте: ' + cards.x_gift);
     if (cards.hiddenDefect) parts.push('дефект: ' + cards.hiddenDefect);
+    if (cards.x_hiddenDefect) parts.push('ещё дефект: ' + cards.x_hiddenDefect);
 
     return parts.join(' | ');
 }
@@ -1199,8 +1208,9 @@ function renderBunkerPlayerFull(player, survived) {
     html += '  </div>';
 
     html += '  <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">';
-    for (var ci = 0; ci < BUNKER_CARD_TYPES.length; ci++) {
-        var ct = BUNKER_CARD_TYPES[ci];
+    var goTypes = cardTypesFor(player.cards);
+    for (var ci = 0; ci < goTypes.length; ci++) {
+        var ct = goTypes[ci];
         if (ct.key === 'historicalFact') continue;
         var val = player.cards ? player.cards[ct.key] : null;
         if (val) {

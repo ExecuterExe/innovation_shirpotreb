@@ -5,6 +5,7 @@ import { isSpeaking, isVoiceMuted, setVoiceMuted, isSpeechSupported } from '../c
 import { isVoiceDevice } from '../components/announcer.js';
 import { chainProductHtml, startProductReplay, fitProductArt } from './draw-chain.js';
 import { askConfirm } from '../components/confirm.js';
+import { roastStageHtml } from '../components/roast.js';
 
 // ═══════════════════════════════════════════
 // Конфиг типов карт — легко расширяется
@@ -78,7 +79,7 @@ export function renderPresentation(container) {
 
     html += '  <div class="classic-hud-mid flex-1 max-w-md mx-6">';
     html += '    <div class="flex justify-between text-xs font-bold text-corp-muted mb-1.5">';
-    var hudLabel = (inQuestions ? '🙋 ВОПРОСЫ · ' : '') + 'ПИТЧ ' + (state.presenterIndex + 1) + ' / ' + state.totalPresenters;
+    var hudLabel = (inQuestions ? '🙋 ВОПРОСЫ · ' : '') + (pres.roast ? '🔥 ПРОЖАРКА ' : 'ПИТЧ ') + (state.presenterIndex + 1) + ' / ' + state.totalPresenters;
     html += '      <span>' + hudLabel + '</span>';
     if (inQuestions && questionsTime < 0) {
         html += '      <span class="font-mono text-corp-muted">без таймера</span>';
@@ -134,26 +135,29 @@ export function renderPresentation(container) {
     }
 
     // ═══════ SPOTLIGHT STAGE ═══════
-    var stageExtra = isMe ? ' spotlight-glow border-accent-blue/30' : '';
+    var stageExtra = (isMe ? ' spotlight-glow border-accent-blue/30' : '') + (pres.roast ? ' roast-stage' : '');
     // С рисунком из «Испорченного прототипа» сцена компактнее — чтобы всё помещалось на экран
     var compact = !!pres.product;
-    html += '<div class="corp-card-elevated ' + (compact ? 'p-4 md:p-5' : 'p-8 md:p-10') + ' text-center mb-6' + stageExtra + '">';
+    // Прожарка: плашка «кого жарят» добавляет строку — сцену чуть поджимаем, чтобы влезла без прокрутки
+    var roastTight = !!pres.roast && !compact;
+    html += '<div class="corp-card-elevated ' + (compact ? 'p-4 md:p-5' : roastTight ? 'p-6' : 'p-8 md:p-10') + ' text-center mb-6' + stageExtra + '">';
 
     // Presenter name
-    html += '  <div class="text-xs text-corp-muted font-bold uppercase tracking-[0.15em] mb-2">' + (inQuestions ? 'Вопросы к' : 'Сейчас выступает') + '</div>';
+    html += '  <div class="text-xs text-corp-muted font-bold uppercase tracking-[0.15em] mb-2">' + (inQuestions ? 'Вопросы к' : pres.roast ? '🔥 Сейчас жжёт' : 'Сейчас выступает') + '</div>';
     // Выход на сцену — только для нового выступающего, не при переходе к вопросам
-    html += '  <h2 class="font-display ' + (compact ? 'text-2xl md:text-3xl mb-3' : 'text-4xl md:text-5xl mb-6') + ' font-black text-accent-gold' + (inQuestions ? '' : ' presenter-pop') + '" style="text-shadow: 0 0 40px rgba(255,215,0,0.15);">';
+    html += '  <h2 class="font-display ' + (compact ? 'text-2xl md:text-3xl mb-3' : roastTight ? 'text-4xl md:text-5xl mb-3' : 'text-4xl md:text-5xl mb-6') + ' font-black text-accent-gold' + (inQuestions ? '' : ' presenter-pop') + '" style="text-shadow: 0 0 40px rgba(255,215,0,0.15);">';
     html += escapeHtml(pres.nickname);
     html += '  </h2>';
+    if (pres.roast) html += roastStageHtml(pres.roast, state.playerId, compact);
 
     // Живой счётчик реакций зала этому выступающему
     html += buildCrowdMeterHtml(state.crowdTally);
 
     // "It's you!" badge
     if (isMe && !anonymized) {
-        html += '<div class="inline-flex items-center gap-2.5 bg-accent-blue text-white px-6 py-2.5 rounded-full text-sm font-black uppercase tracking-wider ' + (compact ? 'mb-3' : 'mb-8') + ' animate-glow-pulse">';
+        html += '<div class="inline-flex items-center gap-2.5 bg-accent-blue text-white px-6 py-2.5 rounded-full text-sm font-black uppercase tracking-wider ' + (compact ? 'mb-3' : roastTight ? 'mb-4' : 'mb-8') + ' animate-glow-pulse">';
         html += '  <span class="w-2.5 h-2.5 rounded-full bg-white/80 animate-ping"></span>';
-        html += inQuestions ? '  🙋 ОТВЕЧАЙТЕ НА ВОПРОСЫ' : '  🎤 ЭТО ВЫ! ВЫСТУПАЙТЕ!';
+        html += inQuestions ? '  🙋 ОТВЕЧАЙТЕ НА ВОПРОСЫ' : pres.roast ? '  🔥 ЭТО ВЫ! ЖГИТЕ!' : '  🎤 ЭТО ВЫ! ВЫСТУПАЙТЕ!';
         html += '</div>';
     }
 

@@ -7,6 +7,7 @@ import { coinBurst } from '../components/fx.js';
 import { audienceVoteHtml, bindAudienceVote } from '../components/audience.js';
 import { chainThumbHtml, bindArtLightbox } from './draw-chain.js';
 import { askConfirm } from '../components/confirm.js';
+import { roastByHtml } from '../components/roast.js';
 
 // «Испорченный прототип»: вкладываются в продукт — рисунок, название и слоган крупно, питчивший мельче
 function productHeadHtml(p, kickHtml) {
@@ -16,7 +17,7 @@ function productHeadHtml(p, kickHtml) {
     html += '<div class="flex-1 min-w-0">';
     html += '  <div class="inv-product-name">' + escapeHtml(pr.name || 'Без названия') + '</div>';
     if (pr.slogan) html += '  <div class="inv-product-slogan">«' + escapeHtml(pr.slogan) + '»</div>';
-    html += '  <div class="inv-product-by">питчил <b>' + escapeHtml(p.nickname) + '</b> · 🎨 ' + escapeHtml(pr.artist || '—') + ' · 🏷 ' + escapeHtml(pr.namer || '—') + (pr.withSlogan ? ' · 📣 ' + escapeHtml(pr.sloganAuthor || '—') : '') + '</div>';
+    html += '  <div class="inv-product-by">' + (p.roast ? 'жарил' : 'питчил') + ' <b>' + escapeHtml(p.nickname) + '</b> · 🎨 ' + escapeHtml(pr.artist || '—') + ' · 🏷 ' + escapeHtml(pr.namer || '—') + (pr.withSlogan ? ' · 📣 ' + escapeHtml(pr.sloganAuthor || '—') : '') + '</div>';
     html += '</div>';
     html += kickHtml || '';
     html += '</div>';
@@ -74,11 +75,19 @@ export function renderInvesting(container) {
     html += '</div>';
 
     // ═══════ HEADER ═══════
-    html += '<div class="text-center mb-8 inv-title">';
-    html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Терминал инвестиций</h2>';
-    html += '  <p class="text-corp-muted text-sm">Распределите жетоны между проектами. Ваш проект скрыт из списка.</p>';
-    html += '  <p class="text-accent-blue font-bold text-sm mt-1">Кто вложится в лучшего предпринимателя — получит ×2!</p>';
-    html += '</div>';
+    if (state.roastRound) {
+        html += '<div class="text-center mb-8 inv-title roast-inv-title">';
+        html += '  <h2 class="text-2xl font-black text-corp-white mb-2">🔥 Кто разнёс лучше всех?</h2>';
+        html += '  <p class="text-corp-muted text-sm">Вкладывайте в самую разгромную прожарку — жетоны получит тот, кто жёг. Ваша прожарка скрыта.</p>';
+        html += '  <p class="roast-inv-hint font-bold text-sm mt-1">Кто вложится в лучшую прожарку — получит ×2!</p>';
+        html += '</div>';
+    } else {
+        html += '<div class="text-center mb-8 inv-title">';
+        html += '  <h2 class="text-2xl font-black text-corp-white mb-2">Терминал инвестиций</h2>';
+        html += '  <p class="text-corp-muted text-sm">Распределите жетоны между проектами. Ваш проект скрыт из списка.</p>';
+        html += '  <p class="text-accent-blue font-bold text-sm mt-1">Кто вложится в лучшего предпринимателя — получит ×2!</p>';
+        html += '</div>';
+    }
 
     if (budget < capital) {
         html += '<div class="corp-card border-accent-red/25 bg-accent-red/10 px-6 py-5 mb-6 curse-banner-enter">';
@@ -109,10 +118,11 @@ export function renderInvesting(container) {
             html += productHeadHtml(p, kickBtn);
         } else {
             html += '  <div class="flex items-center justify-between gap-3 mb-3">';
-            html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
+            html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + roastByHtml(p.roast, '', true) + '</div>';
             html += kickBtn;
             html += '  </div>';
         }
+        if (p.product) html += roastByHtml(p.roast);
 
         // Card tags
         html += '  <div class="flex flex-wrap gap-2">';
@@ -464,10 +474,11 @@ function renderInvestingObserver(container, presentations, isHost) {
             html += productHeadHtml(p, kick);
         } else {
             html += '  <div class="flex items-center justify-between gap-3 mb-3">';
-            html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + '</div>';
+            html += '    <div class="text-lg font-black text-accent-gold">' + escapeHtml(p.nickname) + roastByHtml(p.roast, '', true) + '</div>';
             html += kick;
             html += '  </div>';
         }
+        if (p.product) html += roastByHtml(p.roast);
         html += '  <div class="flex flex-wrap gap-2">';
         for (var ct = 0; ct < CARD_TYPES.length; ct++) {
             var cval = p.cards && p.cards[CARD_TYPES[ct].key];

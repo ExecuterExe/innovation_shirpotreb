@@ -501,12 +501,23 @@ function applyMood(name) {
 // ── публичное API ──
 
 var pendingPhase = 'welcome';
+var roastMode = false;
+
+// Финал-прожарка: подготовка и выступления — на напряжённой теме
+function moodFor(phase) {
+    if (roastMode && (phase === 'preparation' || phase === 'presentation')) return 'tension';
+    return PHASE_MOOD[phase] || 'lounge';
+}
+
+export function setMusicRoast(on) {
+    roastMode = !!on;
+}
 
 // Вызывается при каждой смене экрана
 export function setMusicPhase(phase) {
     pendingPhase = phase;
     if (!started) return;
-    applyMood(PHASE_MOOD[phase] || 'lounge');
+    applyMood(moodFor(phase));
 }
 
 // Запуск после первого касания (браузеры не дают играть звук без жеста)
@@ -517,7 +528,7 @@ export function startMusic() {
     started = true;
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setTargetAtTime(masterLevel(), ctx.currentTime, 0.6);
-    applyMood(PHASE_MOOD[pendingPhase] || 'lounge');
+    applyMood(moodFor(pendingPhase));
     timer = setInterval(tick, 50);
     tick();
 }
